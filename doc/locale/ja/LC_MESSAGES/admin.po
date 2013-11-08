@@ -8424,11 +8424,11 @@ msgstr ""
 
 #: ../../admin/working-log-files/log-formats.en.rst:4
 msgid "Log Formats"
-msgstr ""
+msgstr "ログの形式"
 
 #: ../../admin/working-log-files/log-formats.en.rst:26
 msgid "Squid Format"
-msgstr ""
+msgstr "Squidの形式"
 
 #: ../../admin/working-log-files/log-formats.en.rst:32
 #: ../../admin/working-log-files/log-formats.en.rst:115
@@ -8442,7 +8442,7 @@ msgid ""
 "resolution)."
 msgstr ""
 "``cqtq`` Squid形式でのクライアントのリクエストの日時表記; "
-"1970/1/1(UTC)より1秒刻みで表した時刻(1ミリ秒までの精度を持つ)"
+"1970/1/1(UTC)より1秒刻みで表した時刻(1ミリ秒までの精度を持ちます)"
 
 #: ../../admin/working-log-files/log-formats.en.rst:39
 #: ../../admin/working-log-files/log-formats.en.rst:119
@@ -8457,7 +8457,7 @@ msgid ""
 "byte of the response back to the client."
 msgstr ""
 "``ttms`` クライアントのリクエストを受けてからトラフィックサーバが処理するまでに費やした時間; "
-"クライアントの接続を確立してからトラフィックサーバが最後の1バイトを返すまでの時間をミリ秒で表す"
+"クライアントの接続を確立してからトラフィックサーバが最後の1バイトを返すまでの時間をミリ秒で表します"
 
 #: ../../admin/working-log-files/log-formats.en.rst:43
 #: ../../admin/working-log-files/log-formats.en.rst:124
@@ -8472,7 +8472,7 @@ msgstr "``chi`` クライアントのマシンのIPアドレス"
 #: ../../admin/working-log-files/log-formats.en.rst:51
 #: ../../admin/working-log-files/log-formats.en.rst:128
 msgid "``4``"
-msgstr ""
+msgstr "``4``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:46
 msgid ""
@@ -8481,31 +8481,35 @@ msgid ""
 "<squid-netscape-result-codes>`. The proxy response status code (the HTTP "
 "response status code from Traffic Server to client)."
 msgstr ""
+"``crc/pssc`` キャッシュ結果のコード; リクエストの処理結果を表します: "
+"``HIT``, ``MISS``, その他。キャッシュ結果のコードの詳細は:ref:`ここ<squid-netscape-result-codes>`に書かれています"
+
 
 #: ../../admin/working-log-files/log-formats.en.rst:56
 #: ../../admin/working-log-files/log-formats.en.rst:132
 msgid "``5``"
-msgstr ""
+msgstr "``5``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:54
 msgid ""
 "``psql`` The length of the Traffic Server response to the client in bytes, "
 "including headers and content."
 msgstr ""
+"``psql`` トラフィックサーバがクライアントに応答したコンテンツとヘッダーを含むバイト数を表します"
 
 #: ../../admin/working-log-files/log-formats.en.rst:60
 #: ../../admin/working-log-files/log-formats.en.rst:136
 msgid "``6``"
-msgstr ""
+msgstr "``6``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:59
 msgid "``cqhm`` The client request method: ``GET``, ``POST``, and so on."
-msgstr ""
+msgstr "``cqhm`` クライアントのリクエスト方法: ``GET``, ``POST``, その他"
 
 #: ../../admin/working-log-files/log-formats.en.rst:67
 #: ../../admin/working-log-files/log-formats.en.rst:140
 msgid "``7``"
-msgstr ""
+msgstr "``7``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:63
 msgid ""
@@ -8514,28 +8518,34 @@ msgid ""
 "The escape sequence is a percentage sign followed by the ASCII code number "
 "of the replaced character in hex."
 msgstr ""
+"``cquc`` クライアントがリクエストしたそのままのURL; "
+"解析ツールでの処理やエスケープ文字列の変換がされていない文字や空白のことです。"
+"エスケープ文字列とはASCII文字を%記号の後に16進数に変換したものです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:72
 #: ../../admin/working-log-files/log-formats.en.rst:147
 msgid "``8``"
-msgstr ""
+msgstr "``8``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:70
 msgid ""
 "``caun`` The username of the authenticated client. A hyphen (``-``) means "
 "that no authentication was required."
 msgstr ""
+"``caun`` 認証済みのユーザ名を表します。ハイフン(``-``)の場合の意味は認証の要求が無い事を表します。
 
 #: ../../admin/working-log-files/log-formats.en.rst:81
 #: ../../admin/working-log-files/log-formats.en.rst:152
 msgid "``9``"
-msgstr ""
+msgstr "``9``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:75
 msgid ""
 "``phr/pqsn`` The proxy hierarchy route; the route Traffic Server used to "
 "retrieve the object."
 msgstr ""
+"``phr/pqsn`` プロキシーの階層の経路; "
+"この経路はトラフィックサーバがオブジェクトを取り戻すのに用いられます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:79
 msgid ""
@@ -8543,25 +8553,28 @@ msgid ""
 "request. If the request was a cache hit, then this field contains a hyphen "
 "(``-``)."
 msgstr ""
+"プロキシーの要求するサーバの名前; サーバ名はリクエストによってを満たされます。"
+"もしリクエストがキャッシュヒットしている場合は、この欄はハイフン(``-``)で記されます。
 
 #: ../../admin/working-log-files/log-formats.en.rst:86
 #: ../../admin/working-log-files/log-formats.en.rst:157
 msgid "``10``"
-msgstr ""
+msgstr "``10``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:84
 msgid ""
 "``psct`` The proxy response content type; the object content type taken from"
 " the Traffic Server response header."
 msgstr ""
+"``psct`` プロキシーの応答の型; この型はトラフィックサーバーのレスポンスヘッダーから得られます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:88
 msgid "The following figure shows a sample log entry in a ``squid.log`` file."
-msgstr ""
+msgstr "下記に``squid.log``ファイルに記述される例を示します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:94
 msgid "Sample log entry in squid.log"
-msgstr ""
+msgstr "squid.logに記入されるサンプルのログです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:97
 msgid "Squid log in XML"
