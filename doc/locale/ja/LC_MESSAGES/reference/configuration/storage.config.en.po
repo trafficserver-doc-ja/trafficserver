@@ -1,0 +1,184 @@
+# 
+msgid ""
+msgstr ""
+"Project-Id-Version: Apache Traffic Server 4.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-11-08 17:57+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../../reference/configuration/storage.config.en.rst:20
+msgid "storage.config"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:24
+msgid ""
+"The :file:`storage.config` file lists all the files, directories, and/or "
+"hard disk partitions that make up the Traffic Server cache. After you modify"
+" the :file:`storage.config` file, you must restart Traffic Server."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:29
+msgid "Format"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:31
+msgid "The format of the :file:`storage.config` file is::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:35
+msgid ""
+"where :arg:`pathname` is the name of a partition, directory or file, "
+":arg:`size` is the size of the named partition, directory or file (in "
+"bytes), and :arg:`volume` is the volume number that is used in "
+":file:`volume.config` and :file:`hosting.config`. You must specify a size "
+"for directories or files; size is optional for raw partitions. :arg:`volume`"
+" is optional."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:41
+msgid "You can use any partition of any size. For best performance:"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:43
+msgid "Use raw disk partitions."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:44
+msgid "For each disk, make all partitions the same size."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:45
+msgid "For each node, use the same number of partitions on all disks."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:46
+msgid ""
+"Group similar kinds of storage into different volumes. For example split out"
+" SSD's or RAM drives into their own volume."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:49
+msgid ""
+"Specify pathnames according to your operating system requirements. See the "
+"following examples. In the :file:`storage.config` file, a formatted or raw "
+"disk must be at least 128 MB."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:53
+msgid ""
+"When using raw disk or partitions, you should make sure the :ts:cv:`Traffic "
+"Server user <proxy.config.admin.user_id>` used by the Traffic Server process"
+" has read and write privileges on the raw disk device or partition. One good"
+" practice is to make sure the device file is set with 'g+rw' and the Traffic"
+" Server user is in the group which owns the device file.  However, some "
+"operating systems have stronger requirements - see the following examples "
+"for more information."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:61
+msgid ""
+"As with standard ``records.config`` integers, human readable prefixes are "
+"also supported. They include"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:64
+msgid "``K`` Kilobytes (1024 bytes)"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:65
+msgid "``M`` Megabytes (1024^2 or 1,048,576 bytes)"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:66
+msgid "``G`` Gigabytes (1024^3 or 1,073,741,824 bytes"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:67
+msgid "``T`` Terabytes (1024^4 or 1,099,511,627,776 bytes)"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:71
+msgid "Examples"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:73
+msgid ""
+"The following basic example shows 128 MB of cache storage in the "
+"``/big_dir`` directory::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:78
+msgid ""
+"You can use the ``.`` symbol for the current directory. Here is an example "
+"for 64 MB of cache storage in the current directory::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:83
+msgid ""
+"As an alternative, using the human readable prefixes, you can express a 64GB"
+" cache file with::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:90
+msgid ""
+"When using on-filesystem cache disk storage, you can only have one such "
+"directory specified. This will be address in a future version."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:95
+msgid "Solaris Example"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:97
+msgid "The following example is for the Solaris operating system::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:102
+msgid "Size is optional. If not specified, the entire partition is used."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:105
+msgid "Linux Example"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:107
+msgid ""
+"The following example will use an entire raw disk in the Linux operating "
+"system::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:113
+msgid ""
+"In order to make sure :program:`traffic_server` will have access to this "
+"disk you can use :manpage:`udev(7)` to persistently set the right "
+"permissions. The following rules are targeted for an Ubuntu system, and "
+"stored in ``/etc/udev/rules.d/51-cache-disk.rules``::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:123
+msgid "FreeBSD Example"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:125
+msgid ""
+"Starting with 5.1 FreeBSD dropped support for explicit raw devices. All "
+"devices on FreeBSD can be accessed raw now."
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:128
+msgid ""
+"The following example will use an entire raw disk in the FreeBSD operating "
+"system::"
+msgstr ""
+
+#: ../../reference/configuration/storage.config.en.rst:134
+msgid ""
+"In order to make sure :program:`traffic_server` will have access to this "
+"disk you can use :manpage:`devfs(8)` to persistently set the right "
+"permissions. The following rules are stored in :manpage:`devfs.conf(5)`::"
+msgstr ""
