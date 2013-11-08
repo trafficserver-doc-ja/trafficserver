@@ -8433,7 +8433,7 @@ msgstr ""
 #: ../../admin/working-log-files/log-formats.en.rst:32
 #: ../../admin/working-log-files/log-formats.en.rst:115
 msgid "``1``"
-msgstr ""
+msgstr "``1``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:29
 msgid ""
@@ -8441,11 +8441,13 @@ msgid ""
 "client request in seconds since January 1, 1970 UTC (with millisecond "
 "resolution)."
 msgstr ""
+"``cqtq`` Squid形式でのクライアントのリクエストの日時表記; "
+"1970/1/1(UTC)より1秒刻みで表した時刻(1ミリ秒までの精度を持つ)"
 
 #: ../../admin/working-log-files/log-formats.en.rst:39
 #: ../../admin/working-log-files/log-formats.en.rst:119
 msgid "``2``"
-msgstr ""
+msgstr "``2``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:35
 msgid ""
@@ -8454,16 +8456,18 @@ msgid ""
 "connection with Traffic Server and the time Traffic Server sent the last "
 "byte of the response back to the client."
 msgstr ""
+"``ttms`` クライアントのリクエストを受けてからトラフィックサーバが処理するまでに費やした時間; "
+"クライアントの接続を確立してからトラフィックサーバが最後の1バイトを返すまでの時間をミリ秒で表す"
 
 #: ../../admin/working-log-files/log-formats.en.rst:43
 #: ../../admin/working-log-files/log-formats.en.rst:124
 msgid "``3``"
-msgstr ""
+msgstr "``3``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:42
 #: ../../admin/working-log-files/log-formats.en.rst:114
 msgid "``chi`` The IP address of the client’s host machine."
-msgstr ""
+msgstr "``chi`` クライアントのマシンのIPアドレス"
 
 #: ../../admin/working-log-files/log-formats.en.rst:51
 #: ../../admin/working-log-files/log-formats.en.rst:128
