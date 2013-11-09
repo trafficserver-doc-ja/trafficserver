@@ -19,11 +19,12 @@ msgstr ""
 msgid ""
 "Apache Traffic Server™ speeds Internet access, enhances website performance,"
 " and delivers unprecedented web hosting capabilities."
-msgstr ""
+msgstr "Apache Traffic Server™ はインターネットアクセスを加速させ、ウェブサイトのパフォーマンスを高め、
+かつて無いウェブホスティング性能を提供します。"
 
 #: ../../index.rst:26
 msgid "What Is Apache Traffic Server?"
-msgstr ""
+msgstr "Apache Traffic Server とは？"
 
 #: ../../index.rst:28
 msgid ""
@@ -35,15 +36,23 @@ msgid ""
 "providers (ISPs), backbone providers, and large intranets by maximizing "
 "existing and available bandwidth."
 msgstr ""
+"Traffic Server はハイパフォーマンスなウェブプロキシーキャッシュであり、"
+"それはネットワークの端で頻繁にアクセスされる情報をキャッシュすることにより"
+"ネットワーク効率とパフォーマンスを改善します。これは物理的に近いエンドユーザーにコンテンツを"
+"運ぶ一方で、素早い提供と帯域使用量の削減を可能にします。"
+"Traffic Server は商用のコンテンツ配信やインターネットサービスプロバイダー( ISP )や"
+"バックボーンプロバイダーや巨大なイントラネットを"
+"現行の利用可能な帯域を最大化することで改善するようにデザイン"
+"されています。"
 
 #: ../../index.rst:50
 msgid "Indices and tables"
-msgstr ""
+msgstr "Indices and tables"
 
 #: ../../index.rst:52
 msgid ":ref:`genindex`"
-msgstr ""
+msgstr ":ref:`genindex`"
 
 #: ../../index.rst:53
 msgid ":ref:`search`"
-msgstr ""
+msgstr ":ref:`search`"
