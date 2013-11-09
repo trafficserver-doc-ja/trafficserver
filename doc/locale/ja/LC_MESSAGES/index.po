@@ -19,8 +19,8 @@ msgstr ""
 msgid ""
 "Apache Traffic Server™ speeds Internet access, enhances website performance,"
 " and delivers unprecedented web hosting capabilities."
-msgstr "Apache Traffic Server™ はインターネットアクセスを加速させ、ウェブサイトのパフォーマンスを高め、
-かつて無いウェブホスティング性能を提供します。"
+msgstr "Apache Traffic Server™ はインターネットアクセスを加速させ、ウェブサイトのパフォーマンスを高め、"
+"かつて無いウェブホスティング性能を提供します。"
 
 #: ../../index.rst:26
 msgid "What Is Apache Traffic Server?"
