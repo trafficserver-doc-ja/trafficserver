@@ -8532,7 +8532,7 @@ msgid ""
 "``caun`` The username of the authenticated client. A hyphen (``-``) means "
 "that no authentication was required."
 msgstr ""
-"``caun`` 認証済みのユーザ名を表します。ハイフン(``-``)の場合は認証の要求が無かった事を表します。
+"``caun`` 認証済みのユーザ名を表します。ハイフン(``-``)の場合は認証の要求が無かった事を表します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:81
 #: ../../admin/working-log-files/log-formats.en.rst:152
@@ -8554,7 +8554,7 @@ msgid ""
 "(``-``)."
 msgstr ""
 "プロキシーの要求するサーバの名前; サーバ名はリクエストによってを満たされます。"
-"もしリクエストがキャッシュヒットしている場合は、この欄はハイフン(``-``)で記されます。
+"もしリクエストがキャッシュヒットしている場合は、この欄はハイフン(``-``)で記されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:86
 #: ../../admin/working-log-files/log-formats.en.rst:157
