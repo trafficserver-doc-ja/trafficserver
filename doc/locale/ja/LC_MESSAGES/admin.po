@@ -8441,8 +8441,8 @@ msgid ""
 "client request in seconds since January 1, 1970 UTC (with millisecond "
 "resolution)."
 msgstr ""
-"``cqtq`` Squid形式でのクライアントのリクエストの日時表記; "
-"1970/1/1(UTC)より1秒刻みで表した時刻(1ミリ秒までの精度を持ちます)"
+"``cqtq`` Squid形式でのクライアントのリクエストを受けた日時; "
+"クライアントからのリクエスト時刻を1970/1/1(UTC)より1秒刻みで表します(1ミリ秒の精度を持ちます)。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:39
 #: ../../admin/working-log-files/log-formats.en.rst:119
@@ -8457,7 +8457,7 @@ msgid ""
 "byte of the response back to the client."
 msgstr ""
 "``ttms`` クライアントのリクエストを受けてからトラフィックサーバが処理するまでに費やした時間; "
-"クライアントの接続を確立してからトラフィックサーバが最後の1バイトを返すまでの時間をミリ秒で表します"
+"クライアントの接続を確立してからトラフィックサーバが最後の1バイトを返すまでの時間をミリ秒で表します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:43
 #: ../../admin/working-log-files/log-formats.en.rst:124
@@ -8467,7 +8467,7 @@ msgstr "``3``"
 #: ../../admin/working-log-files/log-formats.en.rst:42
 #: ../../admin/working-log-files/log-formats.en.rst:114
 msgid "``chi`` The IP address of the client’s host machine."
-msgstr "``chi`` クライアントのマシンのIPアドレス"
+msgstr "``chi`` クライアントのマシンのIPアドレスです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:51
 #: ../../admin/working-log-files/log-formats.en.rst:128
@@ -8482,7 +8482,7 @@ msgid ""
 "response status code from Traffic Server to client)."
 msgstr ""
 "``crc/pssc`` キャッシュ結果のコード; リクエストの処理結果を表します: "
-"``HIT``, ``MISS``, その他。キャッシュ結果のコードの詳細は:ref:`ここ<squid-netscape-result-codes>`に書かれています"
+"``HIT``, ``MISS``, その他。キャッシュ結果のコードの詳細は:ref:`ここ<squid-netscape-result-codes>`に書かれています。"
 
 
 #: ../../admin/working-log-files/log-formats.en.rst:56
@@ -8495,7 +8495,7 @@ msgid ""
 "``psql`` The length of the Traffic Server response to the client in bytes, "
 "including headers and content."
 msgstr ""
-"``psql`` トラフィックサーバがクライアントに応答したコンテンツとヘッダーを含むバイト数を表します"
+"``psql`` トラフィックサーバがクライアントにレスポンスしたコンテンツとヘッダーを含むバイト数です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:60
 #: ../../admin/working-log-files/log-formats.en.rst:136
@@ -8504,7 +8504,7 @@ msgstr "``6``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:59
 msgid "``cqhm`` The client request method: ``GET``, ``POST``, and so on."
-msgstr "``cqhm`` クライアントのリクエスト方法: ``GET``, ``POST``, その他"
+msgstr "``cqhm`` クライアントのリクエスト方法: ``GET``, ``POST``, その他。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:67
 #: ../../admin/working-log-files/log-formats.en.rst:140
@@ -8519,8 +8519,8 @@ msgid ""
 "of the replaced character in hex."
 msgstr ""
 "``cquc`` クライアントがリクエストしたそのままのURL; "
-"解析ツールでの処理やエスケープ文字列の変換がされていない文字や空白のことです。"
-"エスケープ文字列とはASCII文字を%記号の後に16進数に変換したものです。"
+"解析ツールでの処理やエスケープ文字列の変換がされていない文字や空白の入ったURLです。"
+"エスケープ文字列とは%記号の後にASCII文字を16進数に変換したものです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:72
 #: ../../admin/working-log-files/log-formats.en.rst:147
@@ -8532,7 +8532,7 @@ msgid ""
 "``caun`` The username of the authenticated client. A hyphen (``-``) means "
 "that no authentication was required."
 msgstr ""
-"``caun`` 認証済みのユーザ名を表します。ハイフン(``-``)の場合の意味は認証の要求が無い事を表します。
+"``caun`` 認証済みのユーザ名を表します。ハイフン(``-``)の場合は認証の要求が無かった事を表します。
 
 #: ../../admin/working-log-files/log-formats.en.rst:81
 #: ../../admin/working-log-files/log-formats.en.rst:152
