@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"PO-Revision-Date: 2013-11-12 01:50+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -13,11 +13,11 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:19
 msgid "Cache Architecture"
-msgstr ""
+msgstr "キャッシュアーキテクチャ"
 
 #: ../../arch/cache/cache-arch.en.rst:24
 msgid "Introduction"
-msgstr ""
+msgstr "導入"
 
 #: ../../arch/cache/cache-arch.en.rst:26
 msgid ""
@@ -30,6 +30,15 @@ msgid ""
 "<http://www.openssl.org/docs/crypto/md5.html>`_ of the URI used to retrieve "
 "the content from the origin server."
 msgstr ""
+"HTTP プロキシに加え、 |ATS| は HTTP キャッシュでもあります。"
+"|TS| は、現在サポートしているHTTPプロキシによって配信されるオクテットストリーム
+のみなら、任意のオクテットストリームをキャッシュできます。"
+"そのようなストリームがキャッシュされる時、それは キャッシュ内で"
+" *オブジェクト* と命名されます。"
+"各オブジェクトは *キャッシュキー* と呼ばれる大域的な一意の値により識別されます。"
+"デフォルトではこの値は、オリジンサーバからコンテンツを取得するために使われるURIの"
+"`MD5 ハッシュ <http://www.openssl.org/docs/crypto/md5.html>`_ をとることで"
+"生成されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:32
 msgid ""
