@@ -51,6 +51,14 @@ msgid ""
 "caching` and :ref:`configuring-the-cache` along with the associated "
 "configuration files and values."
 msgstr ""
+"このドキュメントの目的は、 |TS| キャッシュの基本構造と実装の詳細について記述する"
+"ことです。"
+"キャッシュの設定については、内部の仕組みを理解するのに必要な範囲でのみ述べられます。"
+"このドキュメントは、主に |TS| のコードベースや |TS| のプラグインで働く"
+"|TS| デベロッパーにとって有用となるでしょう。"
+"読者は、:ref:`admin-guide` と、特に :ref:`http-proxy-caching` と "
+":ref:`configuring-the-cache` 加えて設定ファイルや設定値関連に"
+"既に詳しいことが想定されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:38
 msgid ""
@@ -58,20 +66,25 @@ msgid ""
 "this document will frequently use terms in different ways than they are used"
 " in the code in an attempt to create some consistency."
 msgstr ""
+"不幸なことに、内部用語は特に一貫していません。"
+"従って、このドキュメントは一貫性を得るため、コード内で使われるそれらとは違う表現で"
+"頻繁に用語を使用するでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:42
 msgid "Cache Layout"
-msgstr ""
+msgstr "キャッシュレイアウト"
 
 #: ../../arch/cache/cache-arch.en.rst:44
 msgid ""
 "The first step in understanding cache operations is to understand the data "
 "structures and layout of the cache."
 msgstr ""
+"キャッシュオペレーションを理解する最初のステップは、データ構造とキャッシュの"
+"レイアウトを理解する事です。"
 
 #: ../../arch/cache/cache-arch.en.rst:47
 msgid "Cache storage"
-msgstr ""
+msgstr "キャッシュストレージ"
 
 #: ../../arch/cache/cache-arch.en.rst:49
 msgid ""
@@ -79,10 +92,13 @@ msgid ""
 "Each line in the file defines a :term:`cache span` which is treated as an "
 "undifferentiated unit of storage."
 msgstr ""
+"|TS| キャッシュの生のストレージは、 :file:`storage.config` に設定されます。"
+"ファイルの各行は、未分化なストレージのユニットとして扱われる :term:`キャッシュ"
+"スパン` を定義します。"
 
 #: ../../arch/cache/cache-arch.en.rst:54
 msgid "Two cache spans"
-msgstr ""
+msgstr "二つのキャッシュスパン"
 
 #: ../../arch/cache/cache-arch.en.rst:56
 msgid ""
@@ -94,14 +110,26 @@ msgid ""
 "stripe`. Each cache span is divided in to cache stripes and each cache "
 "volume is a collection of those stripes."
 msgstr ""
+"このストレージは、 :file:`volume.config` 内で定義される :term:`キャッシュ"
+"ボリューム` のセットに組織されます。"
+"キャッシュボリュームは、ストレージの合計またはストレージの絶対量のパーセンテージで"
+"定義出来ます。"
+"デフォルトでは、各キャッシュボリュームは堅牢性のためにキャッシュスパンの全てに"
+"広げられます。"
+"キャッシュボリュームとキャッシュスパンの交わるところは、"
+":term:`キャッシュストライプ` です。"
+"各キャッシュスパンはキャッシュストライプに分割され、各キャッシュボリュームは"
+"それらストライプのコレクションです。"
 
 #: ../../arch/cache/cache-arch.en.rst:59
 msgid "If the cache volumes for the example cache spans were defined as"
 msgstr ""
+"もし、例のキャッシュスパンのキャッシュボリュームが以下のように定義されていたら"
 
 #: ../../arch/cache/cache-arch.en.rst:64
 msgid "then the actual layout would look like"
 msgstr ""
+"その時実際のレイアウトはこのように見えるでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:69
 msgid ""
@@ -115,6 +143,17 @@ msgid ""
 "cache spans (and hence, which cache stripes) are contained in a specific "
 "cache volume."
 msgstr ""
+"キャッシュオブジェクトは、一つのストライプに全部が保存され、従って一つのキャッシュ"
+"スパン、オブジェクトは永続的にキャッシュボリュームを横断して分離されます。"
+"オブジェクトはキャッシュボリュームを横断して分離されることはありません。"
+"オブジェクトは、オリジンサーバからオブジェクトを取得するのに使用される"
+"URI のハッシュ値に基づき、自動的にストライプ（よってキャッシュボリュームも）に"
+"割り当てられます。"
+"特定のホストやドメインからのサポートされるコンテンツ を、"
+"特定ボリュームに保存することは、:file:`hosting.config` の"
+"限られた範囲で設定する事で可能です。"
+"加えて、バージョン 4.0.1 では、キャッシュスパン（よってキャッシュストライプも）"
+"が特定のキャッシュボリュームに含まれるよう制御することが可能です。"
 
 #: ../../arch/cache/cache-arch.en.rst:76
 msgid ""
@@ -125,10 +164,16 @@ msgid ""
 "to those files can (and almost always will) invalidate the existing cache in"
 " its entirety."
 msgstr ""
+"キャッシュスパン、キャッシュボリューム、そしてそれらを構成するキャッシュ"
+"ストライプのレイアウトと構造は、全体的に :file:`storage.config` と"
+":file:`cache.config` から取得され、:process:`traffic_server` が開始された時に"
+"ゼロから再計算されます。"
+"従って、それらのファイルへの任意の変更は、（ほとんど常に）それら全体にある既存の"
+"キャッシュを無効にできます。"
 
 #: ../../arch/cache/cache-arch.en.rst:82
 msgid "Stripe Structure"
-msgstr ""
+msgstr "ストライプ構造"
 
 #: ../../arch/cache/cache-arch.en.rst:84
 msgid ""
@@ -140,6 +185,13 @@ msgid ""
 "of as a volume (what this document calls a \"cache volume\") is represented "
 "by :cpp:class:`CacheVol`."
 msgstr ""
+"キャッシュストライプは区別されないバイト列の範囲として扱われます。"
+"内部的に、各ストライプは、ほとんど全体を独立して扱われます。"
+"このセクションで記述されるデータ構造は、各ストライプに重複されています。"
+"内部的に \"ボリューム\" という単語は、これらのストライプに仕様され、主に"
+":cpp:class:`Vol` で実装されています。"
+"キャッシュのボリューム(このドキュメントでは\"キャッシュボリューム\")としての"
+"ユーザの考えは、 :cpp:class:`CacheVol` で表現されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:91
 msgid ""
@@ -148,10 +200,15 @@ msgid ""
 "assignment is changed are effectively lost as their directory data will not "
 "be found in the new stripe."
 msgstr ""
+"ディレクトリはストライプに配置されるため、ストライプ割当はオブジェクトを"
+"扱う動作をする前に行われなければなりません。"
+"変更されたストライプ割当のための任意のキャッシュオブジェクトは、これらの新しい"
+"ストライプで発見されるはずがないディレクトリデータとして効率的に減らされます。"
+"ストライプ割当が、これらのディレクトリデータとして効率的に減らすに変更される。"
 
 #: ../../arch/cache/cache-arch.en.rst:99
 msgid "Cache Directory"
-msgstr ""
+msgstr "キャッシュディレクトリ"
 
 #: ../../arch/cache/cache-arch.en.rst:107
 msgid ""
@@ -167,6 +224,21 @@ msgid ""
 "ways depending on context. This ID is reduced and used as an index in to the"
 " directory to locate an entry in the standard way."
 msgstr ""
+"ストライプのコンテントはディレクトリによって追跡されます。"
+"我々はディレクトリの各要素を \"ディレクトリエントリ\" と呼び、それらは "
+":cpp:class:`Dir` によって表現されます。"
+"各エントリは、キャッシュ内の連続したストレージのチャンクを参照します。"
+"これらは \"フラグメント\" や \"セグメント\"、\"ドック\" / \"ドキュメント\" 、その他の"
+"幾つかのような 様々なものを参照します。"
+"このドキュメントは、\"フラグメント\" という単語を、コード中で最も共通の参照として"
+"いるものとして使います。"
+"\"Doc\" ( :cpp:class:`Doc` の) という単語は、フラグメントの為のヘッダデータを"
+"参照するのに使用されるでしょう。"
+"全体的にディレクトリは、キーとして \"キャッシュID\" を伴うハッシュとして扱われます。"
+"キャッシュIDは、コンテキストに依存した幾つかの方法で生成された128ビット"
+"(16バイト)の値です。"
+"このキーは減らされ、ディレクトリでエントリを配置するための標準的な方法の"
+"インデックスとして使用されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:115
 msgid ""
@@ -176,6 +248,11 @@ msgid ""
 "means that most cache misses do not require disk I/O which has a large "
 "performance benefit."
 msgstr ""
+"ディレクトリはメモリ常住の構造として使用されます。"
+"これはディレクトリエントリは可能な限り小さい（現在、10バイト）ことを意味します。"
+"これは、そこに保存できるデータに幾つかの譲歩を強要します。"
+"一方でこれは、ほとんどのキャッシュミスはディスクI/Oを要求しない、大きな性能面の"
+"恩恵を持つことを意味します。"
 
 #: ../../arch/cache/cache-arch.en.rst:119
 msgid ""
@@ -188,6 +265,14 @@ msgid ""
 "in the cache. If there is enough memory to run |TS| with an empty cache "
 "there is enough to run it with a full cache."
 msgstr ""
+"追加点は、ディレクトリは常に最大のサイズにされることです。"
+"一度ストライプは、ディレクトリサイズを固定し、二度と変更されないよう初期化されます。"
+"このサイズは、ストライプのサイズに(大雑把に、線形に)関係します。"
+"この理由は、 |TS| のメモリ使用量はディスクキャッシュのサイズに強く依存するためです。"
+"ディレクトリサイズを変更しないため、このメモリ要求により、 |TS| がキャッシュに"
+"保存されたコンテントより更に多くのメモリを消費することもありません。"
+"もし 空のキャッシュを伴って |TS| を動作させる為に十分なメモリがあるなら、"
+"フルキャッシュを伴ってそれを起動するのに十分あります。"
 
 #: ../../arch/cache/cache-arch.en.rst:128
 msgid ""
@@ -196,6 +281,10 @@ msgid ""
 "as big as the actual data. Exact size data is stored in the fragment header "
 "on disk."
 msgstr ""
+"各エントリは、ストライプやサイズのオフセットを保存します。"
+"ディレクトリエントリに保存されるサイズは、少なくともディスクの実際のデータと同じ"
+"くらい大きい :ref:`おおよそのサイズ <dir-size>` です。"
+"正確なサイズデータは、ディスクのフラグメントヘッダ内に保存されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:133
 msgid ""
@@ -203,6 +292,9 @@ msgid ""
 "original URL for the object. The original source of the cache ID is not "
 "stored anywhere."
 msgstr ""
+"HTTPヘッダのデータは、ディスクI/Oなしには検査できません。"
+"これは、オブジェクトのオリジナルURLが含まれます。"
+"キャッシュIDのオリジナルソースは、どこにも保存されません。"
 
 #: ../../arch/cache/cache-arch.en.rst:139
 msgid ""
@@ -215,6 +307,17 @@ msgid ""
 "exceeeding 65535 (2\\ :sup:`16`\\ -1) entries in a segment. Note that all "
 "segments in the same stripe will have the same number of buckets."
 msgstr ""
+"ディレクトリ内のエントリはグループ化されています。"
+"最初のレベルのグルーピングは、 *バケット* です。"
+"これはエントリの固定の値(現在は4。 ``DIR_DEPTH`` として定義される)です。"
+"キャッシュIDから生成されたインデックスは、バケットインデックス(エントリ"
+"インデックスではない)として使用されます。"
+"バケットは *セグメント* の中へグループ化されます。"
+"ストライプの全セグメントは、バケットと同じ値を持ちます。"
+"ストライプ内のセグメントの数は、各セグメントが、セグメント内のエントリが 65535 "
+"(2\ :sup:`16`\ -1)を超過することが無いよう、可能な限り多いバケットを持つように"
+"選ばれます。"
+"同じストライプ内の全てのセグメントは、同じバケット数を持つよう注意してください。"
 
 #: ../../arch/cache/cache-arch.en.rst:148
 msgid ""
@@ -233,6 +336,24 @@ msgid ""
 "from the fourth entries across all the buckets first, then the thirds, etc. "
 "This maximizes locality for bucket searching."
 msgstr ""
+"各エントリは、同一セグメントのエントリとリンクするために使用される、前と次の"
+"インデックス値を持ちます。"
+"インデックスサイズは、同じセグメントの任意のエントリのインデックスとして十分で"
+"ある16ビットです。"
+"ストライプヘッダは、フリーリストのルートとして使用されるエントリインデックスの"
+"配列を含みます。"
+"ストライプが初期化される時、各バケットの最初のエントリはゼロにされ(未使用だと"
+"マークされ)、セグメントの全てのエントリは、ストライプヘッダのルートの"
+"フリーリストへの関連付けがされます。"
+"本質的には、各固定バケットの最初の要素は、そのバケットにルートとして使用されます。"
+"固定バケットの他のエントリは、そのバケットに追加するため優先的に好まれますが、"
+"これは必要ではありません。"
+"エキストラバケットエントリが順番、全てが二番目の次に三番目、その次に四番目、に"
+"追加されるように、セグメントフリーリストは初期化されます"
+"フリーリストはFIFOであるため、これはエキストラエントリは、最初の次に三番目、"
+"その他と全てのバケットを横断して、四番目のエントリから選択されるかもしれないことを"
+"意味します。"
+"これはバケット検索の局所性を最大化します。"
 
 #: ../../arch/cache/cache-arch.en.rst:161
 msgid ""
@@ -246,10 +367,20 @@ msgid ""
 "and previous indices used for the free list so that it can be found when "
 "doing a lookup of a cache ID."
 msgstr ""
+"使用され返される時、もはや使用されなくなった時に、エントリはこのリストから"
+"削除されます。"
+"エントリは、可能であれば、キャッシュキーによりインデックス化されたバケットから"
+"割り当てられます。"
+"バケットのエントリは最初に検索され、もしどれかがフリーリストにある場合、その"
+"エントリが使用されます。。"
+"もしセグメントの最初のエントリより使用出来るものが無い場合、フリーリストが使用"
+"されます。"
+"このエントリは、キャッシュIDの検索を行う時に見つけられるよう、フリーリストに"
+"使用された同一の次もしくは前インデックスから、バケットへ取り付けられます。"
 
 #: ../../arch/cache/cache-arch.en.rst:169
 msgid "Storage Layout"
-msgstr ""
+msgstr "ストレージレイアウト"
 
 #: ../../arch/cache/cache-arch.en.rst:171
 msgid ""
@@ -263,6 +394,18 @@ msgid ""
 "header without the segment free lists. This makes the size of the header "
 "dependent on the directory but not that of the footer."
 msgstr ""
+"ストレージレイアウトは、キャッシュされたコンテントにより追跡されるストライプの"
+"メタデータです。"
+"メタデータは三つの部分、ストライプヘッダ、ディレクトリ、ストライプフッタで"
+"成立します。"
+"メタデータは二度保存されます。"
+"ヘッダとフッタは :cpp:class:`VolHeaderFooter` のインスタンスです。"
+"これは、可変長配列を引きずるのに持てるスタブ構造です。"
+"この配列は、ディレクトリ内のセグメントのフリーリストのルートとして使用されます。"
+"それぞれはセグメントのフリーリストの、最初の要素のセグメントインデックスを"
+"含みます。"
+"フッタはセグメントフリーリストを伴わないヘッダのコピーです。"
+"これはディレクトリに依存したヘッダのサイズを作成しますが、フッタは除きます。"
 
 #: ../../arch/cache/cache-arch.en.rst:181
 msgid "Each stripe has several values that describe its basic layout."
@@ -278,6 +421,10 @@ msgid ""
 " of a physical device to avoid problems with the host operating system, or "
 "an offset representing use of space in the cache span by other stripes."
 msgstr ""
+"ストライプデータの開始地点です。"
+"これは、ホストオペレーティングシステムによる問題を回避するための物理デバイスの"
+"始点に予約されたスペース、もしくは他のストライプによって、キャッシュスパンの"
+"スペースの使用を表現するオフセットのどちらかを表現します。"
 
 #: ../../arch/cache/cache-arch.en.rst:188
 msgid "start"
@@ -285,7 +432,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:188
 msgid "The offset for the start of the content, after the stripe metadata."
-msgstr ""
+msgstr "ストライプメタデータの後、コンテントの開始地点のためのオフセット"
 
 #: ../../arch/cache/cache-arch.en.rst:191
 msgid "length"
@@ -293,7 +440,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:191
 msgid "Total number of bytes in the stripe. :cpp:member:`Vol::len`."
-msgstr ""
+msgstr "ストライプのバイトの合計値。 :cpp:member:`Vol::len`"
 
 #: ../../arch/cache/cache-arch.en.rst:194
 msgid "data length"
@@ -304,6 +451,8 @@ msgid ""
 "Total number of blocks in the stripe available for content storage. "
 ":cpp:member:`Vol::data_blocks`."
 msgstr ""
+"コンテントストレージとして使用可能なストライプのブロックの合計値。"
+":cpp:member:`Vol::data_blocks`"
 
 #: ../../arch/cache/cache-arch.en.rst:196
 msgid ""
@@ -311,6 +460,9 @@ msgid ""
 "there are at least three different metrics (bytes, cache blocks, store "
 "blocks) used in various places."
 msgstr ""
+"キャッシュコードの size や length を扱う場合、特に注意しなければなりません。"
+"これらは様々な箇所で、少なくとも三つの違うメトリクス(バイト、キャッシュブロック、"
+"ストアブロック)が使われているからです。"
 
 #: ../../arch/cache/cache-arch.en.rst:198
 msgid ""
@@ -324,6 +476,15 @@ msgid ""
 " of reducing the number of distinct objects that can be stored in the cache "
 "[#]_."
 msgstr ""
+"ディレクトリの合計サイズ(エントリの数)は、ボリュームのサイズを取得し、平均"
+"オブジェクトサイズで除算することで計算されます。"
+"もしキャッシュサイズが、 |TS| のためのメモリ要求がそうであるよう増加される場合、"
+"ディレクトリは常に、その効果があるこのメモリ量を消費します。"
+"平均オブジェクトサイズはデフォルトで8000バイトですが、 "
+":ts:cv:`proxy.config.cache.min_average_object_size` を使うことで設定できます。"
+"平均オブジェクトサイズを増加させることにより、キャッシュに保存する個別の"
+"オブジェクトの数を減らす犠牲によって、ディレクトリのメモリ使用量を減らせる"
+"でしょう。[#]_"
 
 #: ../../arch/cache/cache-arch.en.rst:208
 msgid ""
@@ -336,14 +497,23 @@ msgid ""
 "updated. Instead it will be noted if the object is accessed in the future "
 "and the disk read of the fragment fails."
 msgstr ""
+"コンテントエリアは、実際のオブジェクトと最も最近キャッシュされた"
+"ドキュメントを新たなドキュメントで上書きする循環バッファとして使用されます。"
+"ストライプの新たなキャッシュデータの位置は、 *書込みカーソル* と呼ばれます。"
+"これは、データが書込みカーソルによって上書きされる場合、たとえ失効して"
+"いなくても、オブジェクトは事実上、キャッシュから立ち退かせることを意味します。"
+"もしオブジェクトが上書きされる場合、これはその時は検出されず、ディレクトリは"
+"更新されません。"
+"代わりに、もしオブジェクトが将来アクセスされ、フラグメントのディスク読込みが"
+"失敗する場合、警告されるでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:217
 msgid "The write cursor and documents in the cache."
-msgstr ""
+msgstr "キャッシュ内の書込みカーソルとドキュメント"
 
 #: ../../arch/cache/cache-arch.en.rst:219
 msgid "Cache data on disk is never updated."
-msgstr ""
+msgstr "ディスク上のキャッシュデータは永遠に更新されません。"
 
 #: ../../arch/cache/cache-arch.en.rst:221
 msgid ""
@@ -357,10 +527,21 @@ msgid ""
 "to removed from cache, only the directory needs to be changed. No other work"
 " (and *particularly* no disk I/O) needs to be done."
 msgstr ""
+"これは心に留めておく重要な思考です。"
+"更新されるように見えるもの（古くなったコンテンツをリフレッシュし、304を返す"
+"ような）は、実際には書込みカーソルで書き込まれているデータの新しいコピーです。"
+"オリジナルは、書込みカーソルがディスクのその位置に到着する時消費される、"死んだ""
+"スペースとして残されます。"
+"一旦ボリュームディレクトリが（メモリ内で！）更新されると、キャッシュ上のオリジナル"
+"オブジェクトは効率的に破棄されます。"
+"これは他のケースで同様に用いられる、一般的なスペース管理技術です。"
+"もしオブジェクトをキャッシュから削除することが必要になる場合、ボリュームディレク"
+"トリエントリのみ変更されます。"
+"他の動作を行う必要はありません。（そして、 *特に* ディスクI/Oもありません）"
 
 #: ../../arch/cache/cache-arch.en.rst:229
 msgid "Object Structure"
-msgstr ""
+msgstr "オブジェクト構造"
 
 #: ../../arch/cache/cache-arch.en.rst:231
 msgid ""
@@ -369,6 +550,10 @@ msgid ""
 "headers. The content data is the content of the object, the octet stream "
 "delivered to the client as the object."
 msgstr ""
+"オブジェクトは二つのデータのタイプ、メタデータとコンテントデータとして保存されます。"
+"メタデータは、HTTPヘッダを含む、オブジェクトとコンテントに関する全てのデータです。"
+"コンテントデータはオブジェクトのコンテントで、オブジェクトとしてクライアントに"
+"配信されるオクテットストリームです。"
 
 #: ../../arch/cache/cache-arch.en.rst:235
 msgid ""
@@ -383,6 +568,17 @@ msgid ""
 "the disk. This fragment will contain the request header and response along "
 "with overall object properties (such as content length)."
 msgstr ""
+"オブジェクトは、キャッシュに格納される :cpp:class:`Doc` 構造内のルートです。"
+":cpp:class:`Doc` はフラグメントのためヘッダデータとして提供し、各フラグメントの"
+"開始地点に含まれます。"
+"これは "ファースト ``Doc``" と呼ばれ、常にメタデータに含まれます。"
+"オブジェクトの任意の命令は、最初にこのフラグメントを読み込むでしょう。"
+"そのフラグメントは、オブジェクトのキャッシュキーをキャッシュIDに変換することに"
+"より配置され、その時そのキーを伴ってディレクトリエントリが検索されます。"
+"ディレクトリエントリは、その時ディスクから読み込まれるファーストフラグメントの"
+"オフセットとおおよそのサイズを持ちます。"
+"このフラグメントは、全体のオブジェクトのプロパティ(コンテント長のような)に加えて、"
+"リクエストヘッダとレスポンスを含むでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:245
 msgid ""
@@ -400,6 +596,20 @@ msgid ""
 "directory entry and the key for that entry is stored in the first fragment "
 "metadata."
 msgstr ""
+"|TS| は オブジェクト用に `コンテントの検証 "
+"<http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.44>`_"
+"をサポートします。"
+"これらを *オルタネイト* と呼びます。"
+"全てのオルタネイトの全てのメタデータは、オルタネイトのセットとそれらの"
+"HTTPヘッダを含むファーストフラグメントに格納されます。"
+"これは、ファースト ``Doc`` がディスクから読込まれた後に、"
+"`オルタネイトセクション <http://trafficserver.apache.org/docs/trunk/sdk/http-hooks-and-transactions/http-alternate-selection.en.html>`_ が実行され有効になります。"
+"一個以上のオルタネイトを持つオブジェクトは、ファーストフラグメントとは別に保存された"
+"オルタネイトコンテントを持ちます。"
+"一つのオルタネイトのみ持つオブジェクトについては、コンテントはメタデータとしての"
+"(最初の)フラグメントと同じになるかもしれないし、そうでもないかもしれません。"
+"個々の分離されたオルタネイトコンテントは、ボリュームディレクトリエントリに"
+"割り当てられ、エントリーのキーはファーストフラグメントのメタデータに保存されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:254
 msgid ""
@@ -408,10 +618,13 @@ msgid ""
 "length area of the on disk image, followed by information about additional "
 "fragments if needed to store the object."
 msgstr ""
+"バージョン 4.0.1 以前は、ヘッダデータは、もしオブジェクトを保存することが必要に"
+"なった場合、追加のフラグメントについての情報により追跡されるディスクイメージの"
+"可変長領域をまとめる :cpp:class:`CacheHTTPInfoVector` クラス内に保存されていました。"
 
 #: ../../arch/cache/cache-arch.en.rst:261
 msgid "``Doc`` layout 3.2.0"
-msgstr ""
+msgstr "3.2.0 以前の ``Doc`` レイアウト"
 
 #: ../../arch/cache/cache-arch.en.rst:263
 msgid ""
@@ -421,10 +634,15 @@ msgid ""
 " metadata to being directly incorporated in to the "
 ":cpp:class:`CacheHTTPInfoVector`, yielding a layout of the following form."
 msgstr ""
+"これは、一つのフラグメントテーブルのみで、一つ以上のオルタネイト [#]_"
+"を持つオブジェクトに対して正確な信頼性を持てない問題があります。"
+"従って、以下の形式のレイアウトになるよう、フラグメントデータはメタデータの個別の"
+"可変長セクションから、 :cpp:class:`CacheHTTPInfoVector` へ直接統合されるよう"
+"移動されました。"
 
 #: ../../arch/cache/cache-arch.en.rst:270
 msgid "``Doc`` layout 4.0.1"
-msgstr ""
+msgstr "4.0.1 の ``Doc`` レイアウト"
 
 #: ../../arch/cache/cache-arch.en.rst:272
 msgid ""
@@ -433,6 +651,11 @@ msgid ""
 "identifies a directory entry that is referred to as the \"earliest "
 "``Doc``\". This is the location where the content for the alternate begins."
 msgstr ""
+"ベクターの各要素は、各オルタネイトに加え、HTTPヘッダと(もしあれば)フラグメント"
+"テーブル、キャッシュキーを含みます。"
+"このキャッシュキーは "アーリスト ``Doc`` " として参照されるボリュームディレクトリ"
+"エントリを識別します。"
+"これはオルタネイトのコンテントが始まる位置です。"
 
 #: ../../arch/cache/cache-arch.en.rst:276
 msgid ""
@@ -445,6 +668,11 @@ msgid ""
 " first fragment, making the alternate non-resident. \"Small\" is defined as "
 "a length smaller than :ts:cv:`proxy.config.cache.alt_rewrite_max_size`."
 msgstr ""
+"オブジェクトが最初にキャッシュされたとき、それは単一のオルタネイトを持ち、(大き"
+"すぎない場合は)ファースト ``Doc`` に格納されるでしょう。"
+"これはコード中で *レジデントオルタネイト* と名付けられます。"
+"レジデントオルタネイトは好ましく無く、今度はオブジェクトコンテントが分離される"
+"ようヘッダ情報が更新されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:284
 msgid ""
@@ -452,6 +680,8 @@ msgid ""
 "Subsequent ``Doc`` instances for the object, including the earliest ``Doc``,"
 " should have an ``hlen`` of zero and if not, it is ignored."
 msgstr ""
+":cpp:class:`CacheHTTPInfoVector` はファースト ``Doc`` にのみ保存されます。"
+"その後の ``Doc`` インスタンスは、ゼロの ``hlen`` を持つでしょう"
 
 #: ../../arch/cache/cache-arch.en.rst:287
 msgid ""
@@ -468,12 +698,30 @@ msgid ""
 "computationally chained from the previous in that the cache key for fragment"
 " N is computed by::"
 msgstr ""
+"巨大なオブジェクトは、キャッシュに書き込まれる時に *フラグメント*"
+"に分割されます。"
+"各フラグメントはボリュームディレクトリの自身のエントリを持ちます。"
+"これはドキュメント長の合計が、ファースト ``Doc`` もしくはアーリスト ``Doc``"
+"のコンテントより長いことを示します。"
+"これは、(最初のオフセットが常にゼロである)過去に最初だった各フラグメント毎の"
+"コンテントデータの、最初のバイトのオブジェクトコンテント内の、"
+"バイトオフセットを含みます。"
+"これは、中間のフラグメントが、ファースト/アーリスト ``Doc`` の次にロードされた関連データを"
+"伴う最初のフラグメントをスキップできることにより、巨大なオブジェクトの為に非常に"
+"効率的に提供されるためのレンジリクエスト許可します。"
+"シーケンスの最後のフラグメントは、フラグメントサイズとオフセットがオブジェクトの"
+"合計サイズの最後に到達することにより検出されます。"
+"明示的なエンドマークはありません。"
+"各フラグメントは計算上は前のものと繋がっています。"
+"フラグメントNのキャッシュキーは、以下により計算されます::"
 
 #: ../../arch/cache/cache-arch.en.rst:298
 msgid ""
 "where ``next_key`` is a global function that deterministically computes a "
 "new cache key from an existing cache key."
 msgstr ""
+"``next_key`` の部分は、既存のキャッシュキーから新しいキャッシュキーを決定論的に"
+"計算する帯域関数です。"
 
 #: ../../arch/cache/cache-arch.en.rst:300
 msgid ""
@@ -488,10 +736,21 @@ msgid ""
 "contiguous as data from different objects are interleaved as the data "
 "arrives in |TS|."
 msgstr ""
+"複数のフラグメントを伴うオブジェクトは、(アーリスト ``Doc`` を含む)最初に"
+"書き込まれたデータフラグメントと最後に書き込まれたファースト ``Doc`` のように、"
+"レイアウトされます。"
+"ディスクから読み込まれる時、ファースト、アーリストの ``Doc``"
+"の両方は、全体のドキュメントがディスクに存在することを確認する(それら、他の"
+"フラグメントのブックエンドとして、書込みカーソルは確認された ``Doc`` インスタンス"
+"の少なくとも一つの上書き無しに、それらを上書き出来ません)ため、(それらが"
+"書込みカーソルにより上書きされていない確認することにより試験されます)検証されます。"
+"単一のオブジェクトのフラグメントは、異なるオブジェクトが |TS| に届いたデータ"
+"として綴じ込められたデータとして、必然的に隣接しないよう整列されることに注意"
+"してください。"
 
 #: ../../arch/cache/cache-arch.en.rst:310
 msgid "Multi-alternate and multi-fragment object storage"
-msgstr ""
+msgstr "オブジェクトストレージの、複数のオルタネイトと複数のフラグメント"
 
 #: ../../arch/cache/cache-arch.en.rst:314
 msgid ""
@@ -505,6 +764,15 @@ msgid ""
 "read from disk and placed in the write queue and written as its turn comes "
 "up."
 msgstr ""
+"キャッシュへ "ピン留め" されるオブジェクトは、上書きされてはいけません。"
+"そのため、それらは 書込みカーソルの前に"退避" させられます"
+"各フラグメントは読み込まれ、再書込みされます。"
+"潜在的に信頼性の低いディスク領域ではなく、メモリ内で発見できるよう、退避される"
+"オブジェクトのための特別な検出メカニズムがあります。"
+"ピン留めされたオブジェクトを発見するため、キャッシュは書込みカーソルより前にスキャンされます。"
+"データを退避させることができない書込みカーソル直前のデットゾーンがあります。"
+"退避されたデータはディスクから読み込まれ、書込みキューに置かれ、出番が来ると"
+"書き込まれます。"
 
 #: ../../arch/cache/cache-arch.en.rst:320
 msgid ""
@@ -514,24 +782,26 @@ msgid ""
 "near use the same underlying evacuation mechanism but are handled "
 "automatically and not via the explicit ``pinned`` bit in :cpp:class:`Dir`."
 msgstr ""
+"オブジェクトは、:file:`cache.config` ファイルを経て、以下の値をゼロでない値"
+"(デフォルトではゼロ)に設定した場合のみピン留めできます。::"
 
 #: ../../arch/cache/cache-arch.en.rst:325
 msgid ""
 "It could, under certain circumstances, be accurate for none of the "
 "alternates."
-msgstr ""
+msgstr "それは、ある状況下では、オルタネイト無しに正確になりえます。"
 
 #: ../../arch/cache/cache-arch.en.rst:328
 msgid "Additional Notes"
-msgstr ""
+msgstr "追加情報"
 
 #: ../../arch/cache/cache-arch.en.rst:330
 msgid "Some general observations on the data structures."
-msgstr ""
+msgstr "データ構造のいくつかの概説。"
 
 #: ../../arch/cache/cache-arch.en.rst:333
 msgid "Cyclone buffer"
-msgstr ""
+msgstr "循環バッファ"
 
 #: ../../arch/cache/cache-arch.en.rst:335
 msgid ""
@@ -544,6 +814,16 @@ msgid ""
 "excessive disk activity. The original purpose of pinning seems to have been "
 "for small, frequently used objects explicitly marked by the administrator."
 msgstr ""
+"キャッシュが循環であるため、キャッシュオブジェクトは不定期間の保存はされません。"
+"たとえオブジェクトが古くなくても、そのボリュームのキャッシュサイクルとして"
+"上書き出来ます。"
+"``ピン留め`` としてオブジェクトをマーキングすることにより、書込みカーソルの通過を"
+"やり過ごし、しかしキャッシュ内で再保存をする効果によりギャップを埋めて、コピー"
+"することによりこれが処理され、オブジェクトを保存します。"
+"巨大なオブジェクトや大量のオブジェクトのピン留めは、過度のディスク動作を引き"
+"起こす場合があります。"
+"ピン留めの本来の目的は、頻繁に使用されるオブジェクトを管理者により明記的に"
+"印付け、それを小さくすることだと思われます。"
 
 #: ../../arch/cache/cache-arch.en.rst:341
 msgid ""
@@ -555,6 +835,14 @@ msgid ""
 "which suffices to (eventually) free the space and render the document "
 "inaccessible."
 msgstr ""
+"これは、オブジェクトの失効データがクライアントに提供されるのをを単に防ぐのが"
+"目的であることを意味します。"
+"それらは標準の感覚では削除されたかクリーンアップされていません。"
+"書込みは書込みカーソルでのみ発生するので、どんなイベントにおいてもスペースは"
+"直ちには取り戻されません。"
+"オブジェクトの削除は、(結局)スペースを解放し、かつドキュメントをアクセス不可能に"
+"するのに十分であるボリュームディレクトリのディレクトリエントリの削除からのみ"
+"成り立ちます。"
 
 #: ../../arch/cache/cache-arch.en.rst:346
 msgid ""
@@ -566,10 +854,17 @@ msgid ""
 "term storage of large objects. See the :ref:`volume tagging` appendix for "
 "details on some work in this area."
 msgstr ""
+"歴史的に、ウェブコンテンツは比較的小さく、特に一貫していなかったので、キャッシュは"
+"この手段で設計されます。"
+"この設計は高性能かつ低い一貫性の要求も提供します。"
+"ストレージのフラグメンテーション問題は無く、またキャッシュミスやオブジェクト"
+"削除はディスクI/Oを要求しません。"
+"それは巨大なオブジェクトの長期間保存は特に扱いません。"
+"この分野の幾つかの働きの詳細の付録 :ref:`volume tagging` を見てください。"
 
 #: ../../arch/cache/cache-arch.en.rst:352
 msgid "Disk Failure"
-msgstr ""
+msgstr "ディスク障害"
 
 #: ../../arch/cache/cache-arch.en.rst:354
 msgid ""
@@ -581,6 +876,14 @@ msgid ""
 "objects on still operational volumes while distributing the assignments from"
 " the failed disk to those operational volumes. This mostly done in::"
 msgstr ""
+"キャッシュは、ディスク障害に比較的強いように設計されます。"
+"各ボリュームの各ストレージユニットはほとんど独立しているので、ディスクの損失は "
+"対応する :cpp:class:`Vol` インスタンス(ストレージユニットを使うキャッシュ"
+"ボリューム毎のそれ)が使えなくなることを単に意味します。"
+"主な問題は、まだ運用中のボリューム上のオブジェクトのため、故障したディスクから"
+"それらの運用中のボリューム割当の配布中に割当を両方保存するためのボリューム割当"
+"テーブルの更新です。"
+"これはほとんどこれで処理されます::"
 
 #: ../../arch/cache/cache-arch.en.rst:358
 msgid ""
@@ -591,34 +894,42 @@ msgid ""
 "a new storage unit is added to a running system. The mechanism for this, if "
 "any, is still under investigation."
 msgstr ""
+"現役動作中のディスクにリストアするのは、かなり困難な作業です。"
+"キャッシュキーのボリューム割当の変更は、現在のどのキャッシュデータもアクセス"
+"不可能にします。"
+"これは当然ながらディスクが故障した時の問題ではありませんが、新しいストレージ"
+"ユニットが動作中のシステムに追加された場合は、どのキャッシュされたオブジェクトが"
+"事実上追い出されるか決定するため少々扱いにくいです。"
+"このためのメカニズムは、もし何かあれば、まだ調査下にあります。"
 
 #: ../../arch/cache/cache-arch.en.rst:361
 msgid "Implementation Details"
-msgstr ""
+msgstr "実装の詳細"
 
 #: ../../arch/cache/cache-arch.en.rst:364
 msgid "Stripe Directory"
-msgstr ""
+msgstr "ストライプディレクトリ"
 
 #: ../../arch/cache/cache-arch.en.rst:368
 msgid "The in memory volume directory entries are defined as described below."
 msgstr ""
+"メモリ内のボリュームディレクトリエントリは、以下の記述で定義されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:372
 msgid "Defined in |P-CacheDir.h|_."
-msgstr ""
+msgstr "|P-CacheDir.h|_ で定義される。"
 
 #: ../../arch/cache/cache-arch.en.rst:375
 msgid "Name"
-msgstr ""
+msgstr "名前"
 
 #: ../../arch/cache/cache-arch.en.rst:375
 msgid "Type"
-msgstr ""
+msgstr "型"
 
 #: ../../arch/cache/cache-arch.en.rst:375
 msgid "Use"
-msgstr ""
+msgstr "用途"
 
 #: ../../arch/cache/cache-arch.en.rst:377
 msgid "offset"
@@ -630,7 +941,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:377
 msgid "Offset of first byte of metadata (volume relative)"
-msgstr ""
+msgstr "(ボリュームに関連した)メタデータの先頭バイトのオフセット"
 
 #: ../../arch/cache/cache-arch.en.rst:378
 msgid "big"
@@ -642,7 +953,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:378
 msgid "Size multiplier"
-msgstr ""
+msgstr "サイズの乗数"
 
 #: ../../arch/cache/cache-arch.en.rst:379
 msgid "size"
@@ -654,7 +965,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:379
 msgid "Size"
-msgstr ""
+msgstr "サイズ"
 
 #: ../../arch/cache/cache-arch.en.rst:380
 msgid "tag"
@@ -666,7 +977,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:380
 msgid "Partial key (fast collision check)"
-msgstr ""
+msgstr "(高速な衝突チェックの為の)キーの一部"
 
 #: ../../arch/cache/cache-arch.en.rst:381
 msgid "phase"
@@ -681,7 +992,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:381
 msgid "Unknown"
-msgstr ""
+msgstr "不明"
 
 #: ../../arch/cache/cache-arch.en.rst:382
 msgid "head"
@@ -689,7 +1000,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:382
 msgid "Flag: first fragment in an object"
-msgstr ""
+msgstr "オブジェクト内のファーストフラグメントを示すフラグ"
 
 #: ../../arch/cache/cache-arch.en.rst:383
 #: ../../arch/cache/cache-arch.en.rst:312
@@ -698,7 +1009,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:383
 msgid "Flag: document is pinned"
-msgstr ""
+msgstr "ドキュメントがピン留めされていることを示すフラグ"
 
 #: ../../arch/cache/cache-arch.en.rst:384
 msgid "token"
@@ -706,7 +1017,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:384
 msgid "Flag: Unknown"
-msgstr ""
+msgstr "不明なフラグ"
 
 #: ../../arch/cache/cache-arch.en.rst:385
 msgid "next"
@@ -718,7 +1029,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:385
 msgid "Segment local index of next entry."
-msgstr ""
+msgstr "次エントリへのセグメントローカルなインデックス"
 
 #: ../../arch/cache/cache-arch.en.rst:386
 msgid "offset_high"
@@ -730,7 +1041,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:386
 msgid "High order offset bits"
-msgstr ""
+msgstr "高順序オフセットビット"
 
 #: ../../arch/cache/cache-arch.en.rst:389
 msgid ""
@@ -739,6 +1050,10 @@ msgid ""
 " the cache has at least one directory entry this data has been made as small"
 " as possible."
 msgstr ""
+"ストライプディレクトリは ``Dir`` インスタンスの配列です。"
+"各エントリは、キャッシュされたオブジェクトを含むボリュームのスパンを参照します。"
+"キャッシュ内の各オブジェクトは、少なくとも一つのディレクトリエントリを持つため、"
+"このデータは可能な限り小さくされています。"
 
 #: ../../arch/cache/cache-arch.en.rst:391
 msgid ""
@@ -748,6 +1063,12 @@ msgid ""
 "storage unit in a cache volume, this is the offset in to the slice of a "
 "storage unit attached to that volume."
 msgstr ""
+"オフセット値はボリューム内のオブジェクトの開始バイトです。"
+"それは、 *offset* (下位24ビット) と *offset_high* (上位16ビット) メンバに"
+"渡って分割された40ビット長です。"
+"キャッシュボリュームの各ストレージユニットのためのディレクトリが存在するので、"
+"これはボリュームに取り付けられたストレージユニットの一部分へのオフセットで"
+"あることに注意してください。"
 
 #: ../../arch/cache/cache-arch.en.rst:395
 msgid ""
@@ -759,11 +1080,20 @@ msgid ""
 "large as the actual size but can be larger, at the cost of reading the "
 "extraneous bytes."
 msgstr ""
+"*size* と *big* 値は、オブジェクトを含むスパンの大まかなサイズを計算する為に"
+"使用されます。"
+"この値は、オフセット値において、ストレージから読み込むためのバイト数として"
+"使用されます。"
+"正確なサイズは、読込みが完了した時に一度参照される :cpp:class:`Doc` の"
+"オブジェクトメタデータに含まれます。"
+"この理由として、大まかなサイズは少なくとも実際のデータと同じくらい大きくする"
+"必要が有り、しかし無関係のバイトの読込みのコスト大きくできることがあります。"
 
 #: ../../arch/cache/cache-arch.en.rst:397
 msgid ""
 "The computation of the approximate size of the fragment is defined as::"
 msgstr ""
+"フラグメントの大まかなサイズの計算は、以下のように定義されます。::"
 
 #: ../../arch/cache/cache-arch.en.rst:401
 msgid ""
@@ -771,10 +1101,13 @@ msgid ""
 "block (9, corresponding to a sector size of 512). Therefore the value with "
 "current defines is::"
 msgstr ""
+"``CACHE_BLOCK_SHIFT`` の部分は、基本キャッシュブロックのサイズのビット幅"
+"(9、512のセクタサイズに関連づけられる) です。"
+"従って、その値は現在は以下のように定義されます。::"
 
 #: ../../arch/cache/cache-arch.en.rst:405
 msgid "Because *big* is 2 bits the values for the multiplier of *size* are"
-msgstr ""
+msgstr "*big* は2ビットであるため、*size*の乗数の値は、"
 
 #: ../../arch/cache/cache-arch.en.rst:410
 msgid "*big*"
@@ -782,11 +1115,11 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:410
 msgid "Multiplier"
-msgstr ""
+msgstr "乗数"
 
 #: ../../arch/cache/cache-arch.en.rst:410
 msgid "Maximum Size"
-msgstr ""
+msgstr "最大サイズ"
 
 #: ../../arch/cache/cache-arch.en.rst:412
 msgid "0"
@@ -835,10 +1168,13 @@ msgid ""
 "Note also that *size* is effectively offset by one, so a value of 0 "
 "indicates a single unit of the multiplier."
 msgstr ""
+"*size* も何かに効率的なオフセットであり、そのため0の値は乗数の単一ユニット示す"
+"ことに注意してください。"
 
 #: ../../arch/cache/cache-arch.en.rst:422
 msgid "The target fragment size can set with the :file:`records.config` value"
 msgstr ""
+"ターゲットフラグメントサイズは、 :file:`records.config` の値で設定できます。"
 
 #: ../../arch/cache/cache-arch.en.rst:424
 msgid "``proxy.config.cache.target_fragment_size``"
@@ -855,6 +1191,16 @@ msgid ""
 "the size of a struct :cpp:class:`Doc`. In practice then the largest "
 "reasonable target fragment size is 4M - 262144 = 3932160."
 msgstr ""
+":ref:`キャッシュエントリ乗数<big-mult>` の倍数になるように、この値は選ばれる"
+"べきです。"
+"それは2の冪乗にする必要はありません。"
+"巨大なフラグメントはI/Oの効率を向上しますが、より余分なスペースを読み込みます。"
+"デフォルトサイズ(1M, 2^20)は、様々な特定ケースを通して、このパラメータを合わせる"
+"ことにより恩恵が得られる、ほとんどの環境で合理的な選択です。"
+"|TS| は、 :cpp:class:`Doc` 構造のサイズより少ない4M(2^22) である 4194232 バイトの"
+"内部的な最大値を課します。"
+"事実上、その後の最大の合理的なターゲットフラグメントサイズは"
+"4M - 262144 = 3932160 です。"
 
 #: ../../arch/cache/cache-arch.en.rst:432
 msgid ""
@@ -866,18 +1212,30 @@ msgid ""
 " of the approximate size. That represents the largest possible amount of "
 "wasted disk I/O when the fragment is read from disk."
 msgstr ""
+"フラグメントがディスクへ保存される時、キャッシュインデックスエントリのサイズ"
+"データは、フラグメントのサイズにより許容される非常に良い粒度で設定されます。"
+"これが :ref:`キャッシュエントリ乗数 <big-mult>` テーブルを参照する決定するため、"
+"少なくともフラグメントと同じくらい大きな、最も小さな最大サイズを検索します。"
+"それは選択された *big* の値、従って大まかなサイズの粒度を索引するでしょう。"
+"フラグメントがディスクから読み込まれる時、それは可能な限り最大の余分な"
+"ディスクI/Oの量を表します。"
 
 #: ../../arch/cache/cache-arch.en.rst:438
 msgid ""
 "The cache index entry size is used only for reading the fragment from disk. "
 "The actual size on disk, and the"
 msgstr ""
+"キャッシュインデックスエントリサイズは、ディスクからのフラグメントの"
+"読込みのみに使用されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:439
 msgid ""
 "amount of cache space consumed, is the actual size of the content rounded up"
 " to the disk sector size (default 512 bytes)."
 msgstr ""
+"ディスク上の実際のサイズ、そしてキャッシュスペースが消費された量は、"
+"ディスクセクタサイズ(でフォルトでは512バイト)に集められたコンテントの"
+"実際のサイズです。"
 
 #: ../../arch/cache/cache-arch.en.rst:444
 msgid ""
@@ -887,6 +1245,11 @@ msgid ""
 "segment references can therefore use a 16 bit value to refer to any other "
 "entry in the segment."
 msgstr ""
+"ボリュームの為のインデックスエントリのセットは、 *セグメント* へグループ化されます。"
+"インデックスのセグメントの数は、それらが2^16エントリを超えるセグメント数でないよう"
+"可能な限り少ないセグメントにするために選択されます。"
+"内部セグメントはそのため、セグメントの任意の他のエントリを参照する為に16ビット値を"
+"使用できます。"
 
 #: ../../arch/cache/cache-arch.en.rst:448
 msgid ""
@@ -894,10 +1257,15 @@ msgid ""
 "(currently 4) entries. These are handled in the standard hash table way, "
 "giving somewhat less than 2^14 buckets per segment."
 msgstr ""
+"セグメントのインデックスエントリは、 ``DIR_DEPTH`` (現在は4)エントリ毎に"
+"グループ化されます。"
+"これらは、セグメント毎2^14以下のバケットを与えるよう、標準的なハッシュテーブルの"
+"方法で扱われます"
 
 #: ../../arch/cache/cache-arch.en.rst:451
 msgid "The comment in :file:`records.config` is simply wrong."
 msgstr ""
+":file:`records.config` のコメントは単純に間違っています。"
 
 #: ../../arch/cache/cache-arch.en.rst:456
 msgid "Directory Probing"
@@ -911,6 +1279,12 @@ msgid ""
 "(:arg:`d`), and a last collision (:arg:`last_collision`). The last of these "
 "is an in and out parameter, updated as useful during the probe."
 msgstr ""
+"ディレクトリ検査は、キャッシュIDに基づくストライプディレクトリの特定のディレクトリ"
+"エントリに配置します。"
+"これは主に、 :cpp:func:`dir_probe()` 関数によって扱われます。"
+"これはキャッシュID(:arg:`key`)、ストライプ(:arg:`d`)、そして最後の"
+"コリジョン(:arg:`last_collision`)をパスされます。"
+"これらの最後はパラメータを入ったり出たりし、検証の間に役立つよう更新されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:463
 msgid ""
