@@ -13,11 +13,11 @@ msgstr ""
 
 #: ../../admin/configuring-traffic-server.en.rst:5
 msgid "Configuring Traffic Server"
-msgstr ""
+msgstr "Traffic Server の設定"
 
 #: ../../admin/configuring-traffic-server.en.rst:24
 msgid "Traffic Server provides several options for configuring the system."
-msgstr ""
+msgstr "Traffic Server はシステムを設定するためのいくつかの方法を提供しています。"
 
 #: ../../admin/configuring-traffic-server.en.rst:32
 msgid "Configure Traffic Server Using Traffic Line"
