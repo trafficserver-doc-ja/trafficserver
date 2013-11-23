@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: 2013-11-23 17:04+0900\n"
+"PO-Revision-Date: 2013-11-23 17:59+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -21,11 +21,7 @@ msgid ""
 "objects (such as documents, images, and articles) and then serve this "
 "information to users on demand. It improves performance and frees up "
 "Internet bandwidth for other tasks."
-msgstr ""
-"ウェブプロキシーキャッシュは頻繁にアクセスされるウェブオブジェクト(ドキュメン"
-"トや画像、記事など)のコピーを保存し、ユーザーの求めに応じてこれらを配信するこ"
-"とを可能にします。これはパフォーマンスを向上させ、インターネットの帯域を他の"
-"タスクのために空けます。"
+msgstr "ウェブプロキシーキャッシュは頻繁にアクセスされるウェブオブジェクト(ドキュメントや画像、記事など)のコピーを保存し、ユーザーの求めに応じてこれらを配信することを可能にします。これはパフォーマンスを向上させ、インターネットの帯域を他のタスクのために空けます。"
 
 #: ../../admin/http-proxy-caching.en.rst:32
 msgid "Understanding HTTP Web Proxy Caching"
@@ -1587,26 +1583,26 @@ msgstr "一度これら全てが有効化されると、Squid の Collapesd Forw
 
 #: ../../admin/http-proxy-caching.en.rst:812
 msgid "Fuzzy Revalidation"
-msgstr ""
+msgstr "Fuzzy Revalidation"
 
 #: ../../admin/http-proxy-caching.en.rst:813
 msgid ""
 "Traffic Server can be set to attempt to revalidate an object before it "
 "becomes stale in cache. :file:`records.config` contains the settings:"
-msgstr ""
+msgstr "Traffic Server はキャッシュでスティールになる前に、オブジェクトをリバリデートを試みるようにセットすることもできます。:file:`records.config` contains the settings:"
 
 #: ../../admin/http-proxy-caching.en.rst:815
 msgid "CONFIG :ts:cv:`proxy.config.http.cache.fuzz.time` ``INT 240``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.http.cache.fuzz.time` ``INT 240``"
 
 #: ../../admin/http-proxy-caching.en.rst:816
 msgid "CONFIG :ts:cv:`proxy.config.http.cache.fuzz.min_time` ``INT 0``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.http.cache.fuzz.min_time` ``INT 0``"
 
 #: ../../admin/http-proxy-caching.en.rst:817
 msgid ""
 "CONFIG :ts:cv:`proxy.config.http.cache.fuzz.probability` ``FLOAT 0.005``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.http.cache.fuzz.probability` ``FLOAT 0.005``"
 
 #: ../../admin/http-proxy-caching.en.rst:819
 msgid ""
@@ -1621,14 +1617,14 @@ msgid ""
 "virtually guaranteed to trigger a revalidate event within the 240s. These "
 "configs are also overridable per remap rule or via a plugin, so can be "
 "adjusted per request if necessary."
-msgstr ""
+msgstr "あるオブジェクトに対する全てのリクエストは \"fuzz.time\" 前に (例えば、240 秒)オブジェクトはスティールになるようにセットされています。小さなチャンス( fuzz.probabilitu == 0.5%) でリクエストはリバリデーションリクエストをオリジンに投げます。2,3 の秒間リクエスト数しかないオブジェクトにとって、これはトリガーにならないでしょう。この機能は確立が 1 のときや、ヒットするオブジェクトが小さい数のコネクションでは重要にはなりません。デフォルトはいい妥協点です。オブジェクトがほぼ秒間 4 リクエストのオブジェクトにとって、240 秒でリバリデートイベントがトリガーされる仮想的な担保になります。これらの設定は remap ルール毎やプラグインによって上書きすることもできます。秒間リクエストに合わせることが重要です。"
 
 #: ../../admin/http-proxy-caching.en.rst:822
 msgid ""
 "Note that if the revalidation occurs, the requested object is no longer "
 "available to be served from cache.  Subsequent requests for that object will "
 "be proxied to the origin."
-msgstr ""
+msgstr "リベリデーションが起きた場合、リクエストされたオブジェクトはもはやキャッシュから配信することはできません。続いて起きるオブジェクトへのリクエストはオリジンサーバーにプロキシーされます。"
 
 #: ../../admin/http-proxy-caching.en.rst:825
 msgid ""
