@@ -1002,7 +1002,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:497
 msgid "Cacheability"
-msgstr ""
+msgstr "キャッシャビリティ"
 
 #: ../../arch/cache/cache-arch.en.rst:499
 msgid ""
@@ -1017,89 +1017,105 @@ msgid ""
 "Those checks are described as appropriate in the sections on the relevant "
 "operations."
 msgstr ""
+"キャッシュへの考慮を伴うリクエストと共に最初に行われるのは、潜在的に"
+"キャッシュするのに有効なオブジェクトであるかどうかを決定することです。初期の"
+"パースとリマップの後、このチェックは、主にネガティブな結果を検出するために"
+"行われます。これは、全ての後のキャッシュ処理がスキップされる場合のためです。"
+" -- それはキャッシュに配置されず、キャッシュルックアップが完了するはずです。"
+"それらを変更する設定オプションと共に、必要条件の数があります。追加の"
+"キャッシャビリティチェックは、より多くのトランザクションについて知られている処理"
+"(プラグインオペレーションやオリジンサーバレスポンスのような)以降に完了されます。"
+"それらのチェックは関連するオペレーションのセクションで適切に記述されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:501
 msgid "The set of things which can affect cacheability are"
-msgstr ""
+msgstr "キャッシャビリティに影響できる項目のセットは、"
 
 #: ../../arch/cache/cache-arch.en.rst:503
 msgid "Built in constraints"
-msgstr ""
+msgstr "ビルドイン制約"
 
 #: ../../arch/cache/cache-arch.en.rst:504
 msgid "Settings in :file:`records.config`"
-msgstr ""
+msgstr ":file:`records.config` の設定"
 
 #: ../../arch/cache/cache-arch.en.rst:505
 msgid "Settings in :file:`cache.config`"
-msgstr ""
+msgstr ":file:`cache.config` の設定"
 
 #: ../../arch/cache/cache-arch.en.rst:506
 msgid "Plugin operations"
-msgstr ""
+msgstr "プラグインオペレーション"
 
 #: ../../arch/cache/cache-arch.en.rst:508
 msgid ""
 "The initial internal checks, along with their :file:`records.config` "
 "overrides[#]_, are done in::"
 msgstr ""
+"初期の内部チェック、それらの :file:`records.config` を伴ったオーバー"
+"ライドは以下のように完了します::"
 
 #: ../../arch/cache/cache-arch.en.rst:512
 msgid "The checks that are done are"
-msgstr ""
+msgstr "チェックは以下のように行われます。"
 
 #: ../../arch/cache/cache-arch.en.rst:517
 msgid "Cacheable Method"
-msgstr ""
+msgstr "キャッシュ可能なメソッド"
 
 #: ../../arch/cache/cache-arch.en.rst:515
 msgid ""
 "The request must be one of ``GET``, ``HEAD``, ``POST``, ``DELETE``, ``PUT``."
-msgstr ""
+msgstr "リクエストは、 ``GET``, ``HEAD``, ``POST``, ``DELETE``, ``PUT`` の"
+"一つでなければなりません。"
 
 #: ../../arch/cache/cache-arch.en.rst:517
 msgid "See ``HttpTransact::is_method_cache_lookupable()``."
-msgstr ""
+msgstr "``HttpTransact::is_method_cache_lookupable()`` を見てください。"
 
 #: ../../arch/cache/cache-arch.en.rst:531
 msgid "Dynamic URL"
-msgstr ""
+msgstr "ダイナミック URL"
 
 #: ../../arch/cache/cache-arch.en.rst:520
 msgid ""
 "|TS| tries to avoid caching dynamic content because it's dynamic. A URL is "
 "considered dynamic if it"
 msgstr ""
+"動的であるため、 |TS| は動的コンテンツのキャッシングを避けようとします。"
+"もし以下のようなら、 URL は動的であると考えられます。"
 
 #: ../../arch/cache/cache-arch.en.rst:522
 msgid "is not ``HTTP`` or ``HTTPS``"
-msgstr ""
+msgstr "``HTTP`` や ``HTTPS`` ではない"
 
 #: ../../arch/cache/cache-arch.en.rst:523
 msgid "has query parameters"
-msgstr ""
+msgstr "クエリパラメータを含む"
 
 #: ../../arch/cache/cache-arch.en.rst:524
 msgid "ends in ``asp``"
-msgstr ""
+msgstr "``asp`` で終わる"
 
 #: ../../arch/cache/cache-arch.en.rst:525
 msgid "has ``cgi`` in the path"
-msgstr ""
+msgstr "パスの中に ``cgi`` を含む"
 
 #: ../../arch/cache/cache-arch.en.rst:527
 msgid "This check can be disabled by setting a non-zero value for::"
-msgstr ""
+msgstr "このチェックは、以下にゼロでない値を設定することで無効にできます::"
 
 #: ../../arch/cache/cache-arch.en.rst:531
 msgid ""
 "In addition if a TTL is set for rule that matches in :file:`cache.config` "
 "then this check is not done."
 msgstr ""
+"加えて、もし :file:`cache.config` に合致するルールに TTL が設定されていたら、"
+"このチェックは行われません。"
 
 #: ../../arch/cache/cache-arch.en.rst:534
 msgid "Range Request"
-msgstr ""
+msgstr "レンジリクエスト"
 
 #: ../../arch/cache/cache-arch.en.rst:534
 msgid ""
@@ -1107,12 +1123,18 @@ msgid ""
 ":file:`records.config` is non-zero. This does not mean the range request can"
 " be cached, only that it might be satisfiable from the cache."
 msgstr ""
+"キャッシュバリッドは :file:`records.config` の "
+":ts:cv:`proxy.config.http.cache.range.lookup` を除き、ゼロでない値です。"
+"これは、レンジリクエストはキャッシュから満たされるかもしれないのみならず、"
+"キャッシュできる事を意味しません。"
 
 #: ../../arch/cache/cache-arch.en.rst:536
 msgid ""
 "A plugin can call :c:func:`TSHttpTxnReqCacheableSet()` to force the request "
 "to be viewed as cache valid."
 msgstr ""
+"プラグインは、リクエストがキャッシュバリッドとして見なされる事を強制する"
+"ため :c:func:`TSHttpTxnReqCacheableSet()` を呼び出せます。"
 
 #: ../../arch/cache/cache-arch.en.rst:538
 msgid ""
@@ -1123,6 +1145,12 @@ msgid ""
 "directive (from the administrator point of view) is effective in preventing "
 "caching of the object."
 msgstr ""
+"コードでは、このロジックの中で、ステートマシンインスタンスの "
+"``cache_info.directives`` の中の ``does_config_permit_lookup`` を設定することに"
+"より :file:`cache.config` をチェックするよう見えますが、私はその値が使用されて"
+"いる箇所を発見できません。 ``does_config_permit_storing`` ディレクティブが設定され、"
+"後にチェックされるので、そのディレクティブは(管理者の観点から)オブジェクトの"
+"キャッシングを妨げるのに効果的です。"
 
 #: ../../arch/cache/cache-arch.en.rst:541
 msgid "Cache Lookup"
