@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: 2013-11-23 15:04+0900\n"
+"PO-Revision-Date: 2013-11-23 15:39+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -1341,7 +1341,7 @@ msgstr " :ts:cv:`proxy.config.cache.limits.http.max_alts` 変数を変更して�
 
 #: ../../admin/http-proxy-caching.en.rst:714
 msgid "Using Congestion Control"
-msgstr ""
+msgstr "Congestion Control の使用"
 
 #: ../../admin/http-proxy-caching.en.rst:716
 msgid ""
@@ -1349,42 +1349,42 @@ msgid ""
 "stop forwarding HTTP requests to origin servers when they become congested. "
 "Traffic Server then sends the client a message to retry the congested origin "
 "server later."
-msgstr ""
+msgstr "**Congestion Control** オプションはオリジンサーバーが混雑しているときに Traffic Server が HTTP リクエストをフォワートすることを止めることを可能にします。Traffic Server はその後、混雑してるオリジンサーバーに後でリトライするメッセージをクライアントに送ります。"
 
 #: ../../admin/http-proxy-caching.en.rst:721
 msgid ""
 "To use the **Congestion Control** option, you must perform the following "
 "tasks:"
-msgstr ""
+msgstr "**Congestion Control** オプションを使うには、次のタスクを実行してください。"
 
 #: ../../admin/http-proxy-caching.en.rst:724
 msgid ""
 "Set the variable :ts:cv:`proxy.config.http.congestion_control.enabled` to "
 "``1``"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.congestion_control.enabled` 変数を ``1`` にセットして下さい。"
 
 #: ../../admin/http-proxy-caching.en.rst:726
 msgid "Create rules in the :file:`congestion.config` file to specify:"
-msgstr ""
+msgstr "ルールを作成して :file:`congestion.config` ファイルに次のように記述してください。"
 
 #: ../../admin/http-proxy-caching.en.rst:727
 msgid "which origin servers Traffic Server tracks for congestion"
-msgstr ""
+msgstr "Traffic Server がどのオリジンサーバーが混雑してる"
 
 #: ../../admin/http-proxy-caching.en.rst:728
 msgid ""
 "the timeouts Traffic Server uses, depending on whether a server is congested"
-msgstr ""
+msgstr "サーバーが混雑していると判定するために Traffic Sever が使用するタイムアウト値"
 
 #: ../../admin/http-proxy-caching.en.rst:730
 msgid ""
 "the page Traffic Server sends to the client when a server becomes congested"
-msgstr ""
+msgstr "サーバー混雑時に Traffic Server がクライアントに送るページ"
 
 #: ../../admin/http-proxy-caching.en.rst:732
 msgid ""
 "if Traffic Server tracks the origin servers per IP address or per hostname"
-msgstr ""
+msgstr "Traffic Server が IP アドレス毎に追跡するか、ホストネーム毎に追跡するかどうか"
 
 #: ../../admin/http-proxy-caching.en.rst:741
 msgid "Using Transaction Buffering Control"
