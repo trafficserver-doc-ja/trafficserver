@@ -1564,7 +1564,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:541
 msgid "Cache Lookup"
-msgstr ""
+msgstr "キャッシュルックアップ"
 
 #: ../../arch/cache/cache-arch.en.rst:543
 msgid ""
@@ -1573,14 +1573,19 @@ msgid ""
 "where it is located. In some cases the lookup proceeds to read the first "
 "``Doc`` from disk to verify the object is still present in the cache."
 msgstr ""
+"初期リクエストが、キャッシュが不正確であると決定されなかった場合、ルックアップが"
+"実行されます。キャッシュルックアップは、もしオブジェクトがキャッシュの中にある"
+"なら、配置される場所を決定します。幾つかのケースでは、ルックアップは、まだ"
+"キャッシュに保存されているオブジェクトを検証するため、ディスクから"
+"ファースト ``Doc`` を読み込むために続行します。"
 
 #: ../../arch/cache/cache-arch.en.rst:545
 msgid "There are three basic steps to a cache lookup."
-msgstr ""
+msgstr "キャッシュルックアップまで、3つの基礎的なステップがあります。"
 
 #: ../../arch/cache/cache-arch.en.rst:547
 msgid "The cache key is computed."
-msgstr ""
+msgstr "キャッシュキーが計算されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:549
 msgid ""
@@ -1589,10 +1594,14 @@ msgid ""
 " is not stored anywhere, it presumed computable from the client request "
 "header."
 msgstr ""
+"これは通常、リクエスト URL を用いて計算されますが、 "
+":ref:`プラグインによって <cache-key>` オーバーライドできます。私がキャッシュ"
+"インデックス文字列がどこにも保存されない事を教えられる限り、クライアント"
+"リクエストヘッダから計算可能であると推定されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:551
 msgid "The cache stripe is determined (based on the cache key)."
-msgstr ""
+msgstr "キャッシュストライプは(キャッシュキーに基づいて)決定されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:553
 msgid ""
@@ -1600,31 +1609,42 @@ msgid ""
 "instances. The construction and arrangement of this array is the essence of "
 "how volumes are assigned."
 msgstr ""
+"キャッシュキーは、 :cpp:class:`Vol` インスタンスの配列の中で、ハッシュキー"
+"として使用されます。この配列の生成と配置は、ボリュームの割り当てられ方の"
+"本質です。"
 
 #: ../../arch/cache/cache-arch.en.rst:555
 msgid ""
 "The cache stripe directory :ref:`is probed <dir-probe>` using the index key "
 "computed from the cache key."
 msgstr ""
+"インデックスキーを用いて :ref:`検証された <dir-probe>` キャッシュストライプ"
+"ディレクトリは、キャッシュキーから計算されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:557
 msgid ""
 "Various other lookaside directories are checked as well, such as the "
 ":ref:`aggregation buffer <aggregation-buffer>`."
 msgstr ""
+"様々な他のルックアサイドディレクトリは、 "
+":ref:`集約バッファ <aggregation-buffer>` と同様にチェックされます。"
 
 #: ../../arch/cache/cache-arch.en.rst:559
 msgid ""
 "If the directory entry is found the first ``Doc`` is read from disk and "
 "checked for validity."
 msgstr ""
+"ディレクトリエントリが発見された場合、ファースト ``Doc`` はディスクから"
+"読み込まれ、正当性が検証されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:561
 msgid ""
-"This is done in :cpp:func:`CacheVC::openReadStartHead()` or "
+"This is done in :cpp:func:`cachevc::openreadstarthead()` or "
 ":cpp:func:`CacheVC::openReadStartEarliest()` which are tightly coupled "
 "methods."
 msgstr ""
+"これは 強く結びついたメソッドである :cpp:func:`cachevc::openreadstarthead()` "
+"もしくは :cpp:func:`CacheVC::openReadStartEarliest()` の中で実行されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:563
 msgid ""
@@ -1633,6 +1653,10 @@ msgid ""
 "check for an already extant ``OpenDir`` which if found is returned without "
 "additional work."
 msgstr ""
+"もしルックアップが成功したら、更に詳細なディレクトリエントリ"
+"(:cpp:class:`OpenDir`)が生成されます。ディレクトリ検査は、追加作業無しに"
+"返される、既に現存している ``OpenDir`` が見つかった場合、そのチェックを含む"
+"ことに注意してください。"
 
 #: ../../arch/cache/cache-arch.en.rst:566
 msgid "Cache Read"
