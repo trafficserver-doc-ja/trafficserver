@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: 2013-11-10 14:32+0900\n"
+"PO-Revision-Date: 2013-11-23 15:04+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -1265,7 +1265,7 @@ msgstr ""
 
 #: ../../admin/http-proxy-caching.en.rst:656
 msgid "Caching HTTP Alternates"
-msgstr ""
+msgstr "Caching HTTP Alternates"
 
 #: ../../admin/http-proxy-caching.en.rst:658
 msgid ""
@@ -1279,49 +1279,49 @@ msgid ""
 "specific ``Content-Type``\\s that Traffic Server will identify as alternates "
 "for caching. You can also limit the number of alternate versions of an "
 "object allowed in the cache."
-msgstr ""
+msgstr "いくつかの同一の URL へ複数のオブジェクトを回答するオリジンサーバーもあります。これらのオブジェクトのコンテンツはサーバーが異なる言語ごとにコンテンツを配信したり、異なるブラウザ毎にプレゼンテーションスタイルを用意していたいり、異なるドキュメントフォーマット(HTML, XML) を提供しているか等により、など多岐にわたります。同一オブジェクトの異なるバージョンは **alternates** と呼ばれ、``Vary`` レスポンスヘッダーに基づいて Traffic Server にキャッシュされます。Traffic Server がキャッシュする代替を判別する特別な ``Content-Type`` をリクエストやレスポンスヘッダに追加することができます。キャッシュする代替バージョンの数を制限することもできます。"
 
 #: ../../admin/http-proxy-caching.en.rst:670
 msgid "Configuring How Traffic Server Caches Alternates"
-msgstr ""
+msgstr "Traffic Server がキャッシュする代替の設定"
 
 #: ../../admin/http-proxy-caching.en.rst:672
 msgid ""
 "To configure how Traffic Server caches alternates, follow the steps below"
-msgstr ""
+msgstr "Traffic Server が代替をキャッシュするように設定するには、次のステップに従ってください。"
 
 #: ../../admin/http-proxy-caching.en.rst:677
 msgid ":ts:cv:`proxy.config.http.cache.enable_default_vary_headers`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.cache.enable_default_vary_headers`"
 
 #: ../../admin/http-proxy-caching.en.rst:678
 msgid ":ts:cv:`proxy.config.http.cache.vary_default_text`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.cache.vary_default_text`"
 
 #: ../../admin/http-proxy-caching.en.rst:679
 msgid ":ts:cv:`proxy.config.http.cache.vary_default_images`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.cache.vary_default_images`"
 
 #: ../../admin/http-proxy-caching.en.rst:680
 msgid ":ts:cv:`proxy.config.http.cache.vary_default_other`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.cache.vary_default_other`"
 
 #: ../../admin/http-proxy-caching.en.rst:687
 msgid ""
 "If you specify ``Cookie`` as the header field on which to vary in the above "
 "variables, make sure that the variable :ts:cv:`proxy.config.http.cache."
 "cache_responses_to_cookies` is set appropriately."
-msgstr ""
+msgstr "``Cookie`` を変数の上で変化するようにヘッダーフィールドに指定する場合、 :ts:cv:`proxy.config.http.cache.cache_responses_to_cookies` が適切にセットされていることを確認して下さい。"
 
 #: ../../admin/http-proxy-caching.en.rst:693
 msgid "Limiting the Number of Alternates for an Object"
-msgstr ""
+msgstr "オブジェクトの代替数の制限"
 
 #: ../../admin/http-proxy-caching.en.rst:695
 msgid ""
 "You can limit the number of alternates Traffic Server can cache per object "
 "(the default is 3)."
-msgstr ""
+msgstr "Traffic Server がオブジェクト毎にキャッシュする代替数を制限することができます。(デフォルトは 3 です)"
 
 #: ../../admin/http-proxy-caching.en.rst:700
 msgid ""
@@ -1329,15 +1329,15 @@ msgid ""
 "because all alternates have the same URL. Although Traffic Server can look "
 "up the URL in the index very quickly, it must scan sequentially through "
 "available alternates in the object store."
-msgstr ""
+msgstr "全ての代替は同一の URL を持つため、代替の数が多いと Traffic Server のキャッシュパフォーマンスに影響を与えるかもしれません。しかし、Traffic Server はインデックスの中の URL をとても高速に検索します。キャッシュストアの中に使用可能な代替があるか線形にスキャンします。"
 
 #: ../../admin/http-proxy-caching.en.rst:705
 msgid "To limit the number of alternates"
-msgstr ""
+msgstr "代替の数を制限するには"
 
 #: ../../admin/http-proxy-caching.en.rst:707
 msgid "Edit the variable :ts:cv:`proxy.config.cache.limits.http.max_alts`"
-msgstr ""
+msgstr " :ts:cv:`proxy.config.cache.limits.http.max_alts` 変数を変更してください。"
 
 #: ../../admin/http-proxy-caching.en.rst:714
 msgid "Using Congestion Control"
