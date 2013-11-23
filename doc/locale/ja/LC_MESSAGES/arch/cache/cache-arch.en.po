@@ -945,7 +945,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:486
 msgid "Cache Operations"
-msgstr ""
+msgstr "キャッシュオペレーション"
 
 #: ../../arch/cache/cache-arch.en.rst:488
 msgid ""
@@ -953,6 +953,9 @@ msgid ""
 "remapped. Tunneled transactions do not interact with the cache because the "
 "headers are never parsed."
 msgstr ""
+"キャッシュアクティビティは、 HTTP リクエストヘッダがパースされ、リマップ"
+"されてから開始します。トンネルされたトランザクションは、ヘッダがパースされる"
+"ことがないため、キャッシュに作用しません。"
 
 #: ../../arch/cache/cache-arch.en.rst:490
 msgid ""
@@ -965,6 +968,15 @@ msgid ""
 "course of the transaction as well. This is done to avoid the cost of cache "
 "activity for objects that cannot be in the cache."
 msgstr ""
+"ロジックを理解するため、\"キャッシュバリッド\"という用語を紹介しなければ"
+"いけません。これはキャッシュに置かれるのに有効なオブジェクトに、直接"
+"関連づけられているものを意味します。(例えば、 URLを参照する ``DELETE`` "
+"はキャッシュバリッドですが、それ自身はキャッシュできません) |TS| は"
+"トランザクション中に何度かキャッシュの正当性を計算し、キャッシュ"
+"バリッド結果のためにキャッシュオペレーションのみ行うため、重要です。"
+"基準は、トランザクションの進行の間に、同様に変更に使用されます。これは"
+"キャッシュできないオブジェクトの為のキャッシュアクティビティのコストを"
+"避けるために完了します。"
 
 #: ../../arch/cache/cache-arch.en.rst:492
 msgid ""
@@ -972,6 +984,9 @@ msgid ""
 "deleting entries as a special case of writing where only the volume "
 "directory is updated."
 msgstr ""
+"キャッシュオペレーションの3 つの基礎は、ルックアップ、リード、そして"
+"ライトです。我々はボリュームディレクトリが更新されるのみの箇所への書き込みの"
+"特殊なケースとしてエントリの削除を行うでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:494
 msgid ""
@@ -980,6 +995,10 @@ msgid ""
 "read`_ is attempted. If either the lookup or the read fails and the content "
 "is considered cacheable then a `cache write`_ is attempted."
 msgstr ""
+"クライアントリクエストヘッダがパースされ、キャッシュできると決定された後、 "
+"`キャッシュルックアップ`_ が行われます。成功した場合、 `キャッシュリード`_ が試みら"
+"れます。ルックアップかリードのいずれかが失敗する、もしくはコンテントがキャッシュ"
+"できると判断される場合、 `キャッシュライト`_  が試みられます。"
 
 #: ../../arch/cache/cache-arch.en.rst:497
 msgid "Cacheability"
