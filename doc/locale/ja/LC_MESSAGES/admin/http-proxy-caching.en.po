@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: 2013-11-23 16:29+0900\n"
+"PO-Revision-Date: 2013-11-23 17:04+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -1504,7 +1504,7 @@ msgstr "c:func:`TSHttpTxnConfigIntSet` を使う場合、`TS_HTTP_READ_RESPONSE_
 
 #: ../../admin/http-proxy-caching.en.rst:782
 msgid "Reducing Origin Server Requests (Avoiding the Thundering Herd)"
-msgstr ""
+msgstr "オリジンサーバーへのリクエストの削減(轟く群衆を避ける)"
 
 #: ../../admin/http-proxy-caching.en.rst:784
 msgid ""
@@ -1513,11 +1513,11 @@ msgid ""
 "simultaneous requests to the origin server, potentially overwhelming it or "
 "associated resources. There are several features in Traffic Server that can "
 "be used to avoid this scenario."
-msgstr ""
+msgstr "オブジェクトがキャッシュから配信されない場合、リクエストはオリジンサーバーにプロキシーされます。\n"
 
 #: ../../admin/http-proxy-caching.en.rst:789
 msgid "Read While Writer"
-msgstr ""
+msgstr "Read While Writer"
 
 #: ../../admin/http-proxy-caching.en.rst:790
 msgid ""
@@ -1530,38 +1530,38 @@ msgid ""
 "between cache refresh, and cold cache, so we have no way to know if a "
 "response is going to be cacheable, and therefore allow read-while-writer "
 "functionality."
-msgstr ""
+msgstr "Traffic Server がオリジンからオブジェクトをフェッチしに行くとき、そしてレスポンスを受け取るとき、どんな数のクライアントでも部分的にキャッシュオブジェクトに入ったものを配信し始めることができます。違いは Squid はオリジンに行ったすぐ後で許可していますが、ATS は完全なレスポンスヘッダーを受け取るまでできません。この理由はキャッシュリフレッシュとコールドキャッシュの間で差異を作りたくないからです。レスポンスがキャッシュ可能なものか知る方法がないので、read-while-writer 機能を許可しています。"
 
 #: ../../admin/http-proxy-caching.en.rst:792
 msgid "The configurations necessary to enable this in ATS are:"
-msgstr ""
+msgstr "ATS でこれを有効化する為に必要な設定は"
 
 #: ../../admin/http-proxy-caching.en.rst:794
 msgid "CONFIG :ts:cv:`proxy.config.cache.enable_read_while_writer` ``INT 1``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.cache.enable_read_while_writer` ``INT 1``"
 
 #: ../../admin/http-proxy-caching.en.rst:795
 msgid ""
 "CONFIG :ts:cv:`proxy.config.http.background_fill_active_timeout` ``INT 0``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.http.background_fill_active_timeout` ``INT 0``"
 
 #: ../../admin/http-proxy-caching.en.rst:796
 msgid ""
 "CONFIG :ts:cv:`proxy.config.http.background_fill_completed_threshold` "
 "``FLOAT 0.000000``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.http.background_fill_completed_threshold` ``FLOAT 0.000000``"
 
 #: ../../admin/http-proxy-caching.en.rst:797
 msgid "CONFIG :ts:cv:`proxy.config.cache.max_doc_size` ``INT 0``"
-msgstr ""
+msgstr "CONFIG :ts:cv:`proxy.config.cache.max_doc_size` ``INT 0``"
 
 #: ../../admin/http-proxy-caching.en.rst:799
 msgid "All four configurations are required, for the following reasons:"
-msgstr ""
+msgstr "次の理由により、４つ全ての設定が必要です。"
 
 #: ../../admin/http-proxy-caching.en.rst:801
 msgid "enable_read_while_writer turns the feature on. It's off (0) by default"
-msgstr ""
+msgstr "enable_read_while_writer は機能を on にします。デフォルトでは off (0) です。"
 
 #: ../../admin/http-proxy-caching.en.rst:802
 msgid ""
@@ -1570,20 +1570,20 @@ msgid ""
 "goes away, someone needs to take over the session. Hence, you should set the "
 "background fill timeouts and threshold to zero; this assures they never "
 "times out and always is allowed to kick in."
-msgstr ""
+msgstr "バックグラウンドフィル機能は全てのあり得るリクエストでキックされることが許可されているべきです。これは重要で、writer (\\\"最初のクライアントセッション\\\") が出て行った場合、誰かがセッションを引継ぐ必要があります。したがって、バックグラウンドフィルタイムアウトを設定し、境界点をゼロにするべきです。これは彼らを安心させます。タイムアウトせずに、キックインすることを常に許可されています。"
 
 #: ../../admin/http-proxy-caching.en.rst:803
 msgid ""
 "The proxy.config.cache.max_doc_size should be unlimited (set to 0), since "
 "the object size may be unknown, and going over this limit would cause a "
 "disconnect on the objects being served."
-msgstr ""
+msgstr "proxy.config.cache.max_doc_size は無制限(0)に設定されているべきです。オブジェクトサイズは分からないので。この制限は配信されているオブジェクトのコネクションの切断の原因になるかもしれません。\n"
 
 #: ../../admin/http-proxy-caching.en.rst:805
 msgid ""
 "Once all this enabled, you have something that is very close, but not quite "
 "the same, as Squid's Collapsed Forwarding."
-msgstr ""
+msgstr "一度これら全てが有効化されると、Squid の Collapesd Forwarding にとても近いが、違うものができます。"
 
 #: ../../admin/http-proxy-caching.en.rst:812
 msgid "Fuzzy Revalidation"
