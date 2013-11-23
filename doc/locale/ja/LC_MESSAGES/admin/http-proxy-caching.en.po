@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: 2013-11-23 15:39+0900\n"
+"PO-Revision-Date: 2013-11-23 16:29+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -1388,7 +1388,7 @@ msgstr "Traffic Server が IP アドレス毎に追跡するか、ホストネ�
 
 #: ../../admin/http-proxy-caching.en.rst:741
 msgid "Using Transaction Buffering Control"
-msgstr ""
+msgstr "Transaction Buffering Control の使用"
 
 #: ../../admin/http-proxy-caching.en.rst:743
 msgid ""
@@ -1400,7 +1400,7 @@ msgid ""
 "connection is fast and the origin server connection slow. If very large "
 "objects are being used this can cause the memory usage of Traffic Server to "
 "become `very large <https://issues.apache.org/jira/browse/TS-1496>`_."
-msgstr ""
+msgstr "デフォルトでは I/O オペレーションは Traffic Server、ネットワークやキャッシュが実行される限り速くフルスピードで実行されます。これはクライアント側のコネクションが遅い場合に、大きなオブジェクトにとって問題になる可能性があります。このような場合、クライアントに送られるのを待っている間、コンテンツはメモリにバッファーされます。これはクライアントのコネクションが早く、オリジンサーバーのコネクションが遅い場合に ``POST`` リクエストでも発生し得ます。とても大きなオブジェクトが使われているとこれは Traffic Server のメモリ使用量がとても大きくなる原因になり得ます。 `very large <https://issues.apache.org/jira/browse/TS-1496>`_\n"
 
 #: ../../admin/http-proxy-caching.en.rst:750
 msgid ""
@@ -1411,7 +1411,7 @@ msgid ""
 "from arriving. Internal operations continue to proceed at full speed until "
 "the buffer space in use drops below the low water mark and external data I/O "
 "is re-enabled."
-msgstr ""
+msgstr "この問題はトランザクションが使うバッファースペースの量をコントロールすることで改善されるかもしれません。high water と low water マークはトランザクションで使用されるバイトの幅をセットします。バッファースペースが high water マークを越えた場合、コネクションは追加のデータがやってくることを止める為に減速します。使われているバッファースペースが low water マークを下回り、外部のデータ I/O が再開されるまで内側のオペレーションはフルスピードで進み続けます。"
 
 #: ../../admin/http-proxy-caching.en.rst:755
 msgid ""
@@ -1420,87 +1420,87 @@ msgid ""
 "and then throttling the client side connection either externally or via a "
 "transform. This will cause the connection to the origin server to be limited "
 "to roughly the client side connection speed."
-msgstr ""
+msgstr "?"
 
 #: ../../admin/http-proxy-caching.en.rst:759
 msgid ""
 "Traffic Server does network I/O in large chunks (32K or so) and therefore "
 "the granularity of transaction buffering control is limited to a similar "
 "precision."
-msgstr ""
+msgstr "Traffic Server はネットワーク I/O をラージチャンク(32K など) で行います。よって、粗いトランザクションバッファーコントロールは同じような値に制限されています。"
 
 #: ../../admin/http-proxy-caching.en.rst:762
 msgid ""
 "The buffer size calculations include all elements in the transaction, "
 "including any buffers associated with :ref:`transform plugins <transform-"
 "plugin>`."
-msgstr ""
+msgstr "バッファーサイズの計算はトランザクションの全ての要素を含んでいます。これは :ref:`transform plugins <transform-plugin>` に紐づけられているどんなバッファーも含みます。"
 
 #: ../../admin/http-proxy-caching.en.rst:764
 msgid ""
 "Transaction buffering control can be enabled globally by using configuration "
 "variables or by :c:func:`TSHttpTxnConfigIntSet` in a plugin."
-msgstr ""
+msgstr "トランザクションバッファーコントロールは設定変数を使ってグローバルに有効化することもできます。また :c:func:`TSHttpTxnConfigIntSet` を使用してプラグインの中で有効化することもできます。"
 
 #: ../../admin/http-proxy-caching.en.rst:767
 msgid "Value"
-msgstr ""
+msgstr "値"
 
 #: ../../admin/http-proxy-caching.en.rst:767
 msgid "Variable"
-msgstr ""
+msgstr "変数"
 
 #: ../../admin/http-proxy-caching.en.rst:767
 msgid "`TSHttpTxnConfigIntSet` key"
-msgstr ""
+msgstr "`TSHttpTxnConfigIntSet` キー"
 
 #: ../../admin/http-proxy-caching.en.rst:769
 msgid "Enable buffering"
-msgstr ""
+msgstr "バッファーの有効化"
 
 #: ../../admin/http-proxy-caching.en.rst:769
 msgid ":ts:cv:`proxy.config.http.flow_control.enabled`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.flow_control.enabled`"
 
 #: ../../admin/http-proxy-caching.en.rst:769
 msgid "`TS_CONFIG_HTTP_FLOW_CONTROL_ENABLED`"
-msgstr ""
+msgstr "`TS_CONFIG_HTTP_FLOW_CONTROL_ENABLED`"
 
 #: ../../admin/http-proxy-caching.en.rst:770
 msgid "Set high water"
-msgstr ""
+msgstr "high water の設定"
 
 #: ../../admin/http-proxy-caching.en.rst:770
 msgid ":ts:cv:`proxy.config.http.flow_control.high_water`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.flow_control.high_water`"
 
 #: ../../admin/http-proxy-caching.en.rst:770
 msgid "`TS_CONFIG_HTTP_FLOW_CONTROL_HIGH_WATER`"
-msgstr ""
+msgstr "`TS_CONFIG_HTTP_FLOW_CONTROL_HIGH_WATER`"
 
 #: ../../admin/http-proxy-caching.en.rst:771
 msgid "Set low water"
-msgstr ""
+msgstr "low water の設定"
 
 #: ../../admin/http-proxy-caching.en.rst:771
 msgid ":ts:cv:`proxy.config.http.flow_control.low_water`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.http.flow_control.low_water`"
 
 #: ../../admin/http-proxy-caching.en.rst:771
 msgid "`TS_CONFIG_HTTP_FLOW_CONTROL_LOW_WATER`"
-msgstr ""
+msgstr "`TS_CONFIG_HTTP_FLOW_CONTROL_LOW_WATER`"
 
 #: ../../admin/http-proxy-caching.en.rst:774
 msgid ""
 "Be careful to always have the low water mark equal or less than the high "
 "water mark. If you set only one, the other will be set to the same value."
-msgstr ""
+msgstr "low water マークは high water マークと常に同じか少ないことに注意してください。一方だけを設定すると、もう一方は同じ値に設定されます。"
 
 #: ../../admin/http-proxy-caching.en.rst:777
 msgid ""
 "If using c:func:`TSHttpTxnConfigIntSet`, it must be called no later than "
 "`TS_HTTP_READ_RESPONSE_HDR_HOOK`."
-msgstr ""
+msgstr "c:func:`TSHttpTxnConfigIntSet` を使う場合、`TS_HTTP_READ_RESPONSE_HDR_HOOK` のすぐ後ろで呼ばれなければなりません。"
 
 #: ../../admin/http-proxy-caching.en.rst:782
 msgid "Reducing Origin Server Requests (Avoiding the Thundering Herd)"
