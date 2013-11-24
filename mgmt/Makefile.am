@@ -17,7 +17,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-SUBDIRS = cluster preparse utils web2 stats api cli
+SUBDIRS = cluster preparse utils web2 stats api
 
 # This is for traffic_manager only (local manager)
 AM_CPPFLAGS = $(ink_with_modules_local) \
@@ -58,6 +58,7 @@ libmgmt_p_a_CPPFLAGS = \
   -I$(top_srcdir)/lib/records \
   -I$(top_srcdir)/lib/ts \
   -I$(top_srcdir)/lib
+
 libmgmt_p_a_SOURCES = \
   BaseManager.cc \
   BaseManager.h \

@@ -206,6 +206,7 @@ ConfigVolumes config_volumes;
 
 #if TS_HAS_TESTS
 void force_link_CacheTestCaller() {
+  force_link_CacheTest();
 }
 #endif
 

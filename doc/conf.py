@@ -265,7 +265,12 @@ man_pages = [
    ('reference/api/TSPluginInit.en', 'TSPluginInit', u'Traffic Server plugin loading and registration', None, u'3ts'),
    ('reference/api/TSRemap.en', 'TSRemap', u'Traffic Server remap plugin entry points ', None, u'3ts'),
    ('reference/api/TSTrafficServerVersionGet.en', 'TSTrafficServerVersionGet', u'return Traffic Server version information', None, u'3ts'),
-   ('reference/api/TSUrlCreate.en', 'TSUrlCreate', u'Traffic Server URL manipulation API', None, u'3ts'),
+   ('reference/api/TSUrlCreate.en', 'TSUrlCreate', u'Traffic Server URL object construction API', None, u'3ts'),
+   ('reference/api/TSUrlHostGet.en', 'TSUrlHostGet', u'Traffic Server URL component retrieval API', None, u'3ts'),
+   ('reference/api/TSUrlHostSet.en', 'TSUrlHostSet', u'Traffic Server URL component manipulation API', None, u'3ts'),
+   ('reference/api/TSUrlPercentEncode.en', 'TSUrlPercentEncode', u'Traffic Server URL percent encoding API', None, u'3ts'),
+   ('reference/api/TSUrlStringGet.en', 'TSUrlStringGet', u'Traffic Server URL string representations API', None, u'3ts'),
+   ('reference/api/TSMimeHdrFieldValueStringGet.en', 'TSMimeHdrFieldValueStringGet', u'Get HTTP MIME header values', None, u'3ts'),
 
    ('reference/commands/traffic_cop.en', 'traffic_cop', u'Traffic Server watchdog', None, '8'),
    ('reference/commands/traffic_line.en', 'traffic_line', u'Traffic Server command line', None, '8'),
@@ -276,7 +281,7 @@ man_pages = [
    ('reference/commands/traffic_shell.en', 'traffic_shell', u'Traffic Server shell', None, '8'),
 
    ('reference/commands/tspush.en', 'tspush', u'Push objects into the Traffic Server cache', None, '1'),
-   ('reference/commands/tstop.en','tstop', u'Display Traffic Server statistics', None, '1'),
+   ('reference/commands/traffic_top.en','traffic_top', u'Display Traffic Server statistics', None, '1'),
    ('reference/commands/tsxs.en', 'tsxs', u'Traffic Server plugin tool', None, '1'),
 
    ('reference/configuration/cache.config.en', 'cache.config', u'Traffic Server cache configuration file', None, '5'),
@@ -362,3 +367,35 @@ epub_copyright = u'2013, dev@trafficserver.apache.org'
 
 # Allow duplicate toc entries.
 #epub_tocdup = True
+
+if __name__ == '__main__':
+  # Use optparse instead of argparse because this needs to work on old Python versions.
+  import optparse
+
+  parser = optparse.OptionParser(description='Traffic Server Sphinx docs configuration')
+  parser.add_option('--check-version', action='store_true', dest='checkvers')
+  parser.add_option('--man-pages', action='store_true', dest='manpages')
+  parser.add_option('--section', type=int, default=0, dest='section')
+
+  (options, args) = parser.parse_args()
+
+  # Print the names of the man pages for the requested manual section.
+  if options.manpages:
+    for page in man_pages:
+      if options.section == 0 or options.section == int(page[4][0]):
+        print page[1] + '.' + page[4]
+
+  # Check whether we have a recent version of sphinx. EPEL and CentOS are completely crazy and I don't understand their
+  # packaging at all. The test below works on Ubuntu and places where sphinx is installed sanely AFAICT.
+  if options.checkvers:
+    print 'checking for sphinx version >= 1.1... ',
+    try:
+      import sphinx
+      version = sphinx.__version__
+      (major, minor, micro) = version.split('.')
+      if (int(major) > 1) or (int(major) == 1 and int(minor) >= 1):
+        print 'found ' + sphinx.__version__
+      sys.exit(0)
+    except Exception as e:
+      print e
+      sys.exit(1)

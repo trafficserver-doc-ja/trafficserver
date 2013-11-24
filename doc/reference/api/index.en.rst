@@ -29,10 +29,15 @@ API Reference
   TSIOBufferCreate.en
   TSInstallDirGet.en
   TSMBufferCreate.en
+  TSMimeHdrFieldValueStringGet.en
   TSPluginInit.en
   TSRemap.en
   TSTrafficServerVersionGet.en
   TSUrlCreate.en
+  TSUrlHostGet.en
+  TSUrlHostSet.en
+  TSUrlPercentEncode.en
+  TSUrlStringGet.en
   TSLifecycleHookAdd.en
   TSHttpOverridableConfig.en
   TSmalloc.en

@@ -58,9 +58,7 @@ extern int remote_management_flag;
 extern char management_directory[PATH_NAME_MAX + 1];
 
 inkcoreapi extern int qt_accept_file_descriptor;
-inkcoreapi extern int CacheClusteringEnabled;
-
-extern int use_mp;
+inkcoreapi extern int cache_clustering_enabled;
 
 // Debugging Configuration
 extern char debug_host[MAXDNAME + 1];
