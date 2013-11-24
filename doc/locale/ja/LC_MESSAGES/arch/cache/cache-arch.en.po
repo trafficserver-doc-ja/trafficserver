@@ -1660,7 +1660,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:566
 msgid "Cache Read"
-msgstr ""
+msgstr "キャッシュリード"
 
 #: ../../arch/cache/cache-arch.en.rst:568
 msgid ""
@@ -1669,10 +1669,14 @@ msgid ""
 "additional information. This will always contain the HTTP headers for all "
 "alternates of the object."
 msgstr ""
+"キャッシュリードは、 `キャッシュルックアップ`_ が成功した後に開始します。"
+"この点で、ファースト ``Doc`` はメモリへ読み込まれ、追加情報の為に問い合わせ"
+"られます。これは、常にオブジェクトの全オルタネイトの HTTP ヘッダを含む"
+"でしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:0
 msgid "Read while write"
-msgstr ""
+msgstr "ライト中リード"
 
 #: ../../arch/cache/cache-arch.en.rst:572
 msgid ""
@@ -1682,6 +1686,12 @@ msgid ""
 "enabled in :file:`records.config` and if not, a cache read will fail if the "
 "object is currently be written or updated."
 msgstr ""
+"\"ライト中リード\" をサポートする為のコードが用意されています。これは、"
+"1 トランザクション内で、他で書き込まれている最中に、キャッシュからオブジェクト"
+"を配信します。これが実際に動作していても、私には明らかにされません。それは"
+"特別に :file:`records.config` で有効にしなければならず、これを行わない場合は、"
+"オブジェクトが現在書き込まれている、もしくは更新されている場合、キャッシュ"
+"リードに失敗するでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:574
 msgid ""
@@ -1689,6 +1699,9 @@ msgid ""
 "comparing the client request to the stored response headers, but it can be "
 "controlled by a plugin using ``TS_HTTP_ALT_SELECT_HOOK``."
 msgstr ""
+"この点で、オブジェクトのオルタネイトは選択されます。これは、保存されたレスポンス"
+"ヘッダへのクライアントリクエストの比較によって行われますが、 "
+"``TS_HTTP_ALT_SELECT_HOOK`` を使用するプラグインによって制御できます。"
 
 #: ../../arch/cache/cache-arch.en.rst:576
 msgid ""
@@ -1697,10 +1710,14 @@ msgid ""
 "is by looking at the headers and possibly other metadata (note the headers "
 "can't be checked until we've selected an alternate)."
 msgstr ""
+"コンテントが、オブジェクトの \"新鮮さ\" の計算によって古い場合は、"
+"この時、閲覧するためにチェックできます。これは、ヘッダとあるいはその他の"
+"メタデータ(我々がオルタネイトを選択するまで、ヘッダはチェックできないことに"
+"注意してください)を見ることによってオブジェクトの古さの必要なチェックです。"
 
 #: ../../arch/cache/cache-arch.en.rst:578
 msgid "Most of this work is done in::"
-msgstr ""
+msgstr "この処理のほとんどは、以下の中で行われます::"
 
 #: ../../arch/cache/cache-arch.en.rst:582
 msgid ""
@@ -1709,6 +1726,9 @@ msgid ""
 "based on when the object was placed in cache, not on any data in the "
 "headers."
 msgstr ""
+"最初に、もしリクエストが設定ファイルの行にマッチしたら、 :file:`cache.config` で"
+"設定できる TTL (time to live) の値がチェックされます。これは、ヘッダ内のどのデータ"
+"でもなく、オブジェクトがいつキャッシュに置かれたかに基づいて行われます。"
 
 #: ../../arch/cache/cache-arch.en.rst:584
 msgid ""
@@ -1716,21 +1736,28 @@ msgid ""
 ":file:`cache.config` value \"revalidate-after\" is not set, and if set the "
 "object is marked \"stale\"."
 msgstr ""
+"次に、 :file:`cache.config` の値 \"revalidate-after\" が設定されておらず、"
+"かつオブジェクトが \"stale\" とマークするよう設定されている場合、内部"
+"フラグ (\"needs-revalidate-once\") がチェックされます。"
 
 #: ../../arch/cache/cache-arch.en.rst:586
 msgid "After these checks the object age is calculated by::"
-msgstr ""
+msgstr "これらのチェックの後、オブジェクトの年齢が、以下により計算されます::"
 
 #: ../../arch/cache/cache-arch.en.rst:590
 msgid ""
 "and then any configured fuzzing is applied. The limits to this age based on "
 "available data is calculated by::"
 msgstr ""
+"そしてその際、任意の設定されたファジングが適用されます。この年齢の制限は、"
+"以下により計算された使用可能なデータに基づきます。::"
 
 #: ../../arch/cache/cache-arch.en.rst:594
 msgid ""
 "How this age is used is determined by the :file:`records.config` value::"
 msgstr ""
+"この年齢がどのように使用されるかは、 :file:`records.config` の以下の値により"
+"決定されます::"
 
 #: ../../arch/cache/cache-arch.en.rst:598
 msgid ""
@@ -1739,6 +1766,10 @@ msgid ""
 "cache control values ``max-age``, ``min-fresh``, ``max-stale`` unless "
 "explicitly overridden in :file:`cache.config`."
 msgstr ""
+"この値がゼロである場合、計算方法は、ドキュメント年齢と共に、新鮮さの限界値を"
+"比較する方法が使用され、 :file:`cache.config` で明示的にオーバーライドされて"
+"いない値を除き、クライアントが配信した cache control 値、``max-age``, "
+"``min-fresh``, ``max-stale`` のどれかを用いて修正されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:600
 msgid ""
@@ -1746,6 +1777,9 @@ msgid ""
 "client request may be changed to an ``If Modified Since`` request to "
 "revalidate."
 msgstr ""
+"オブジェクトが古く無い場合、それがクライアントへ配信されます。"
+"古い場合、クライアントリクエストは、再検証のため、 ``If Modified Since`` "
+"リクエストに変更されるかもしれません。"
 
 #: ../../arch/cache/cache-arch.en.rst:602
 msgid ""
@@ -1756,6 +1790,11 @@ msgid ""
 " object or, if the request contains a single range, it can use the range "
 "acceleration."
 msgstr ""
+"リクエストは、プロデューサとして振る舞う :cpp:class:`CacheVC` と、シンクとして"
+"振る舞うクライアント ``NetVC`` 共に、標準的な仮想接続トンネル "
+"(``HttpTunnel``) を用いて配信されます。リクエストがレンジリクエストである場合、"
+"適切なオブジェクトの部分を選択するための変形を伴って修正出来ます。"
+"あるいはリクエストが単一のレンジを含む場合、範囲加速を使用できます。"
 
 #: ../../arch/cache/cache-arch.en.rst:607
 msgid ""
@@ -1764,6 +1803,11 @@ msgid ""
 "first. This allows loading the fragment containing the first requested byte "
 "immediately rather than performing reads on the intermediate fragments."
 msgstr ""
+"範囲加速は、過去にファーストだった、全フラグメントへのオフセットを含む、"
+"アーリスト ``Doc`` に取り付けられた、フラグメントオフセットテーブルの"
+"問い合わせにより行われます。これは、最初にリクエストされたバイトを、"
+"中間のフラグメントの読込みが実行されるより早く、フラグメントを読み込む事を"
+"許可します。"
 
 #: ../../arch/cache/cache-arch.en.rst:612
 msgid "Cache Write"
