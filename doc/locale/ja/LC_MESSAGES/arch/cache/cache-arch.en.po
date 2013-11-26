@@ -1401,7 +1401,7 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:612
 msgid "Cache Write"
-msgstr ""
+msgstr "キャッシュライト"
 
 #: ../../arch/cache/cache-arch.en.rst:614
 msgid ""
@@ -1415,10 +1415,19 @@ msgid ""
 " to the cache and then to the client, it is split and goes both directions "
 "in parallel. This avoids any data synchronization issues between the two."
 msgstr ""
+"キャッシュへの書込みは、 cpp:class:`CacheVC` クラスのインスタンスによって"
+"扱われます。おれは、データを受信し、キャッシュにそれを書く、シンクとして"
+"振る舞う仮想接続です。標準的なトランザクションのため、 :cpp:class:HttpTunnel に"
+"よって扱われる仮想接続 (*VConns*) の間でデータは転送されます。キャッシュへの"
+"書き込みは、トンネルコンシューマとして、 ``CacheVC`` インスタンスに取り付け"
+"られることにより処理されます。それは従って、クライアントへデータを転送する"
+"仮想接続と並列に動作します。データはキャッシュとその後のクライアントへ流れません。"
+"それは分離され、並列に両方向に配信されます。これにより、データが2点間で同時に"
+"発行することを避けます。"
 
 #: ../../arch/cache/cache-arch.en.rst:0
 msgid "Writing to disk"
-msgstr ""
+msgstr "ディスクへの書込み"
 
 #: ../../arch/cache/cache-arch.en.rst:623
 msgid ""
@@ -1427,6 +1436,9 @@ msgid ""
 "hands the operation off to the AIO thread which signals back once the "
 "operation completes."
 msgstr ""
+"ディスクへの実際の書込みは、 I/O 命令を発行する別のスレッド、 AIO スレッドに"
+"よって扱われます。キャッシュロジックはデータを集約し、その後命令を、 "
+"命令完了後すぐに発信し返す AIO スレッドに渡します。"
 
 #: ../../arch/cache/cache-arch.en.rst:627
 msgid ""
@@ -1440,6 +1452,15 @@ msgid ""
 "continues to operate on subsequent data. The volume in turn places these "
 "write requests in an holding area called the `aggregation buffer`_."
 msgstr ""
+" ``CacheVC`` が非依存にそのトランザクションをそれぞれ処理する間、それらは"
+"ボリュームコンテントへそのデータを書き込む為にボリュームオブジェクトを"
+"呼び出す ``CacheVC`` ごとに、ボリュームレベルで対話します。 ``CacheVC`` は"
+"トランザクションが完了するか、書き込んだデータの総量が、ターゲットフラグ"
+"サイズを超えるまで、内部的なデータを収集します。前者の場合、全体の"
+"オブジェクトは書込みのためボリュームに送られます。後者の場合、データの総量の"
+"ターゲットフラグメントサイズは送られ、 ``CacheVC`` は続きのデータの書込みのため"
+"継続します。この時のボリュームは、 `集約バッファ`_ と呼ばれる、保持している"
+"領域にこれらの書込みリクエストを配置します。"
 
 #: ../../arch/cache/cache-arch.en.rst:634
 msgid ""
@@ -1453,39 +1474,56 @@ msgid ""
 "finalized in the cache the write cursor was at the position of the first "
 "``Doc``)."
 msgstr ""
+"ターゲットフラグメントサイズ以下のオブジェクトのため、順序は考慮しません。"
+"オブジェクトは単純にボリュームコンテントに書き込まれます。巨大なオブジェクトの"
+"ため、アーリスト ``Doc`` が最初に書き込まれ、ファースト ``Doc`` は最後に"
+"書き込まれます。これは、オブジェクトに書き込まれるべき幾つかの検出能力を"
+"提供します。書込みカーソルの性質により、最初のフラグメントの上書きも無しに"
+"書き込める(アーリスト ``Doc`` の)最初のフラグメントの後にフラグメントはありません。"
+"(我々がその時にキャッシュ内でオブジェクトが終了されていたことを知るまで、書込み"
+"カーソルはファースト ``Doc`` の位置にいました。)"
 
 #: ../../arch/cache/cache-arch.en.rst:641
 msgid ""
 "It is the responsibility of the ``CacheVC`` to not submit writes that exceed"
 " the target fragment size."
 msgstr ""
+"ターゲットフラグメントサイズを超えた書込みを発行しないことが、 ``CacheVC`` の"
+"役割です。"
 
 #: ../../arch/cache/cache-arch.en.rst:646
 msgid "Update"
-msgstr ""
+msgstr "更新"
 
 #: ../../arch/cache/cache-arch.en.rst:648
 msgid ""
 "Cache write also covers the case where an existing object in the cache is "
 "modified. This occurs when"
-msgstr ""
+msgstr "キャッシュライトは、キャッシュ内の存在するオブジェクトを更新する"
+"ケースもカバーします。これは以下の時に発生します。"
 
 #: ../../arch/cache/cache-arch.en.rst:650
 msgid ""
 "A conditional request is made to the origin server and a ``304 - Not "
 "Modified`` response is received."
 msgstr ""
+"条件付きのリクエストはオリジンサーバに作られ、 ``304 - Not Modified`` "
+"レスポンスが受信されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:651
 msgid ""
 "An alternate of the object is retrieved from an origin server and added to "
 "the object."
 msgstr ""
+"オブジェクトのオルタネイトはオリジンサーバから回収され、オブジェクトに追加"
+"されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:652
 msgid ""
 "An alternate of the object is removed (e.g., due to a ``DELETE`` request)."
 msgstr ""
+"オブジェクトのオルタネイトは、(例えば、 ``DELETE`` リクエストによって)"
+"削除されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:654
 msgid ""
@@ -1500,10 +1538,18 @@ msgid ""
 "the first ``Doc``, the rest of the data for each alternate is completely "
 "independent."
 msgstr ""
+"各ケースにおいて、オブジェクトのメタデータは修正されなくてはいけません。 "
+"|TS| は既にキャッシュにあるデータを更新することは無いため、ファースト ``Doc`` "
+"は再度キャッシュに書き込まれるでしょう。クライアントリクエストは既に処理されて"
+"いるので、ファースト ``Doc`` はキャッシュから読み込まれ、メモリに存在します。"
+"オルタネイトベクタは(エントリは新しい HTTP ヘッダを含むように、追加や削除、"
+"変更をされるよう)適切に更新され、ディスクに書き込まれます。異なる ``CacheVC`` "
+"インスタンスによって、複数のオルタネイトを変更することができます。唯一の競合は"
+"ファースト ``Doc`` です。各オルタネイトのデータの残りは完全に独立しています。"
 
 #: ../../arch/cache/cache-arch.en.rst:664
 msgid "Aggregation Buffer"
-msgstr ""
+msgstr "集約バッファ"
 
 #: ../../arch/cache/cache-arch.en.rst:666
 msgid ""
@@ -1519,6 +1565,17 @@ msgid ""
 "process repeats. There is a special lookup table for the aggregation buffer "
 "so that object lookup can find cache data in that memory."
 msgstr ""
+"キャッシュへのディスク書込みは、*集約バッファ* を通して扱われます。 これは、"
+"各 :cpp:class:`Vol` インスタンスの一つです。システムコールの回数の最小化の"
+"ため、データは粗い :ref:`ターゲットフラグメントサイズ <target-fragment-size>` "
+"バイト単位でディスクに書き込まれます。このアルゴリズムは単純に用いられます。 "
+"- データは、もうターゲットフラグメントサイズの超過無しに調節できなくなるまで"
+"集約バッファに積み上げられます。この点でバッファはディスクに書き込まれ、"
+"バッファ内のデータと共に、オブジェクトのボリュームディレクトリエントリが、"
+"実際のディスク上のオブジェクトがある場所と更新されます。(ディスクへの書込み"
+"動作が決定されます。)バッファが書き込まれた後、クリアされ、処理が繰り返されます。"
+"オブジェクトルックアップが、メモリ上のキャッシュデータを見つけられるため、"
+"集約バッファの為の特殊なルックアップテーブルがあります。"
 
 #: ../../arch/cache/cache-arch.en.rst:674
 msgid ""
@@ -1528,6 +1585,11 @@ msgid ""
 "memory cached until enough additional cache content arrives to fill the "
 "buffer."
 msgstr ""
+"集約バッファのデータが、キャッシュの他の部分に可視であるため、とりわけ"
+" `キャッシュルックアップ`_ では、ディスクへの部分的に満たされた集約"
+"バッファをプッシュする必要はありません。この影響で、そのようなデータは"
+"バッファを満たすような、十分に追加キャッシュコンテントが届けられるまで、"
+"効率的にメモリキャッシュされます。"
 
 #: ../../arch/cache/cache-arch.en.rst:678
 msgid ""
@@ -1540,10 +1602,18 @@ msgid ""
 "fragment table is accumulated in the earliest ``Doc`` which has the offsets "
 "of the first byte for each fragment."
 msgstr ""
+"サイズに切られたフラグメントは、書き込み命令をディスクに分配するためだけに"
+"使用されるため、ターゲットフラグメントサイズは、小サイズのオブジェクトに"
+"少々の影響があります。巨大なオブジェクトでは、オブジェクトがディスク内の"
+"別の場所のフラグメントに分割されることになるので、この影響は非常に重要です。"
+"各フラグメント書込みは、計算的に繋げられるボリュームエントリの、それら自身の"
+"エントリを持ちます。(各キャッシュキーは、過去のものから計算されます)もし可能なら、"
+"フラグメントテーブルは、各フラグメントへの最初のバイトのオフセットを持つ"
+"アーリスト ``Doc`` に蓄積されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:685
 msgid "Evacuation Mechanics"
-msgstr ""
+msgstr "退避のメカニズム"
 
 #: ../../arch/cache/cache-arch.en.rst:687
 msgid ""
@@ -1556,6 +1626,13 @@ msgid ""
 "on data in stripe data structures (attached to the :cpp:class:`Vol` "
 "instance)."
 msgstr ""
+"デフォルトでは、一度キャッシュを一周するまで進むと、少なくとも一度は、書込み"
+"カーソルはオブジェクトを上書き(事実上のキャッシュからの追い出し)します。"
+"幾つかのケースでは、これは受け入れられず、オブジェクトはキャッシュからの"
+"読込みと、オブジェクトの物理ストレージを、書込みカーソルの手前から背後に"
+"移動させたキャッシュへの書き戻しによる *退避* が行われます。退避された"
+"オブジェクトは、ストライプデータ構造( :cpp:class:`Vol` インスタンスが"
+"保持する)のデータに基づくこの方法で扱われます。"
 
 #: ../../arch/cache/cache-arch.en.rst:693
 msgid ""
@@ -1576,6 +1653,19 @@ msgid ""
 "fragments, it is not ncessarily done at the time the first / earliest "
 "fragment is evacuated."
 msgstr ""
+"退避データ構造は、分離され、 ``EVACUATION_BUCKET_SIZE`` バイトの連続した領域の"
+"セットの上のボリュームコンテントに分割されて定義されます。"
+" :cpp:member:`Vol::evacuate` のメンバは、各退避領域の要素を持つ配列です。"
+"各要素は、 :cpp:class:`EvacuationBlock` インスタンスの双方向連結リストです。"
+"各インスタンスは、退避するフラグメントを指定する :cpp:class:`Dir` を含みます。"
+"退避ブロックは、各バケットは連結リスト内で強制的に整列されないにも関わらず、"
+"(このソートは退避中に扱われます。)フラグメントが配置された退避領域に合致する、"
+"退避バケット(配列の要素)に配置されるものと仮定します。オブジェクトは、退避ブロックの"
+"ファーストもしくはアーリストフラグメントを指定する事で退避されます。退避命令は、"
+"後に続くフラグメントの退避を、退避ブロックのそれらのフラグメントを追加することに"
+"することによって継続するでしょう。それらのフラグメントの実際の退避は、書込み"
+"カーソルがフラグメントに到達するまで遅延されることに注意してください。 これは"
+"ファースト / アーリストフラグメントが退避される時は、必然的に行われません。"
 
 #: ../../arch/cache/cache-arch.en.rst:704
 msgid ""
@@ -1592,6 +1682,17 @@ msgid ""
 "modified and the number of readers is not tracked, so the evacuation is "
 "valid as long as the object exists."
 msgstr ""
+"退避には二つのタイプがあります。読み込みベースと強制です。 "
+"``EvacuationBlock`` は、これを追跡する為に読込みカウントを持ちます。"
+"読み込みカウントがゼロの場合、退避が強制され、ターゲットが存在しない場合は、"
+"書き込みカーソルが接近した時に退避されるでしょう。読み込み値が非ゼロである"
+"場合は、それは現在はオブジェクトを読み込める予測の実体の数です。オブジェクトを"
+"横断した読込みが要求される、もしくは ``EvacuationBlock`` を1カウントで生成する"
+"時、読み込みはカウントを増加します。リーダーがオブジェクトの読込みを終了する際、"
+"カウントは減少し、カウントがゼロになった場合 ``EvacuationBlock`` は除去され"
+"ます。 ``EvacuationBlock`` が、カウンタがゼロになった状態で、既に存在する場合、"
+"カウントは修正されず、リーダーの数は追跡されなくなり、それによりオブジェクトが"
+"存在する限り、退避は正常です。"
 
 #: ../../arch/cache/cache-arch.en.rst:712
 msgid ""
@@ -1602,6 +1703,11 @@ msgid ""
 "virtual connection is called as the data is put in to the aggregation "
 "buffer."
 msgstr ""
+"退避は、基本的には :cpp:member:`Vol::aggWrite` 内で、キャッシュライトにより"
+"動作します。このメソッドは、ストライプに書込みを試みた、保留している"
+"しているキャッシュ仮想接続を処理します。これらのうち幾つかは退避仮想接続"
+"でしょう。そうである場合、仮想接続の完了時のコールバックは、集約バッファに"
+"置かれたデータとして呼び出されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:717
 msgid ""
@@ -1617,6 +1723,14 @@ msgid ""
 "it is placed at the front of the write queue for the stripe and the write "
 "aggregation resumed."
 msgstr ""
+"処理できるキャッシュ仮想接続が無くなった際、追加の ts:const:`EVACUATION_SIZE` "
+"範囲と合わせ、範囲をクリアするために、 :cpp:member:`Vol::evac_range` が"
+"呼び出されます。その範囲をカバーするバケットはチェックされます。バケットに"
+"要素がある場合、新しいキャッシュ仮想接続 (a \"doc evacuator\") が生成され、"
+"集約書込みを進める代わりに、(例えば、ストライプの最小のオフセットと共に)"
+"書込みカーソルを閉じた退避要素を読み込む為に使用されます。読み込みが完了した際、"
+"検証のためチェックされ、正常であればそれのキャッシュ仮想接続は、ストライプの"
+"書き込みキューの前方に配置され、書込み集約はレジュームされます。"
 
 #: ../../arch/cache/cache-arch.en.rst:725
 msgid ""
@@ -1630,6 +1744,15 @@ msgid ""
 "stripe write queue and written out in turn. Because the fragment data is now"
 " in memory it is acceptable to overwrite the disk image."
 msgstr ""
+"書き込みを行う前に、退避を開始するために、 :cpp:func:`Vol::evac_range()` "
+"メソッドが呼び出されます。フラグメントが範囲内のバケット内に見つかった場合、"
+"(最小オフセット、書込みカーソルを閉ざした)アーリストフラグメントが選択され、"
+"ディスクから読み込まれ、集約バッファの書込みが延期されます。読み込みは、"
+"読み込みバッファとして効率的な配信もする、キャッシュ仮想接続を介して行われ"
+"ます。一旦読み込みが完了したら、キャッシュ仮想接続インスタンス (the \"doc "
+"evacuator\") は、ストライプ書込みキューの前方に配置され、書き出されます。"
+"フラグメントデータはその時メモリにあるため、ディスクイメージの書込みは"
+"受理できます。"
 
 #: ../../arch/cache/cache-arch.en.rst:732
 msgid ""
@@ -1637,6 +1760,9 @@ msgid ""
 "again, each time evauating (if needed) a fragment and queuing them for "
 "writing in turn."
 msgstr ""
+"通常のストライプの書込みがレジュームした際、これと同じチェックが再度行われ、"
+"各タイミングで(必要であれば)フラグメントを退避し、その時書込み用にキューに"
+"格納されることに注意してください。"
 
 #: ../../arch/cache/cache-arch.en.rst:735
 msgid ""
@@ -1647,6 +1773,12 @@ msgid ""
 "fragment). The logic doesn't seem to check the length and presumes that the "
 "end of the alternate is when the next key is not in the directory."
 msgstr ""
+"ディレクトリの更新は、退避されたフラグメントの書込みが完了した時に行われます。"
+"複数フラグメントオブジェクトは、フラグメントの読み込みが完了した後に検出され"
+"ます。ファーストフラグメントが無い場合、次のフラグメントが退避のためにマーク"
+"されます。(この時、読込みであった際、その続きのフラグメントが読み出される"
+"でしょう) このロジックは、長さをチェックし、次のキーがディレクトリに無い時の"
+"オルタネイトの終わりを推定するように見えません。"
 
 #: ../../arch/cache/cache-arch.en.rst:740
 msgid ""
@@ -1656,10 +1788,15 @@ msgid ""
 "time for the \"next\" fragment to evacuate it will find that next fragment "
 "and evacuate it before it is overwritten."
 msgstr ""
+"これは、集約書込みロジックの \"一つずつ\" のストラテジで対応します。"
+"フラグメントが、退避されているフラグメントに閉じられている場合、最終的に"
+"同じ退避バケット内に置かれるでしょう。集約書込みは、退避のために \"次の\" "
+"フラグメントのために毎回チェックするので、次のフラグメントを検索し、それを"
+"上書きされる前までに退避するでしょう。"
 
 #: ../../arch/cache/cache-arch.en.rst:757
 msgid "Evacuation Operation"
-msgstr ""
+msgstr "退避命令"
 
 #: ../../arch/cache/cache-arch.en.rst:759
 msgid ""
@@ -1667,12 +1804,18 @@ msgid ""
 "is fragments which are currently open, to be read or written. This is "
 "tracked by the reader value in the evacuation blocks noted above."
 msgstr ""
+"退避が行われているフラグメントの主要なソースは、アクティブなフラグメントです。"
+"これは現在開かれており、読込みまたは書込みがされているフラグメントです。これは"
+"上で注意した、退避ブロックのリーダー値によって追跡されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:761
 msgid ""
 "If object pinning is enabled then a scan is done on a regular basis as the "
 "write cursor moves to detected pinned objects and mark them for evacuation."
 msgstr ""
+"オブジェクトのピン留めが有効な場合、書き込みカーソルが検出された、ピン留め"
+"されたオブジェクトまで動作し、退避のためのマークを行う為に定期的にスキャンが"
+"行われます。"
 
 #: ../../arch/cache/cache-arch.en.rst:763
 msgid ""
@@ -1687,10 +1830,21 @@ msgid ""
 "evacuated). If when the object is closed the fragment is still marked then "
 "it is placed in the appropriate evacuation bucket."
 msgstr ""
+"フラグメントは、 *ヒットした退避* を跨いだ退避も可能です。これは、 "
+":ts:cv:`proxy.config.cache.hit_evacuate_percent` と、"
+":ts:cv:`proxy.config.cache.hit_evacuate_size_limit` によって設定されます。 "
+"フラグメントが読み込まれた際、閉じられて、書込みカーソルの前方にいるかを確認"
+"する為にチェックされます。ストライプのサイズの指定されたパーセント以下のものを"
+"閉じます。デフォルト値の 10 が設定されている場合、フラグメントがストライプの"
+"サイズの 10% 書き込まれている場合に、退避の為のマークが付けられます。書込み"
+"カーソルが、開かれているまま残されているフラグメントを通過する場合、これが"
+"明確にされます。(全ての開かれたオブジェクトは退避されます。)オブジェクトが"
+"閉じられた際、フラグメントがマークされていた場合、適切な退避バケットに配置"
+"されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:766
 msgid "Initialization"
-msgstr ""
+msgstr "初期化"
 
 #: ../../arch/cache/cache-arch.en.rst:768
 msgid ""
@@ -1699,22 +1853,26 @@ msgid ""
 "valid element in the file an instance of :cpp:class:`Span` is created. These"
 " are of basically four types,"
 msgstr ""
+"初期化処理は、ストレージ設定ファイル、デフォルトでは :file:`storage.config` を"
+"読み込む :cpp:class:`Store` インスタンスと共に開始します。ファイルの有効な要素の"
+"それぞれについて、 :cpp:class:`Span` インスタンスが生成されます。これらは基本的に "
+"4 つのタイプがあります。"
 
 #: ../../arch/cache/cache-arch.en.rst:772
 msgid "File"
-msgstr ""
+msgstr "ファイル"
 
 #: ../../arch/cache/cache-arch.en.rst:773
 msgid "Directory"
-msgstr ""
+msgstr "ディレクトリ"
 
 #: ../../arch/cache/cache-arch.en.rst:774
 msgid "Disk"
-msgstr ""
+msgstr "ディスク"
 
 #: ../../arch/cache/cache-arch.en.rst:775
 msgid "Raw device"
-msgstr ""
+msgstr "ローデバイス"
 
 #: ../../arch/cache/cache-arch.en.rst:777
 msgid ""
@@ -1725,12 +1883,20 @@ msgid ""
 "offsets are also coalesced [#]_. This is all done in "
 ":c:func:`ink_cache_init()` called during startup."
 msgstr ""
+"全ての `Span` インスタンスが設定された後、それらはデバイスIDによって、 "
+":cpp:member:`Store::disk` の配列に繋げられた、内部的な連結リストにグループ化"
+"されます。同一のディレクトリ、ディスクやローデバイスをを参照するスパンは、"
+"単一のスパンに結合されます。同じオフセットを持つ同一のファイルを参照する"
+"スパンも、結合されます。この処理は全て、起動時に :c:func:`ink_cache_init()` で"
+"処理されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:781
 msgid ""
 "After configuration initialization the cache processor is started by calling"
 " :ccp:func:`CacheProcessor::start()`. This does a number of things."
 msgstr ""
+"設定の初期化の後、 :ccp:func:`CacheProcessor::start()` の呼び出しにより、"
+"キャッシュプロセッサが開始されます。これは様々な処理を行います"
 
 #: ../../arch/cache/cache-arch.en.rst:784
 msgid ""
@@ -1743,16 +1909,24 @@ msgid ""
 ":c:func:`cplist_reconfigure`. The :cpp:class:`CacheVol` instances are "
 "created at this time."
 msgstr ""
+"各有効なスパンで、 :cpp:class:`CacheDisk` のインスタンスが生成されます。"
+"このクラスは、継続であり、スパンにおいてブロッキング命令を処理するのに"
+"用いることが可能です。これは I/O 命令が完了した時に呼び出されるように、 AIO "
+"スレッドに渡されます。これらはその際、ストレージユニットの初期化を行うために、"
+" AIO スレッドにディスパッチされます。これら全てが完了した後、ストレージは "
+":c:func:`cplist_reconfigure` でボリュームを横断して分配されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:790
 msgid "Footnotes"
-msgstr ""
+msgstr "脚注"
 
 #: ../../arch/cache/cache-arch.en.rst:791
 msgid ""
 "`Work is under way <https://issues.apache.org/jira/browse/TS-2020>`_ on "
 "extending this to include objects that are in the ram cache."
 msgstr ""
+"ram キャッシュのオブジェクトを含めるため、これを拡張する "
+"<https://issues.apache.org/jira/browse/TS-2020>`_ の作業が進められています。"
 
 #: ../../arch/cache/cache-arch.en.rst:794
 msgid ""
@@ -1760,6 +1934,9 @@ msgid ""
 "file or directory storage units on the same device to be ignored. See "
 "`TS-1869 <https://issues.apache.org/jira/browse/TS-1869>`_."
 msgstr ""
+"この連結リストは、後の処理ではほとんど無視されます。1 つを除き全ての、同一"
+"デバイスのストレージユニットのファイルやディレクトリが無視されることに起因します。 "
+"`TS-1869 <https://issues.apache.org/jira/browse/TS-1869>`_ を見てください。"
 
 #: ../../arch/cache/cache-arch.en.rst:797
 msgid ""
@@ -1767,35 +1944,38 @@ msgid ""
 "and should all be zero at the time the spans are coalesced, and as far as I "
 "can tell the sort / coalesce is only done during initialization."
 msgstr ""
+"オフセットが後で計算され、その時結合されたスパンが全てゼロになるべきで、"
+"私が初期化中にのみ行われるソート / 結合処理について教えられる限りでは、"
+"どんなことが起こせるか、私には定かではありません。"
 
 #: ../../arch/cache/cache-arch.en.rst:95
 msgid "cache directory"
-msgstr ""
+msgstr "キャッシュディレクトリ"
 
 #: ../../arch/cache/cache-arch.en.rst:101
 msgid "directory entry"
-msgstr ""
+msgstr "ディレクトリエントリ"
 
 #: ../../arch/cache/cache-arch.en.rst:102
 msgid "fragment"
-msgstr ""
+msgstr "フラグメント"
 
 #: ../../arch/cache/cache-arch.en.rst:103
 msgid "cache ID"
-msgstr ""
+msgstr "キャッシュ ID"
 
 #: ../../arch/cache/cache-arch.en.rst:243
 msgid "alternate"
-msgstr ""
+msgstr "オルタネイト"
 
 #: ../../arch/cache/cache-arch.en.rst:442
 msgid "DIR_DEPTH"
-msgstr ""
+msgstr "DIR_DEPTH"
 
 #: ../../arch/cache/cache-arch.en.rst:442
 msgid "index segment"
-msgstr ""
+msgstr "インデックスセグメント"
 
 #: ../../arch/cache/cache-arch.en.rst:442
 msgid "index buckets"
-msgstr ""
+msgstr "インデックスバケット"
