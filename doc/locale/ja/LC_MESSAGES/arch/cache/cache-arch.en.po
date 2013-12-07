@@ -2027,32 +2027,32 @@ msgstr ""
 
 #: ../../arch/cache/cache-arch.en.rst:95
 msgid "cache directory"
-msgstr ""
+msgstr "キャッシュディレクトリ"
 
 #: ../../arch/cache/cache-arch.en.rst:101
 msgid "directory entry"
-msgstr ""
+msgstr "ディレクトリエントリ"
 
 #: ../../arch/cache/cache-arch.en.rst:102
 msgid "fragment"
-msgstr ""
+msgstr "フラグメント"
 
 #: ../../arch/cache/cache-arch.en.rst:103
 msgid "cache ID"
-msgstr ""
+msgstr "キャッシュ ID"
 
 #: ../../arch/cache/cache-arch.en.rst:243
 msgid "alternate"
-msgstr ""
+msgstr "オルタネイト"
 
 #: ../../arch/cache/cache-arch.en.rst:442
 msgid "DIR_DEPTH"
-msgstr ""
+msgstr "DIR_DEPTH"
 
 #: ../../arch/cache/cache-arch.en.rst:442
 msgid "index segment"
-msgstr ""
+msgstr "インデックスセグメント"
 
 #: ../../arch/cache/cache-arch.en.rst:442
 msgid "index buckets"
-msgstr ""
+msgstr "インデックスバケット"
