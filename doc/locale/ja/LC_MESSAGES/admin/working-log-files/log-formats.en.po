@@ -13,16 +13,16 @@ msgstr ""
 
 #: ../../admin/working-log-files/log-formats.en.rst:4
 msgid "Log Formats"
-msgstr ""
+msgstr "ログの形式"
 
 #: ../../admin/working-log-files/log-formats.en.rst:26
 msgid "Squid Format"
-msgstr ""
+msgstr "Squidの形式"
 
 #: ../../admin/working-log-files/log-formats.en.rst:32
 #: ../../admin/working-log-files/log-formats.en.rst:115
 msgid "``1``"
-msgstr ""
+msgstr "``1``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:29
 msgid ""
@@ -30,11 +30,13 @@ msgid ""
 "client request in seconds since January 1, 1970 UTC (with millisecond "
 "resolution)."
 msgstr ""
+"``cqtq`` Squid形式でのクライアントのリクエストを受けた日時; "
+"クライアントからのリクエスト時刻を1970/1/1(UTC)より1秒刻みで表します(1ミリ秒の精度を持ちます)。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:39
 #: ../../admin/working-log-files/log-formats.en.rst:119
 msgid "``2``"
-msgstr ""
+msgstr "``2``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:35
 msgid ""
@@ -43,21 +45,23 @@ msgid ""
 "connection with Traffic Server and the time Traffic Server sent the last "
 "byte of the response back to the client."
 msgstr ""
+"``ttms`` クライアントのリクエストを受けてからトラフィックサーバが処理するまでに費やした時間; "
+"クライアントの接続を確立してからトラフィックサーバが最後の1バイトを返すまでの時間をミリ秒で表します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:43
 #: ../../admin/working-log-files/log-formats.en.rst:124
 msgid "``3``"
-msgstr ""
+msgstr "``3``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:42
 #: ../../admin/working-log-files/log-formats.en.rst:114
 msgid "``chi`` The IP address of the client’s host machine."
-msgstr ""
+msgstr "``chi`` クライアントのマシンのIPアドレスです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:51
 #: ../../admin/working-log-files/log-formats.en.rst:128
 msgid "``4``"
-msgstr ""
+msgstr "``4``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:46
 msgid ""
@@ -66,31 +70,34 @@ msgid ""
 "<squid-netscape-result-codes>`. The proxy response status code (the HTTP "
 "response status code from Traffic Server to client)."
 msgstr ""
+"``crc/pssc`` キャッシュ結果のコード; リクエストの処理結果を表します: "
+"``HIT``, ``MISS``, その他。キャッシュ結果のコードの詳細は:ref:`ここ<squid-netscape-result-codes>`に書かれています。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:56
 #: ../../admin/working-log-files/log-formats.en.rst:132
 msgid "``5``"
-msgstr ""
+msgstr "``5``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:54
 msgid ""
 "``psql`` The length of the Traffic Server response to the client in bytes, "
 "including headers and content."
 msgstr ""
+"``psql`` トラフィックサーバがクライアントにレスポンスしたコンテンツとヘッダーを含むバイト数です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:60
 #: ../../admin/working-log-files/log-formats.en.rst:136
 msgid "``6``"
-msgstr ""
+msgstr "``6``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:59
 msgid "``cqhm`` The client request method: ``GET``, ``POST``, and so on."
-msgstr ""
+msgstr "``cqhm`` クライアントのリクエスト方法: ``GET``, ``POST``, その他。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:67
 #: ../../admin/working-log-files/log-formats.en.rst:140
 msgid "``7``"
-msgstr ""
+msgstr "``7``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:63
 msgid ""
@@ -99,28 +106,34 @@ msgid ""
 "The escape sequence is a percentage sign followed by the ASCII code number "
 "of the replaced character in hex."
 msgstr ""
+"``cquc`` クライアントがリクエストしたそのままのURL; "
+"解析ツールでの処理やエスケープ文字列の変換がされていない文字や空白の入ったURLです。"
+"エスケープ文字列とは%記号の後にASCII文字を16進数に変換したものです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:72
 #: ../../admin/working-log-files/log-formats.en.rst:147
 msgid "``8``"
-msgstr ""
+msgstr "``8``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:70
 msgid ""
 "``caun`` The username of the authenticated client. A hyphen (``-``) means "
 "that no authentication was required."
 msgstr ""
+"``caun`` 認証済みのユーザ名を表します。ハイフン(``-``)の場合は認証の要求が無かった事を表します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:81
 #: ../../admin/working-log-files/log-formats.en.rst:152
 msgid "``9``"
-msgstr ""
+msgstr "``9``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:75
 msgid ""
 "``phr/pqsn`` The proxy hierarchy route; the route Traffic Server used to "
 "retrieve the object."
 msgstr ""
+"``phr/pqsn`` プロキシーの階層の経路; "
+"この経路はトラフィックサーバがオブジェクトを取り戻すのに用いられます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:79
 msgid ""
@@ -128,141 +141,151 @@ msgid ""
 "request. If the request was a cache hit, then this field contains a hyphen "
 "(``-``)."
 msgstr ""
+"プロキシーの要求するサーバの名前; サーバ名はリクエストによってを満たされます。"
+"もしリクエストがキャッシュヒットしている場合は、この欄はハイフン(``-``)で記されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:86
 #: ../../admin/working-log-files/log-formats.en.rst:157
 msgid "``10``"
-msgstr ""
+msgstr "``10``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:84
 msgid ""
 "``psct`` The proxy response content type; the object content type taken from"
 " the Traffic Server response header."
 msgstr ""
+"``psct`` プロキシーの応答の型; この型はトラフィックサーバーのレスポンスヘッダーから得られます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:88
 msgid "The following figure shows a sample log entry in a ``squid.log`` file."
-msgstr ""
+msgstr "下記に``squid.log``ファイルに記述される例を示します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:94
 msgid "Sample log entry in squid.log"
-msgstr ""
+msgstr "squid.logに記入されるサンプルのログです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:97
 msgid "Squid log in XML"
-msgstr ""
+msgstr "XMLでのSquidログ"
 
 #: ../../admin/working-log-files/log-formats.en.rst:108
 msgid "Netscape Formats"
-msgstr ""
+msgstr "Netscape形式のログ"
 
 #: ../../admin/working-log-files/log-formats.en.rst:111
 #: ../../admin/working-log-files/log-formats.en.rst:218
 msgid "Netscape Common"
-msgstr ""
+msgstr "Netscapeの共通ログ"
 
 #: ../../admin/working-log-files/log-formats.en.rst:118
 msgid "``-`` This hyphen (``-``) is always present in Netscape log entries."
-msgstr ""
+msgstr "``-`` このハイフン(``-``)は常にログの中に現れます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:122
 msgid ""
 "``caun`` The authenticated client username. A hyphen (``-``) means no "
 "authentication was required."
-msgstr ""
+msgstr "``caun`` 認証済みのユーザ名。"
+"ハイフン(``-``)の場合は認証の要求がなかったことを示します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:127
 msgid ""
 "``cqtd`` The date and time of the client request, enclosed in brackets."
-msgstr ""
+msgstr "``cqtd`` クライアントからリクエストを受けた時間、括弧内に収められています。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:131
 msgid "``cqtx`` The request line, enclosed in quotes."
-msgstr ""
+msgstr "``cqtx`` リクエストの内容、引用符内に収めらています。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:135
 msgid "``pssc`` The proxy response status code (HTTP reply code)."
-msgstr ""
+msgstr "``pssc`` トラフィックサーバのステータスコードです(HTTPの応答コード)。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:139
 msgid ""
 "``pscl`` The length of the Traffic Server response to the client in bytes."
-msgstr ""
+msgstr "``pscl`` トラフィックサーバがクライアントにレスポンスしたバイト数です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:143
 #: ../../admin/working-log-files/log-formats.en.rst:240
 msgid "Netscape Extended"
-msgstr ""
+msgstr "拡張版のNetscape形式のログ"
 
 #: ../../admin/working-log-files/log-formats.en.rst:146
 msgid "``sssc`` The origin server response status code."
-msgstr ""
+msgstr "``sssc`` オリジンサーバのレスポンスコードです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:150
 msgid ""
 "``sshl`` The server response transfer length; the body length in the origin "
 "server response to Traffic Server, in bytes."
-msgstr ""
+msgstr "``sshl`` オリジンサーバがレスポンスしたボディの長さ; "
+"オリジンサーバがトラフィックサーバへレスポンスしたボディの長さをバイト数で表します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:155
 msgid ""
 "``cqbl`` The client request transfer length; the body length in the client "
 "request to Traffic Server, in bytes."
-msgstr ""
+msgstr "``cqbl`` クライアントがリクエストしたボディの長さ; "
+"クライアントがトラフィックサーバへリクエストしたボディの長さをバイト数で表します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:162
 msgid "``11``"
-msgstr ""
+msgstr "``11``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:160
 msgid ""
 "``pqbl`` The proxy request transfer length; the body length in the Traffic "
 "Server request to the origin server."
-msgstr ""
-
+msgstr "``pqbl`` トラフィックサーバがリクエストしたボディの長さ; "
+"トラフィックサーバがオリジンサーバへリクエストしたボディの長さです。"
 #: ../../admin/working-log-files/log-formats.en.rst:167
 msgid "``12``"
-msgstr ""
+msgstr "``12``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:165
 msgid ""
 "``cqhl`` The client request header length; the header length in the client "
 "request to Traffic Server."
-msgstr ""
+msgstr "``cqhl`` クライアントがリクエストしたヘッダーの長さ; "
+"クライアントがトラフィックサーバへリクエストしたヘッダーの長さです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:172
 msgid "``13``"
-msgstr ""
+msgstr "``13``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:170
 msgid ""
 "``pshl`` The proxy response header length; the header length in the Traffic "
 "Server response to the client."
-msgstr ""
+msgstr "``pshl`` トラフィックサーバがレスポンスしたヘッダーの長さ; "
+"トラフィックサーバがクライアントへレスポンスしたヘッダーの長さです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:177
 msgid "``14``"
-msgstr ""
+msgstr "``14``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:175
 msgid ""
 "``pqhl`` The proxy request header length; the header length in Traffic "
 "Server request to the origin server."
-msgstr ""
+msgstr "トラフィックサーバがリクエストしたヘッダーの長さ; "
+"トラフィックサーバがオリジンサーバへリクエストしたヘッダーの長さです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:182
 msgid "``15``"
-msgstr ""
+msgstr "``15``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:180
 msgid ""
 "``sshl`` The server response header length; the header length in the origin "
 "server response to Traffic Server."
-msgstr ""
+msgstr "``sshl`` オリジンサーバがレスポンスしたヘッダーの長さ; "
+"オリジンサーバがトラフィックサーバへレスポンスしたヘッダーの長さです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:189
 msgid "``16``"
-msgstr ""
+msgstr "``16``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:185
 msgid ""
@@ -270,125 +293,139 @@ msgid ""
 "number of seconds between the time that the client established the "
 "connection with Traffic Server and the time that Traffic Server sent the "
 "last byte of the response back to the client."
-msgstr ""
+msgstr "``tts`` トラフィックサーバがクライアントのリクエストの処理に費やした時間; "
+"クライアントがトラフィックサーバとの接続を確立してから"
+"トラフィックサーバが最後の1バイトをクライアントにレスポンスするまでの時間です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:192
 #: ../../admin/working-log-files/log-formats.en.rst:263
 msgid "Netscape Extended2"
-msgstr ""
+msgstr "拡張されたNetscapeのログ形式2"
 
 #: ../../admin/working-log-files/log-formats.en.rst:197
 msgid "``17``"
-msgstr ""
+msgstr "``17``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:195
 msgid ""
 "``phr`` The proxy hierarchy route; the route Traffic Server used to retrieve"
 " the object."
-msgstr ""
+msgstr "``phr`` プロキシーの階層の経路; "
+"この経路はトラフィックサーバがオブジェクトを取り戻すのに用いられます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:203
 msgid "``18``"
-msgstr ""
+msgstr "``18``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:200
 msgid ""
 "``cfsc`` The client finish status code: ``FIN`` if the client request "
 "completed successfully or ``INTR`` if the client request was interrupted."
-msgstr ""
+msgstr "``cfsc`` クライアントの終了ステータスコード: "
+"クライアントのリクエストが成功で完了した場合は ``FIN``、"
+"クライアントのリクエストが中断された場合は ``INTR`` で表されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:209
 msgid "``19``"
-msgstr ""
+msgstr "``19``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:206
 msgid ""
 "``pfsc`` The proxy finish status code: ``FIN`` if the Traffic Server request"
 " to the origin server completed successfully or ``INTR`` if the request was "
 "interrupted."
-msgstr ""
+msgstr "``pfsc`` トラフィックサーバの終了ステータスコード: "
+"トラフィックサーバからオリジンサーバへのリクエストが成功で完了した場合は ``FIN``、"
+"リクエストが中断された場合は ``INTR`` で表されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:215
 msgid "``20``"
-msgstr ""
+msgstr "``20``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:212
 msgid ""
 "``crc`` The cache result code; how the Traffic Server cache responded to the"
 " request: HIT, MISS, and so on. Cache result codes are described :ref:`here "
 "<squid-netscape-result-codes>`."
-msgstr ""
+msgstr "``crc`` キャッシュ結果のコード; "
+"リクエストに対するトラフィックサーバのキャッシュの応答結果: "
+"``HIT``, ``MISS``, その他。"
+"キャッシュ結果のコードの詳細は:ref:`ここ<squid-netscape-result-codes>`に書かれています。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:220
 msgid ""
 "The following figure shows a sample log entry in a ``common.log`` file, the "
 "list following describes the fields of the format."
-msgstr ""
+msgstr "下記に``common.log``ファイルに記述される例を示します。"
+"番号ごとに説明した様に各フィールドに決められた形式で記述されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:227
 msgid "Sample log entry in common.log"
-msgstr ""
+msgstr "ログはcommon.logに記入されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:230
 msgid "Netscape Common in XML"
-msgstr ""
+msgstr "XML形式でのNetscape共通ログ"
 
 #: ../../admin/working-log-files/log-formats.en.rst:242
 msgid ""
 "The following figure shows a sample log entry in an ``extended.log`` file."
-msgstr ""
+msgstr "下記に``extended.log``ファイルに記述される例を示します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:249
 msgid "sample log entry in extended.log"
-msgstr ""
+msgstr "ログはextended.logに記入されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:252
 #: ../../admin/working-log-files/log-formats.en.rst:275
 msgid "Netscape Extended in XML"
-msgstr ""
+msgstr "XMLでの拡張Netscapeログ"
 
 #: ../../admin/working-log-files/log-formats.en.rst:265
 msgid ""
 "The following figure shows a sample log entry in an ``extended2.log`` file."
-msgstr ""
+msgstr "下記に``extended2.log``ファイルに記述される例を示します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:272
 msgid "sample log entry in extended2.log"
-msgstr ""
+msgstr "ログはextended2.logに記入されます。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:288
 msgid "Squid- and Netscape-format: Cache Result Codes"
-msgstr ""
+msgstr "SquidとNetscapeの両方で共通のログ: キャッシュ結果のコード"
 
 #: ../../admin/working-log-files/log-formats.en.rst:290
 msgid ""
 "The following table describes the cache result codes in Squid and Netscape "
 "log files."
-msgstr ""
+msgstr "次の一覧はSquidとNetscape形式のログに記述されるキャッシュ結果のコードです。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:295
 msgid "``TCP_HIT``"
-msgstr ""
+msgstr "``TCP_HIT``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:294
 msgid ""
 "A valid copy of the requested object was in the cache and Traffic Server "
 "sent the object to the client."
-msgstr ""
+msgstr "リクエストされたオブジェクトがキャッシュ内に有効なものとして存在して、"
+"トラフィックサーバがクライアントに送信した時の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:300
 msgid "``TCP_MISS``"
-msgstr ""
+msgstr "``TCP_MISS``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:298
 msgid ""
 "The requested object was not in cache, so Traffic Server retrieved the "
 "object from the origin server (or a parent proxy) and sent it to the client."
-msgstr ""
+msgstr "リクエストされたオブジェクトがキャッシュ内に存在しないので、"
+"トラフィックサーバはオリジンサーバ(または親プロキシー)からオブジェクトを読みだして"
+"それをクライアントに送信した時の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:306
 msgid "``TCP_REFRESH_HIT``"
-msgstr ""
+msgstr "``TCP_REFRESH_HIT``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:303
 msgid ""
@@ -396,44 +433,55 @@ msgid ""
 "modified-since`` request to the origin server and the origin server sent a "
 "``304`` not-modified response. Traffic Server sent the cached object to the "
 "client."
-msgstr ""
+msgstr "オブジェクトはキャッシュに存在しますが古くなっています。"
+"トラフィックサーバはオリジンサーバへ``if-modified-since``のリクエストを作り、"
+"オリジンサーバは``304``の変更されていないというレスポンスを送り返します。"
+"そして、トラフィックサーバはキャッシュされていたオブジェクトをクライアントに送った時の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:312
 msgid "``TCP_REF_FAIL_HIT``"
-msgstr ""
+msgstr "``TCP_REF_FAIL_HIT``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:309
 msgid ""
 "The object was in the cache but was stale. Traffic Server made an ``if-"
 "modified-since`` request to the origin server but the server did not "
 "respond. Traffic Server sent the cached object to the client."
-msgstr ""
+msgstr "オブジェクトはキャッシュに存在しますが古くなっています。"
+"トラフィックサーバはオリジンサーバへ``if-modified-since``のリクエストを作りますが、"
+"オリジンサーバは応答しませんでした。"
+"そして、トラフィックサーバはキャッシュされていたオブジェクトをクライアントに送った結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:318
 msgid "``TCP_REFRESH_MISS``"
-msgstr ""
+msgstr "``TCP_REFRESH_MISS``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:315
 msgid ""
 "The object was in the cache but was stale. Traffic Server made an ``if-"
 "modified-since`` request to the origin server and the server returned a new "
 "object. Traffic Server served the new object to the client."
-msgstr ""
+msgstr "オブジェクトはキャッシュに存在しますが古くなっています。"
+"トラフィックサーバはオリジンサーバへ``if-modified-since``のリクエストを作り、"
+"オリジンサーバは新しいオブジェクトを返します。"
+"そして、トラフィックサーバはその新しいオブジェクトをクライアントに送った結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:324
 msgid "``TCP_CLIENT_REFRESH``"
-msgstr ""
+msgstr "``TCP_CLIENT_REFRESH``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:321
 msgid ""
 "The client issued a request with a ``no-cache`` header. Traffic Server "
 "obtained the requested object from the origin server and sent a copy to the "
 "client. Traffic Server deleted the previous copy of the object from cache."
-msgstr ""
+msgstr "クライアントは``no-cache``ヘッダーを持ったリクエストを発行します。"
+"トラフィックサーバはオリジンサーバからリクエストされているオブジェクトを受け取りコピーをクライアントに送ります。"
+"トラフィックサーバは前にキャッシュで持っていたオブジェクトを消去します。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:331
 msgid "``TCP_IMS_HIT``"
-msgstr ""
+msgstr "``TCP_IMS_HIT``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:327
 msgid ""
@@ -441,11 +489,14 @@ msgid ""
 "cache & fresher than the IMS date, **or** an ``if-modified-since`` request "
 "to the origin server revealed the cached object was fresh. Traffic Server "
 "served the cached object to the client."
-msgstr ""
+msgstr "クライアントは``if-modified-since``リクエストをを発行します。"
+"そしてオブジェクトはキャッシュに存在してIMS日時よりも新しいです。"
+"つまり、オリジンサーバへの``if-modified-since``リクエストはキャッシュは新しい事を示します。"
+"そして、トラフィックサーバは保存されているキャッシュをクライアントへ返した結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:338
 msgid "``TCP_IMS_MISS``"
-msgstr ""
+msgstr "``TCP_IMS_MISS``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:334
 msgid ""
@@ -453,78 +504,82 @@ msgid ""
 "either not in cache or was stale in cache. Traffic Server sent an ``if-"
 "modified-since request`` to the origin server and received the new object. "
 "Traffic Server sent the updated object to the client."
-msgstr ""
+msgstr "クライアントは``if-modified-since``リクエストをを発行しますが、"
+"キャッシュに存在しなかったり、古くなっています。"
+"トラフィックサーバは``if-modified-since``リクエストをオリジンサーバに発行して新しいオブジェクトを受け取ります。"
+"そして、トラフィックサーバは上書きされたオブジェクトをクライアントに送った結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:342
 msgid "``TCP_SWAPFAIL``"
-msgstr ""
+msgstr "``TCP_SWAPFAIL``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:341
 msgid ""
 "The object was in the cache but could not be accessed. The client did not "
 "receive the object."
-msgstr ""
+msgstr "キャッシュ内のオブジェクトがアクセスできず、クライアントがオブジェクトを受け取れなかった結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:345
 msgid "``ERR_CLIENT_ABORT``"
-msgstr ""
+msgstr "``ERR_CLIENT_ABORT``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:345
 msgid "The client disconnected before the complete object was sent."
-msgstr ""
+msgstr "オブジェクトの送信が完了する前にクライアントの接続が切れた場合の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:348
 msgid "``ERR_CONNECT_FAIL``"
-msgstr ""
+msgstr "``ERR_CONNECT_FAIL``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:348
 msgid "Traffic Server could not reach the origin server."
-msgstr ""
+msgstr "トラフィックサーバがオリジンサーバに到達できなかった場合の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:352
 msgid "``ERR_DNS_FAIL``"
-msgstr ""
+msgstr ""``ERR_DNS_FAIL``
 
 #: ../../admin/working-log-files/log-formats.en.rst:351
 msgid ""
 "The Domain Name Server (DNS) could not resolve the origin server name, or no"
 " DNS could be reached."
-msgstr ""
+msgstr "DNSがオリジンサーバの名前を解決できなかった場合、つまりオリジンサーバにDNSが到達できなかった場合の結果です"
 
 #: ../../admin/working-log-files/log-formats.en.rst:356
 msgid "``ERR_INVALID_REQ``"
-msgstr ""
+msgstr "``ERR_INVALID_REQ``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:355
 msgid ""
 "The client HTTP request was invalid. (Traffic Server forwards requests with "
 "unknown methods to the origin server.)"
-msgstr ""
+msgstr "クライアントのHTTPリクエストが無効。"
+"トラフィックサーバはそのままオリジンサーバへ無効のリクエストを送った結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:360
 msgid "``ERR_READ_TIMEOUT``"
-msgstr ""
+msgstr "``ERR_READ_TIMEOUT``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:359
 msgid ""
 "The origin server did not respond to Traffic Server's request within the "
 "timeout interval."
-msgstr ""
+msgstr "オリジンサーバがトラフィックサーバのリクエストを時間内にレスポンスしなかった場合の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:363
 msgid "``ERR_PROXY_DENIED``"
-msgstr ""
+msgstr "``ERR_PROXY_DENIED``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:363
 msgid "Client service was denied."
-msgstr ""
+msgstr "クライアントのサービスが拒否された場合の結果です。"
 
 #: ../../admin/working-log-files/log-formats.en.rst:368
 msgid "``ERR_UNKNOWN``"
-msgstr ""
+msgstr "``ERR_UNKNOWN``"
 
 #: ../../admin/working-log-files/log-formats.en.rst:366
 msgid ""
 "The client connected, but subsequently disconnected without sending a "
 "request."
-msgstr ""
+msgstr "クライアントに接続されたが、リクエストの送信がされずに切断された場合の結果です。"
