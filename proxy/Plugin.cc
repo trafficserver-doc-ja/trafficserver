@@ -89,12 +89,6 @@ dll_error(void * /* dlp ATS_UNUSED */)
 }
 
 static void
-dll_close(void *dlp)
-{
-  dlclose(dlp);
-}
-
-static void
 plugin_load(int argc, char *argv[])
 {
   char path[PATH_NAME_MAX + 1];
@@ -120,8 +114,7 @@ plugin_load(int argc, char *argv[])
 
   handle = dll_open(path);
   if (!handle) {
-    Error("unable to load '%s': %s", path, dll_error(handle));
-    abort();
+    Fatal("unable to load '%s': %s", path, dll_error(handle));
   }
 
   // Allocate a new registration structure for the
@@ -132,9 +125,7 @@ plugin_load(int argc, char *argv[])
 
   init = (init_func_t) dll_findsym(handle, "TSPluginInit");
   if (!init) {
-    Error("unable to find TSPluginInit function '%s': %s", path, dll_error(handle));
-    dll_close(handle);
-    abort();
+    Fatal("unable to find TSPluginInit function '%s': %s", path, dll_error(handle));
   }
 
   // elevate the access to read files as root if compiled with capabilities, if not
@@ -148,7 +139,6 @@ plugin_load(int argc, char *argv[])
 
   plugin_reg_list.push(plugin_reg_current);
   plugin_reg_current = NULL;
-  //dll_close(handle);
 }
 
 static char *
@@ -221,36 +211,8 @@ not_found:
   return NULL;
 }
 
-
-int
-plugins_exist(const char *config_dir)
-{
-  char path[PATH_NAME_MAX + 1];
-  char line[1024], *p;
-  int fd;
-  int plugin_count = 0;
-
-  ink_filepath_make(path, sizeof(path), config_dir, "plugin.config");
-  fd = open(path, O_RDONLY);
-  if (fd < 0) {
-    Warning("unable to open plugin config file '%s': %d, %s", path, errno, strerror(errno));
-    return 0;
-  }
-  while (ink_file_fd_readline(fd, sizeof(line) - 1, line) > 0) {
-    p = line;
-    // strip leading white space and test for comment or blank line
-    while (*p && ParseRules::is_wslfcr(*p))
-      ++p;
-    if ((*p == '\0') || (*p == '#'))
-      continue;
-    plugin_count++;
-  }
-  close(fd);
-  return plugin_count;
-}
-
 void
-plugin_init(const char *config_dir)
+plugin_init(void)
 {
   char path[PATH_NAME_MAX + 1];
   char line[1024], *p;
@@ -267,7 +229,7 @@ plugin_init(const char *config_dir)
     INIT_ONCE = false;
   }
 
-  ink_filepath_make(path, sizeof(path), config_dir, "plugin.config");
+  Layout::get()->relative_to(path, sizeof(path), Layout::get()->sysconfdir, "plugin.config");
   fd = open(path, O_RDONLY);
   if (fd < 0) {
     Warning("unable to open plugin config file '%s': %d, %s", path, errno, strerror(errno));

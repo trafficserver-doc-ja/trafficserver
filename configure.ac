@@ -228,30 +228,9 @@ AC_MSG_RESULT([$enable_micro])
 AS_IF([test "x$enable_micro" = "xyes"], [is_micro_build=1], [is_micro_build=0])
 AC_SUBST(is_micro_build)
 
-#
-# Standalone iocore
-#
-AC_MSG_CHECKING([whether to build a standalone iocore])
-AC_ARG_ENABLE([standalone-iocore],
-  [AS_HELP_STRING([--enable-standalone-iocore],[build just standalone iocore])],
-  [],
-  [enable_standalone_iocore=no]
-)
-AC_MSG_RESULT([$enable_standalone_iocore])
-TS_ARG_ENABLE_VAR([has],[standalone-iocore])
-AC_SUBST(has_standalone_iocore)
-AS_IF([test 0 -ne $has_standalone_iocore],
-  [AC_SUBST([IOCORE_MODULARIZED_DEFS],[""])
-   AC_SUBST([ink_with_modules_def],["-DREC_BUILD_STAND_ALONE"])
-   AC_SUBST([ink_with_modules_local],[""])
-   AC_SUBST([ink_with_modules_process],[""])
-  ],
-  [AC_SUBST([ink_with_modules_def],["-DREC_BUILD_MGMT"])
-   AC_SUBST([ink_with_modules_local],["-DLOCAL_MANAGER"])
-   AC_SUBST([ink_with_modules_process],["-DPROCESS_MANAGER"])
-  ]
-)
-AM_CONDITIONAL([STANDALONE_IOCORE], [test 0 -ne $has_standalone_iocore])
+AC_SUBST([ink_with_modules_def],["-DREC_BUILD_MGMT"])
+AC_SUBST([ink_with_modules_local],["-DLOCAL_MANAGER"])
+AC_SUBST([ink_with_modules_process],["-DPROCESS_MANAGER"])
 
 #
 # Force some static linkage (for testing / development only)
@@ -1123,8 +1102,16 @@ fi
 TS_CHECK_CRYPTO_NEXTPROTONEG
 
 #
+# Check for EC key support.
+TS_CHECK_CRYPTO_EC_KEYS
+
+#
 # Check for ServerNameIndication TLS extension support.
 TS_CHECK_CRYPTO_SNI
+
+#
+# Check for RFC5077 TLS session ticket support.
+TS_CHECK_CRYPTO_TICKETS
 
 #
 # Check for zlib presence and usability
@@ -1666,17 +1653,17 @@ AC_CHECK_MEMBER([struct sockaddr.sa_len], [], [], [#include <netinet/in.h>])
 AC_CHECK_MEMBER([struct sockaddr_in.sin_len], [], [], [#include <netinet/in.h>])
 AC_CHECK_MEMBER([struct sockaddr_in6.sin6_len], [], [], [#include <netinet/in.h>])
 
-if test "x${ac_cv_member_sockaddr_sa_len}" = xyes; then
+if test "x${ac_cv_member_struct_sockaddr_sa_len}" = xyes; then
     AC_DEFINE(HAVE_STRUCT_SOCKADDR_SA_LEN, 1,
 	    [Whether struct sockaddr_in has the sa_len member])
 fi
 
-if test "x${ac_cv_member_sockaddr_in_sin_len}" = xyes ; then
+if test "x${ac_cv_member_struct_sockaddr_in_sin_len}" = xyes ; then
 AC_DEFINE(HAVE_STRUCT_SOCKADDR_IN_SIN_LEN, 1,
 	    [Whether struct sockaddr_in has the sin_len member])
 fi
 
-if test "x${ac_cv_member_sockaddr_in6_sin6_len}" = xyes; then
+if test "x${ac_cv_member_struct_sockaddr_in6_sin6_len}" = xyes; then
     AC_DEFINE(HAVE_STRUCT_SOCKADDR_IN6_SIN6_LEN, 1,
 	    [Whether struct sockaddr_in6 has the sin6_len member])
 fi
@@ -1941,12 +1928,15 @@ AC_CONFIG_FILES([
   plugins/experimental/esi/Makefile
   plugins/experimental/geoip_acl/Makefile
   plugins/experimental/lua/Makefile
+  plugins/experimental/hipes/Makefile
+  plugins/experimental/ts_lua/Makefile
   plugins/experimental/metalink/Makefile
   plugins/experimental/rfc5861/Makefile
   plugins/experimental/spdy/Makefile
   plugins/experimental/tcp_info/Makefile
   plugins/experimental/healthchecks/Makefile
   plugins/experimental/remap_stats/Makefile
+  plugins/experimental/xdebug/Makefile
   plugins/gzip/Makefile
   plugins/libloader/Makefile
   plugins/header_filter/Makefile

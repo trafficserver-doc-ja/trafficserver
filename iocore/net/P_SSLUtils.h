@@ -33,6 +33,15 @@
 #error Traffic Server requires a OpenSSL library that support threads
 #endif
 
+// if we are compiling against an early version of OpenSSL, define our own values
+#ifndef SSL_OP_NO_TLSv1_1
+#define SSL_OP_NO_TLSv1_1 0x10000000L
+#endif
+#ifndef SSL_OP_NO_TLSv1_2
+#define SSL_OP_NO_TLSv1_2 0x08000000L
+#endif
+#define SSL_VERSION_1_0_1 0x010001000 // MMNNFFPPS: major minor fix patch status
+
 struct SSLConfigParams;
 struct SSLCertLookup;
 
@@ -52,6 +61,9 @@ SSL_CTX * SSLInitClientContext(const SSLConfigParams * param);
 
 // Initialize the SSL library.
 void SSLInitializeLibrary();
+
+// Release SSL_CTX and the associated data
+void SSLReleaseContext(SSL_CTX* ctx);
 
 // Log an SSL error.
 #define SSLError(fmt, ...) SSLDiagnostic(DiagsMakeLocation(), false, fmt, ##__VA_ARGS__)

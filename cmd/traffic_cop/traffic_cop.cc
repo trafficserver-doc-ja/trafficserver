@@ -61,11 +61,7 @@ static const char COP_TRACE_FILE[] = "/tmp/traffic_cop.trace";
 #define COP_WARNING  LOG_ERR
 #define COP_DEBUG    LOG_DEBUG
 
-Diags * g_diags; // link time dependency
-
-static const char *root_dir;
 static const char *runtime_dir;
-static const char *config_dir;
 static char config_file[PATH_NAME_MAX];
 
 static char cop_lockfile[PATH_NAME_MAX];
@@ -540,6 +536,20 @@ config_read_int(const char *name, int *val, bool miss_ok = false)
 ConfigIntFatalError:
   cop_log(COP_FATAL, "could not find integer variable %s in records.config\n", name);
   exit(1);
+}
+
+static const char *
+config_read_runtime_dir()
+{
+  char state_dir[PATH_NAME_MAX + 1];
+
+  state_dir[0] = '\0';
+  config_read_string("proxy.config.local_state_dir", state_dir, sizeof(state_dir), true);
+  if (strlen(state_dir) > 0) {
+    return Layout::get()->relative(state_dir);
+  } else {
+    return ats_strdup(Layout::get()->runtimedir);
+  }
 }
 
 static void
@@ -1692,45 +1702,13 @@ init_signals()
 }
 
 static void
-init_config_dir()
-{
-
-  struct stat info;
-
-  cop_log_trace("Entering init_config_dir()\n");
-
-  root_dir = Layout::get()->prefix;
-  runtime_dir = Layout::get()->runtimedir;
-  config_dir = Layout::get()->sysconfdir;
-
-  if (chdir(root_dir) < 0) {
-    cop_log(COP_FATAL, "unable to change to root directory \"%s\" [%d '%s']\n", root_dir, errno, strerror(errno));
-    cop_log(COP_FATAL," please set correct path in env variable TS_ROOT \n");
-    exit(1);
-  }
-
-  if (stat(config_dir, &info) < 0) {
-    cop_log(COP_FATAL, "unable to locate config directory '%s'\n",config_dir);
-    cop_log(COP_FATAL, " please try setting correct root path in env variable TS_ROOT \n");
-    exit(1);
-  }
-
-  if (stat(runtime_dir, &info) < 0) {
-    cop_log(COP_FATAL, "unable to locate local state directory '%s'\n",runtime_dir);
-    cop_log(COP_FATAL, " please try setting correct root path in either env variable TS_ROOT \n");
-    exit(1);
-  }
-  cop_log_trace("Leaving init_config_dir()\n");
-}
-
-static void
 init_lockfiles()
 {
 
   cop_log_trace("Entering init_lockfiles()\n");
-  Layout::relative_to(cop_lockfile, sizeof(cop_lockfile), Layout::get()->runtimedir, COP_LOCK);
-  Layout::relative_to(manager_lockfile, sizeof(manager_lockfile), Layout::get()->runtimedir, MANAGER_LOCK);
-  Layout::relative_to(server_lockfile, sizeof(server_lockfile), Layout::get()->runtimedir, SERVER_LOCK);
+  Layout::relative_to(cop_lockfile, sizeof(cop_lockfile), runtime_dir, COP_LOCK);
+  Layout::relative_to(manager_lockfile, sizeof(manager_lockfile), runtime_dir, MANAGER_LOCK);
+  Layout::relative_to(server_lockfile, sizeof(server_lockfile), runtime_dir, SERVER_LOCK);
 
   cop_log_trace("Leaving init_lockfiles()\n");
 }
@@ -1745,8 +1723,17 @@ static void
 init_config_file()
 {
   struct stat info;
+  const char * config_dir;
 
   cop_log_trace("Entering init_config_file()\n");
+
+  config_dir = Layout::get()->sysconfdir;
+  if (stat(config_dir, &info) < 0) {
+    cop_log(COP_FATAL, "unable to locate config directory '%s'\n",config_dir);
+    cop_log(COP_FATAL, " please try setting correct root path in env variable TS_ROOT \n");
+    exit(1);
+  }
+
   Layout::relative_to(config_file, sizeof(config_file), config_dir, "records.config.shadow");
   if (stat(config_file, &info) < 0) {
     Layout::relative_to(config_file, sizeof(config_file), config_dir, "records.config");
@@ -1761,6 +1748,8 @@ init_config_file()
 static void
 init()
 {
+  struct stat info;
+
   cop_log_trace("Entering init()\n");
 
   RecConfigFileInit();
@@ -1768,9 +1757,16 @@ init()
   init_signals();
   init_syslog();
 
-  init_config_dir();
-
   init_config_file();
+  config_reload_records();
+
+  runtime_dir = config_read_runtime_dir();
+  if (stat(runtime_dir, &info) < 0) {
+    cop_log(COP_FATAL, "unable to locate local state directory '%s'\n",runtime_dir);
+    cop_log(COP_FATAL, " please try setting correct root path in either env variable TS_ROOT \n");
+    exit(1);
+  }
+
   init_lockfiles();
   check_lockfile();
 

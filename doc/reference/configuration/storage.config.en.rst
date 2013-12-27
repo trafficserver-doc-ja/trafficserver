@@ -63,7 +63,7 @@ supported. They include
 
    - ``K`` Kilobytes (1024 bytes)
    - ``M`` Megabytes (1024^2 or 1,048,576 bytes)
-   - ``G`` Gigabytes (1024^3 or 1,073,741,824 bytes
+   - ``G`` Gigabytes (1024^3 or 1,073,741,824 bytes)
    - ``T`` Terabytes (1024^4 or 1,099,511,627,776 bytes)
 
 
@@ -118,6 +118,11 @@ following rules are targeted for an Ubuntu system, and stored in
    # Assign /dev/sde and /dev/sdf to the tserver group
    # make the assignment final, no later changes allowed to the group!
    SUBSYSTEM=="block", KERNEL=="sd[ef]", GROUP:="tserver"
+
+In order to apply these settings, trigger a reload with :manpage:`udevadm(8)`:::
+
+   udevadm trigger --subsystem-match=block
+
 
 FreeBSD Example
 ---------------

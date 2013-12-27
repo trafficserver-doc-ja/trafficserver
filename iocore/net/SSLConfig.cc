@@ -41,6 +41,7 @@
 
 int SSLConfig::configid = 0;
 int SSLCertificateConfig::configid = 0;
+int SSLConfigParams::ssl_maxrecord = 0;
 
 static ConfigUpdateHandler<SSLCertificateConfig> * sslCertUpdate;
 
@@ -63,6 +64,7 @@ SSLConfigParams::SSLConfigParams()
   ssl_ctx_options = 0;
   ssl_session_cache = SSL_SESSION_CACHE_MODE_SERVER;
   ssl_session_cache_size = 1024*20;
+  ssl_session_cache_timeout = 0;
 }
 
 SSLConfigParams::~SSLConfigParams()
@@ -146,6 +148,12 @@ SSLConfigParams::initialize()
   REC_ReadConfigInteger(options, "proxy.config.ssl.TLSv1");
   if (!options)
     ssl_ctx_options |= SSL_OP_NO_TLSv1;
+  REC_ReadConfigInteger(options, "proxy.config.ssl.TLSv1_1");
+  if (!options)
+    ssl_ctx_options |= SSL_OP_NO_TLSv1_1;
+  REC_ReadConfigInteger(options, "proxy.config.ssl.TLSv1_2");
+  if (!options)
+    ssl_ctx_options |= SSL_OP_NO_TLSv1_2;
 #ifdef SSL_OP_CIPHER_SERVER_PREFERENCE
   REC_ReadConfigInteger(options, "proxy.config.ssl.server.honor_cipher_order");
   if (!options)
@@ -161,6 +169,24 @@ SSLConfigParams::initialize()
     sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
 #endif
   }
+
+  // Enable ephemeral DH parameters for the case where we use a cipher with DH forward security.
+#ifdef SSL_OP_SINGLE_DH_USE
+  ssl_ctx_options |= SSL_OP_SINGLE_DH_USE;
+#endif
+
+#ifdef SSL_OP_SINGLE_ECDH_USE
+  ssl_ctx_options |= SSL_OP_SINGLE_ECDH_USE;
+#endif
+
+  // Enable all SSL compatibility workarounds.
+  ssl_ctx_options |= SSL_OP_ALL;
+
+  // According to OpenSSL source, applications must enable this if they support the Server Name extension. Since
+  // we do, then we ought to enable this. Httpd also enables this unconditionally.
+#ifdef SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION
+  ssl_ctx_options |= SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
+#endif
 
   REC_ReadConfigStringAlloc(serverCertChainFilename, "proxy.config.ssl.server.cert_chain.filename");
   REC_ReadConfigStringAlloc(serverCertRelativePath, "proxy.config.ssl.server.cert.path");
@@ -183,6 +209,10 @@ SSLConfigParams::initialize()
   // SSL session cache configurations
   REC_ReadConfigInteger(ssl_session_cache, "proxy.config.ssl.session_cache");
   REC_ReadConfigInteger(ssl_session_cache_size, "proxy.config.ssl.session_cache.size");
+  REC_ReadConfigInteger(ssl_session_cache_timeout, "proxy.config.ssl.session_cache.timeout");
+
+  // SSL record size
+  REC_EstablishStaticConfigInt32(ssl_maxrecord, "proxy.config.ssl.max_record_size");
 
   // ++++++++++++++++++++++++ Client part ++++++++++++++++++++
   client_verify_depth = 7;

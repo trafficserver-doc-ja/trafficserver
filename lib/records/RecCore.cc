@@ -31,8 +31,6 @@
 
 static bool g_initialized = false;
 
-Diags *g_diags = NULL;
-
 RecRecord *g_records = NULL;
 InkHashTable *g_records_ht = NULL;
 ink_rwlock g_records_rwlock;
@@ -179,7 +177,8 @@ RecCoreInit(RecModeT mode_type, Diags *_diags)
   }
   // read stats
   if ((mode_type == RECM_SERVER) || (mode_type == RECM_STAND_ALONE)) {
-    g_stats_snap_fpath = Layout::relative_to(Layout::get()->runtimedir, REC_RAW_STATS_FILE);
+    xptr<char> rundir(RecConfigReadRuntimeDir());
+    g_stats_snap_fpath = Layout::relative_to(rundir, REC_RAW_STATS_FILE);
     RecReadStatsFile();
   }
   // read configs
@@ -215,20 +214,6 @@ RecCoreInit(RecModeT mode_type, Diags *_diags)
 
   return REC_ERR_OKAY;
 }
-
-
-//-------------------------------------------------------------------------
-// RecSetDiags
-//-------------------------------------------------------------------------
-int
-RecSetDiags(Diags * _diags)
-{
-  // Warning! It's very dangerous to change diags on the fly!  This
-  // function only exists so that we can boot-strap TM on startup.
-  ink_atomic_swap(&g_diags, _diags);
-  return REC_ERR_OKAY;
-}
-
 
 //-------------------------------------------------------------------------
 // RecLinkCnfigXXX
@@ -1053,6 +1038,77 @@ REC_readString(const char *name, bool * found, bool lock)
   return _tmp;
 }
 
+//-------------------------------------------------------------------------
+// RecConfigReadRuntimeDir
+//-------------------------------------------------------------------------
+char *
+RecConfigReadRuntimeDir()
+{
+  char buf[PATH_NAME_MAX + 1];
+
+  buf[0] = '\0';
+  RecGetRecordString("proxy.config.local_state_dir", buf, PATH_NAME_MAX);
+  if (strlen(buf) > 0) {
+    return Layout::get()->relative(buf);
+  } else {
+    return ats_strdup(Layout::get()->runtimedir);
+  }
+}
+
+//-------------------------------------------------------------------------
+// RecConfigReadLogDir
+//-------------------------------------------------------------------------
+char *
+RecConfigReadLogDir()
+{
+  char buf[PATH_NAME_MAX + 1];
+
+  buf[0] = '\0';
+  RecGetRecordString("proxy.config.log.logfile_dir", buf, PATH_NAME_MAX);
+  if (strlen(buf) > 0) {
+    return Layout::get()->relative(buf);
+  } else {
+    return ats_strdup(Layout::get()->logdir);
+  }
+}
+
+//-------------------------------------------------------------------------
+// RecConfigReadSnapshotDir.
+//-------------------------------------------------------------------------
+char *
+RecConfigReadSnapshotDir()
+{
+  char buf[PATH_NAME_MAX + 1];
+
+  buf[0] = '\0';
+  RecGetRecordString("proxy.config.snapshot_dir", buf, PATH_NAME_MAX);
+  if (strlen(buf) > 0) {
+    return Layout::get()->relative_to(Layout::get()->sysconfdir, buf);
+  } else {
+    return Layout::get()->relative_to(Layout::get()->sysconfdir, "snapshots");
+  }
+}
+
+//-------------------------------------------------------------------------
+// RecConfigReadConfigPath
+//-------------------------------------------------------------------------
+char *
+RecConfigReadConfigPath(const char * file_variable, const char * default_value)
+{
+  char buf[PATH_NAME_MAX + 1];
+
+  buf[0] = '\0';
+  RecGetRecordString(file_variable, buf, PATH_NAME_MAX);
+  if (strlen(buf) > 0) {
+    return Layout::get()->relative_to(Layout::get()->sysconfdir, buf);
+  }
+
+  if (default_value) {
+    return Layout::get()->relative_to(Layout::get()->sysconfdir, default_value);
+  }
+
+  return NULL;
+}
 
 //-------------------------------------------------------------------------
 // REC_SignalManager (TS)

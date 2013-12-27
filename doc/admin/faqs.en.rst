@@ -29,7 +29,7 @@ FAQs
 How do you create a raw disk for the cache if all your disks have mounted file systems?
 ---------------------------------------------------------------------------------------
 
-Create a large file on filesystem (with :manpage`dd(1)`) and mount it as loopback device.
+Create a large file on filesystem (with :manpage:`dd(1)`) and mount it as loopback device.
 This is accomplished with :manpage:`losetup(8)` on Linux, :manpage:`lofiadm(1m)` on Solaris
 and Illumos, and :manpage:`mdconfig(8)` on FreeBSD.
 
@@ -122,7 +122,7 @@ Please refer to the :ref:`forward-proxy` documentation.
 How do I interpret the Via: header code?
 ----------------------------------------
 
-Take a look at our `Via decoder Ring <http://trafficserver.apache.org/tools/via>`_.
+The ``Via`` header string can be decoded with the `Via Decoder Ring <http://trafficserver.apache.org/tools/via>`_.
 
 Support for HTTP Expect: Header
 -------------------------------

@@ -15,18 +15,23 @@
 #  limitations under the License.
 
 if BUILD_EXPERIMENTAL_PLUGINS
+
 SUBDIRS = \
- lua \
- buffer_upload \
- esi \
- rfc5861 \
- tcp_info \
- custom_redirect \
- metalink \
- spdy \
- channel_stats \
  authproxy \
+ buffer_upload \
+ channel_stats \
+ custom_redirect \
+ esi \
  geoip_acl \
  healthchecks \
- remap_stats
+ lua \
+ hipes \
+ metalink \
+ remap_stats \
+ rfc5861 \
+ spdy \
+ tcp_info \
+ ts_lua \
+ xdebug
+
 endif
