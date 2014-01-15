@@ -668,7 +668,7 @@ specific domains.
   .. note::
         Enabling keep-alive does not automatically enable purging of keep-alive
         requests when nearing the connection limit, that is controlled by
-        ```proxy.config.http.server_max_connections``.
+        :ts:cv:`proxy.config.http.server_max_connections`.
 
 .. ts:cv:: CONFIG proxy.config.http.keep_alive_post_out  INT 0
 
@@ -1313,6 +1313,7 @@ Customizable User Response Pages
 ================================
 
 .. ts:cv:: CONFIG proxy.config.body_factory.enable_customizations INT 1
+
    Specifies whether customizable response pages are language specific
    or not:
 
@@ -2224,6 +2225,34 @@ Sockets
 .. ts:cv:: CONFIG proxy.config.net.sock_mss_in INT 0
 
    Same as the command line option ``--accept_mss`` that sets the MSS for all incoming requests.
+
+.. ts:cv:: CONFIG proxy.config.net.poll_timeout INT 10 (or 30 on Solaris)
+
+   Same as the command line option ``--poll_timeout``, or ``-t``, which
+   specifies the timeout used for the polling mechanism used. This timeout is
+   always in milliseconds (ms). This is the timeout to ``epoll_wait()`` on
+   Linux platforms, and to ``kevent()`` on BSD type OSs. The default value is
+   ``10`` on all platforms.
+
+   Changing this configuration can reduce CPU usage on an idle system, since
+   periodic tasks gets processed at these intervals. On busy servers, this
+   overhead is diminished, since polled events triggers morefrequently.
+   However, increasing the setting can also introduce additional latency for
+   certain operations, and timed events. It's recommended not to touch this
+   setting unless your CPU usage is unacceptable at idle workload. Some
+   alternatives to this could be::
+
+        Reduce the number of worker threads (net-threads)
+        Reduce the number of disk (AIO) threads
+	Make sure accept threads are enabled
+
+   The relevant configurations for this are::
+
+       CONFIG proxy.config.exec_thread.autoconfig INT 0
+       CONFIG proxy.config.exec_thread.limit INT 2
+       CONFIG proxy.config.accept_threads INT 1
+       CONFIG proxy.config.cache.threads_per_disk INT 8
+
 
 Undocumented
 ============

@@ -144,24 +144,19 @@ HttpSM::_instantiate_func(HttpSM * prototype, HttpSM * new_instance)
   int pre_history_len = (char *) (&(prototype->history)) - (char *) prototype;
   int post_history_len = total_len - history_len - pre_history_len;
   int post_offset = pre_history_len + history_len;
-
-#ifndef SIMPLE_MEMCPY_INIT
   int j;
 
   memset(((char *) new_instance), 0, pre_history_len);
   memset(((char *) new_instance) + post_offset, 0, post_history_len);
+
   uint32_t *pd = (uint32_t *) new_instance;
+
   for (j = 0; j < scat_count; j++) {
     pd[to[j]] = val[j];
   }
 
   ink_assert((memcmp((char *) new_instance, (char *) prototype, pre_history_len) == 0) &&
-                   (memcmp(((char *) new_instance) + post_offset, ((char *) prototype) + post_offset, post_history_len) == 0));
-#else
-  // memcpy(new_instance, prototype, total_len);
-  memcpy(new_instance, prototype, pre_history_len);
-  memcpy(((char *) new_instance) + post_offset, ((char *) prototype) + post_offset, post_history_len);
-#endif
+             (memcmp(((char *) new_instance) + post_offset, ((char *) prototype) + post_offset, post_history_len) == 0));
 }
 
 SparseClassAllocator<HttpSM> httpSMAllocator("httpSMAllocator", 128, 16, HttpSM::_instantiate_func);
@@ -3102,6 +3097,7 @@ HttpSM::tunnel_handler_ua(int event, HttpTunnelConsumer * c)
   }
 
   client_response_body_bytes = c->bytes_written - client_response_hdr_bytes;
+
   if (client_response_body_bytes < 0)
     client_response_body_bytes = 0;
 
@@ -6596,8 +6592,10 @@ HttpSM::update_stats()
       ink_hrtime_from_msec(t_state.http_config_param->slow_log_threshold) < total_time) {
     URL* url = t_state.hdr_info.client_request.url_get();
     char url_string[256] = "";
+    int offset = 0;
+    int skip = 0;
 
-    t_state.hdr_info.client_request.url_print(url_string, sizeof url_string, 0, 0);
+    t_state.hdr_info.client_request.url_print(url_string, sizeof url_string, &offset, &skip);
 
     // unique id
     char unique_id_string[128] = "";
