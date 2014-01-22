@@ -367,8 +367,8 @@ msgid ""
 "``Doc``, should have an ``hlen`` of zero and if not, it is ignored."
 msgstr ""
 ":cpp:class:`CacheHTTPInfoVector` は先頭の ``Doc`` にのみ保存されます。"
-"オブジェクトの ``Doc`` インスタンスの後ろには ゼロの ``hlen`` を持つ earliest "
-"``Doc`` を含み、もしそうでないものは無視されます。"
+"earliest ``Doc`` を含む、先頭の ``Doc`` に続くオブジェクトの ``Doc`` インス"
+"タンスはゼロの ``hlen`` を持つはずであり、もしそうでないものは無視されます。"
 
 #: ../../arch/cache/cache-arch.en.rst:311
 msgid ""
