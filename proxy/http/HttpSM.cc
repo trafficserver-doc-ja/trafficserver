@@ -1583,9 +1583,19 @@ HttpSM::handle_api_return()
     }
   case HttpTransact::SERVER_READ:
     {
-      setup_server_transfer();
-      perform_cache_write_action();
-      tunnel.tunnel_run();
+      if (unlikely(t_state.did_upgrade_succeed)) {
+       // We've sucessfully handled the upgrade, let's now setup
+       // a blind tunnel.
+       if(t_state.is_websocket) {
+         HTTP_INCREMENT_DYN_STAT(http_websocket_current_active_client_connections_stat);
+       }
+
+       setup_blind_tunnel(true);
+      } else {
+       setup_server_transfer();
+       perform_cache_write_action();
+       tunnel.tunnel_run();
+      }
       break;
     }
   case HttpTransact::SERVE_FROM_CACHE:
@@ -2739,6 +2749,11 @@ HttpSM::tunnel_handler(int event, void *data)
   ink_assert(data == &tunnel);
   // The tunnel calls this when it is done
   terminate_sm = true;
+
+  if (unlikely(t_state.is_websocket)) {
+    HTTP_DECREMENT_DYN_STAT(http_websocket_current_active_client_connections_stat);
+  }
+
   return 0;
 }
 
@@ -4536,8 +4551,8 @@ HttpSM::do_http_server_open(bool raw)
     HttpServerSession *existing_ss = ua_session->get_server_session();
 
     if (existing_ss) {
-      // [amc] Is this OK? Should we compare ports? (not done by ats_ip_addr_cmp)
-      if (ats_ip_addr_eq(&existing_ss->server_ip.sa, &t_state.current.server->addr.sa)) {
+      if (ats_ip_addr_eq(&existing_ss->server_ip.sa, &t_state.current.server->addr.sa) &&
+          ats_ip_port_cast(&existing_ss->server_ip) == ats_ip_port_cast(&t_state.current.server->addr)) {
         ua_session->attach_server_session(NULL);
         existing_ss->state = HSS_ACTIVE;
         this->attach_server_session(existing_ss);
@@ -4957,7 +4972,6 @@ HttpSM::handle_post_failure()
   }
   ua_entry->in_tunnel = false;
   server_entry->in_tunnel = false;
-  tunnel.deallocate_buffers();
 
   // disable redirection in case we got a partial response and then EOS, because the buffer might not
   // have the full post and it's deallocating the post buffers here
@@ -5039,6 +5053,8 @@ HttpSM::handle_server_setup_error(int event, void *data)
   VIO *vio = (VIO *) data;
   ink_assert(vio != NULL);
 
+  STATE_ENTER(&HttpSM::handle_server_setup_error, event);
+
   // If there is POST or PUT tunnel wait for the tunnel
   //  to figure out that things have gone to hell
 
@@ -5118,8 +5134,6 @@ HttpSM::handle_server_setup_error(int event, void *data)
   vc_table.cleanup_entry(server_entry);
   server_entry = NULL;
   server_session = NULL;
-
-  STATE_ENTER(&HttpSM::handle_server_setup_error, callout_state);
 
   // if we are waiting on a plugin callout for
   //   HTTP_API_SEND_REQUEST_HDR defer calling transact until
@@ -6137,6 +6151,7 @@ HttpSM::setup_server_transfer_to_cache_only()
 void
 HttpSM::setup_server_transfer()
 {
+  DebugSM("http", "Setup Server Transfer");
   int64_t alloc_index, hdr_size;
   int64_t nbytes;
 
@@ -6807,6 +6822,7 @@ HttpSM::set_next_state()
       break;
     }
   
+  case HttpTransact::HTTP_POST_REMAP_UPGRADE:
   case HttpTransact::HTTP_POST_REMAP_SKIP:
     {
       call_transact_and_set_next_state(NULL);

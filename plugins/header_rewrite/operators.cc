@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "operators.h"
+#include "expander.h"
 
 // OperatorConfig
 void
@@ -384,10 +385,13 @@ OperatorAddHeader::exec(const Resources& res) const
 {
   std::string value;
 
-  VariableExpander ve(value);
-  value = ve.expand(res);
-
   _value.append_value(value, res);
+
+  if (_value.need_expansion()) {
+    VariableExpander ve(value);
+
+    value = ve.expand(res);
+  }
 
   // Never set an empty header (I don't think that ever makes sense?)
   if (value.empty()) {

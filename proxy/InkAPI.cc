@@ -198,6 +198,7 @@ tsapi const char *TS_MIME_FIELD_RETRY_AFTER;
 tsapi const char *TS_MIME_FIELD_SENDER;
 tsapi const char *TS_MIME_FIELD_SERVER;
 tsapi const char *TS_MIME_FIELD_SET_COOKIE;
+tsapi const char *TS_MIME_FIELD_STRICT_TRANSPORT_SECURITY;
 tsapi const char *TS_MIME_FIELD_SUBJECT;
 tsapi const char *TS_MIME_FIELD_SUMMARY;
 tsapi const char *TS_MIME_FIELD_TE;
@@ -271,6 +272,7 @@ tsapi int TS_MIME_LEN_RETRY_AFTER;
 tsapi int TS_MIME_LEN_SENDER;
 tsapi int TS_MIME_LEN_SERVER;
 tsapi int TS_MIME_LEN_SET_COOKIE;
+tsapi int TS_MIME_LEN_STRICT_TRANSPORT_SECURITY;
 tsapi int TS_MIME_LEN_SUBJECT;
 tsapi int TS_MIME_LEN_SUMMARY;
 tsapi int TS_MIME_LEN_TE;
@@ -1425,6 +1427,7 @@ api_init()
     TS_MIME_FIELD_SENDER = MIME_FIELD_SENDER;
     TS_MIME_FIELD_SERVER = MIME_FIELD_SERVER;
     TS_MIME_FIELD_SET_COOKIE = MIME_FIELD_SET_COOKIE;
+    TS_MIME_FIELD_STRICT_TRANSPORT_SECURITY = MIME_FIELD_STRICT_TRANSPORT_SECURITY;
     TS_MIME_FIELD_SUBJECT = MIME_FIELD_SUBJECT;
     TS_MIME_FIELD_SUMMARY = MIME_FIELD_SUMMARY;
     TS_MIME_FIELD_TE = MIME_FIELD_TE;
@@ -1498,6 +1501,7 @@ api_init()
     TS_MIME_LEN_SENDER = MIME_LEN_SENDER;
     TS_MIME_LEN_SERVER = MIME_LEN_SERVER;
     TS_MIME_LEN_SET_COOKIE = MIME_LEN_SET_COOKIE;
+    TS_MIME_LEN_STRICT_TRANSPORT_SECURITY = MIME_LEN_STRICT_TRANSPORT_SECURITY;
     TS_MIME_LEN_SUBJECT = MIME_LEN_SUBJECT;
     TS_MIME_LEN_SUMMARY = MIME_LEN_SUMMARY;
     TS_MIME_LEN_TE = MIME_LEN_TE;
@@ -6659,7 +6663,17 @@ TSStatCreate(const char *the_name, TSRecordDataType the_type, TSStatPersistence 
     syncer = RecRawStatSyncCount;
     break;
   }
-  RecRegisterRawStat(api_rsb, RECT_PLUGIN, the_name, (RecDataT)the_type, (RecPersistT)persist, id, syncer);
+
+  switch (persist) {
+  case TS_STAT_PERSISTENT:
+    RecRegisterRawStat(api_rsb, RECT_PLUGIN, the_name, (RecDataT)the_type, RECP_PERSISTENT, id, syncer);
+    break;
+  case TS_STAT_NON_PERSISTENT:
+    RecRegisterRawStat(api_rsb, RECT_PLUGIN, the_name, (RecDataT)the_type, RECP_NON_PERSISTENT, id, syncer);
+    break;
+  default:
+    return TS_ERROR;
+  }
 
   return id;
 }
@@ -7591,6 +7605,22 @@ _conf_to_memberp(TSOverridableConfigKey conf, HttpSM* sm, OverridableDataType *t
   case TS_CONFIG_HTTP_ACCEPT_ENCODING_FILTER_ENABLED:
     ret = &sm->t_state.txn_conf->accept_encoding_filter_enabled;
     break;
+  case TS_CONFIG_SSL_HSTS_MAX_AGE:
+    typ = OVERRIDABLE_TYPE_INT;
+    ret = &sm->t_state.txn_conf->proxy_response_hsts_max_age;
+    break;
+  case TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS:
+    typ = OVERRIDABLE_TYPE_BYTE;
+    ret = &sm->t_state.txn_conf->proxy_response_hsts_include_subdomains;
+    break;
+  case TS_CONFIG_HTTP_CACHE_OPEN_READ_RETRY_TIME:
+    typ = OVERRIDABLE_TYPE_INT;
+    ret = &sm->t_state.txn_conf->cache_open_read_retry_time;
+    break;
+  case TS_CONFIG_HTTP_CACHE_MAX_OPEN_READ_RETRIES:
+    typ = OVERRIDABLE_TYPE_INT;
+    ret = &sm->t_state.txn_conf->max_cache_open_read_retries;
+    break;
 
     // This helps avoiding compiler warnings, yet detect unhandled enum members.
   case TS_CONFIG_NULL:
@@ -7775,6 +7805,11 @@ TSHttpTxnConfigFind(const char* name, int length, TSOverridableConfigKey *conf, 
       cnf = TS_CONFIG_HTTP_CACHE_HTTP;
     break;
 
+  case 29:
+    if (!strncmp(name, "proxy.config.ssl.hsts_max_age", length))
+      cnf = TS_CONFIG_SSL_HSTS_MAX_AGE;
+    break;
+
   case 31:
     if (!strncmp(name, "proxy.config.http.chunking.size", length))
       cnf = TS_CONFIG_HTTP_CHUNKING_SIZE;
@@ -7891,6 +7926,8 @@ TSHttpTxnConfigFind(const char* name, int length, TSOverridableConfigKey *conf, 
         cnf = TS_CONFIG_HTTP_ORIGIN_MAX_CONNECTIONS;
       else if (!strncmp(name, "proxy.config.http.cache.required_headers", length))
         cnf = TS_CONFIG_HTTP_CACHE_REQUIRED_HEADERS;
+      else if (!strncmp(name, "proxy.config.ssl.hsts_include_subdomains", length))
+        cnf = TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS;
       break;
     case 't':
       if (!strncmp(name, "proxy.config.http.keep_alive_enabled_out", length))
@@ -7977,10 +8014,18 @@ TSHttpTxnConfigFind(const char* name, int length, TSOverridableConfigKey *conf, 
     break;
 
   case 44:
-    if (!strncmp(name, "proxy.config.http.anonymize_remove_client_ip", length))
-      cnf = TS_CONFIG_HTTP_ANONYMIZE_REMOVE_CLIENT_IP;
-    else if (!strncmp(name, "proxy.config.http.anonymize_insert_client_ip", length))
-      cnf = TS_CONFIG_HTTP_ANONYMIZE_INSERT_CLIENT_IP;
+    switch (name[length-1]) {
+    case 'p':
+      if (!strncmp(name, "proxy.config.http.anonymize_remove_client_ip", length))
+        cnf = TS_CONFIG_HTTP_ANONYMIZE_REMOVE_CLIENT_IP;
+      else if (!strncmp(name, "proxy.config.http.anonymize_insert_client_ip", length))
+        cnf = TS_CONFIG_HTTP_ANONYMIZE_INSERT_CLIENT_IP;
+      break;
+    case 'e':
+      if (!strncmp(name, "proxy.config.http.cache.open_read_retry_time", length))
+        cnf = TS_CONFIG_HTTP_CACHE_OPEN_READ_RETRY_TIME;
+      break;
+    }
     break;
 
   case 45:
@@ -8000,6 +8045,8 @@ TSHttpTxnConfigFind(const char* name, int length, TSOverridableConfigKey *conf, 
     case 's':
       if (!strncmp(name, "proxy.config.http.connect_attempts_rr_retries", length))
         cnf = TS_CONFIG_HTTP_CONNECT_ATTEMPTS_RR_RETRIES;
+      else if (!strncmp(name, "proxy.config.http.cache.max_open_read_retries", length))
+        cnf = TS_CONFIG_HTTP_CACHE_MAX_OPEN_READ_RETRIES;
       break;
     }
     break;

@@ -1,6 +1,104 @@
                                                          -*- coding: utf-8 -*-
 Changes with Apache Traffic Server 4.2.0
 
+  *) [TS-2549] printf() compiler warnings  on OSX (clang) with the CPP APIs.
+
+  *) [TS-2532] Fix make distclean for C++ API examples.
+
+  *) [TS-2306] Client connection hang while downloading big file from origin
+   server over SSL connection
+
+  *) [TS-2353] Add ability to load ssl certs that are owned by root and only
+   read only by the user
+
+  *) [TS-2551] Eliminate the tr1 dependency from CPP APIs.
+
+  *) [TS-2541] Add WebSocket support
+
+  *) [TS-2550] Add inline configuration overrised to the conf_remap plugin.
+
+  *) [TS-2546] Move xptr and _xstrdup to ink_memory.{h,cc}.
+
+  *) [TS-2180] Small memory leak in RecCore.cc, from previous refactoring.
+
+  *) [TS-2534] Make sure RecRecord structs are always properly initialized.
+
+  *) [TS-2483] Add a new metric, proxy.node.restarts.proxy.cache_ready_time,
+   tracking absolute time when the cache started (finished
+   initialization). Until cache is available, or no cache configured, this
+   metric stays at a value of "0".
+
+  *) [TS-2517 First implementation of traffic_shell.pl, and reorg the modules
+   a bit for more consistency. Also fixes a timeout issue in AdminClient.pm.
+
+  *) [TS-1467] Disable client initiated renegotiation (SSL) DDoS by default
+
+  *) [TS-2538] Cleanup of ProcessMutex (unused) and InkMutex (dupe of
+   ink_mutex). We now use ink_mutex consistently.
+
+  *) [TS-2544] conf_remap plugin: allow for multiple configuration files.
+
+  *) [TS-2530] Check for loopback interfaces when computing the local address.
+   Author: Ron Barber rbarber@yahoo-inc.com
+
+  *) [TS-2031] Prevent duplicate SSL SNI name registration.
+   Author: Feifei Cai <ffcai@yahoo-inc.com>
+
+  *) [TS-2501] Refactor and improve performance for the case without
+   expansions. Review: Alexey Ivanov <aivanov@linkedin.com>.
+
+  *) [TS-2533 ] Add three commands previously provided by traffic_shell.
+
+  *) [TS-2304] Make the healthcheck plugin watch for file permission changes.
+
+  *) [TS-2519] Make build version metrics non-persistent.
+
+  *) [TS-1606] Log buffers are not flushed periodically when TS is launched 
+   with NO_REMOTE_MANAGEMENT flag
+
+  *) [TS-2481] Incorrect origin server port used sometimes (with keep-alive).
+   Author: Dimitry Andric <dimitry@andric.com>
+
+  *) [TS-2526] Remove the g_stats_snap_fpath global variable.
+
+  *) [TS-2525] Remove restrictions on outbound transparency with SSL.
+
+  *) [TS-2425] Update to TS-2261 for loading plugins as root
+
+  *) [TS-2505] Add traffic_line --offline option.
+
+  *) [TS-2305] Fall back to ftruncate if posix_fallocate fails.
+
+  *) [TS-2504] Support OpenSSL installations that use the lib64 directory.
+
+  *) [TS-799] Have AdminClient.pm created from .in file.
+
+  *) [TS-2509] Add the const qualifier to pure HttpTunnel member functions.
+
+  *) [TS-2508] Add a *highly* experimental escalation plugin.
+
+  *) [TS-2507] Fix the state transition logging in HttpSM::handle_server_setup_error.
+
+  *) [TS-1648] Segmentation fault in dir_clear_range()
+
+  *) [TS-2500] Fix handling of cache stripe assignment when a disk is
+   taken offline.
+
+  *) [TS-2499] Fix the header_rewrite plugin expansions of the new %<>
+   strings. Author: Alexey Ivanov <aivanov@linkedin.com>.
+
+  *) [TS-2498] Add a build option to install the example plugins.
+
+  *) [TS-2484] Add API support for the two missing overridable APIs:
+         proxy.config.http.cache.max_open_read_retries
+         proxy.config.http.cache.open_read_retry_time
+
+  *) [TS-2497] Failed post results in tunnel buffers being returned to
+   freelist prematurely.
+   Reporter: Thomas Jackson <thjackso@linkedin.com>
+
+  *) [TS-1668] Added HSTS configuration options to ATS
+
   *) [TS-2495] Reduce the size of HttpVCTableEntry.
 
   *) [TS-2491] stop other esi plugin unit test programs after error.

@@ -459,6 +459,20 @@ AC_ARG_ENABLE([experimental-plugins],
 AC_MSG_RESULT([$enable_experimental_plugins])
 AM_CONDITIONAL([BUILD_EXPERIMENTAL_PLUGINS], [ test "x${enable_experimental_plugins}" = "xyes" ])
 
+#
+# Example plugins. The example plugins are always built, but not always installed. Installing
+# them is useful for QA, but not useful for most users, so we default this to disabled.
+#
+
+AC_MSG_CHECKING([whether to install example plugins])
+AC_ARG_ENABLE([example-plugins],
+  [AS_HELP_STRING([--enable-example-plugins],[install example plugins])],
+  [],
+  [enable_example_plugins=no]
+)
+AC_MSG_RESULT([$enable_example_plugins])
+AM_CONDITIONAL([BUILD_EXAMPLE_PLUGINS], [ test "x${enable_example_plugins}" = "xyes" ])
+
 
 #
 # build c++ api
@@ -572,6 +586,24 @@ AC_COMPILE_IFELSE([
 AC_MSG_RESULT([$have_gnu_cxx_hash_map])
 if test "x${have_gnu_cxx_hash_map}" = "xyes" ; then
   AC_DEFINE(HAVE_GNU_CXX_HASH_MAP, 1, [whether __gnu_cxx::hash_map is available])
+fi
+
+# And check for std::shared_ptr vs std::tr1::shared_ptr
+TS_FLAG_HEADERS([unordered_map unordered_set])
+AC_MSG_CHECKING([for std::shared_ptr])
+AC_COMPILE_IFELSE([
+  AC_LANG_PROGRAM([
+    #include <memory>
+    using std::shared_ptr;
+    ], [
+  ])],
+  [ have_std_shared_ptr=yes ],
+  [ have_std_shared_ptr=no ]
+)
+
+AC_MSG_RESULT([$have_std_shared_ptr])
+if test "x${have_std_shared_ptr}" = "xyes" ; then
+  AC_DEFINE(HAVE_STD_SHARED_PTR, 1, [whether std::shared_ptr is available])
 fi
 
 AC_LANG_POP()
@@ -1093,9 +1125,6 @@ AX_BOOST_BASE([1.33],
 #
 # Check for SSL presence and usability
 TS_CHECK_CRYPTO
-if test "x${enable_crypto}" != "xyes"; then
-  AC_MSG_ERROR([Need at least one SSL library, --with-openssl is supported])
-fi
 
 #
 # Check for NextProtocolNegotiation TLS extension support.
@@ -1909,6 +1938,7 @@ AC_CONFIG_FILES([
   lib/atscppapi/examples/async_timer/Makefile
   lib/wccp/Makefile
   lib/perl/Makefile
+  lib/perl/lib/Apache/TS.pm
   mgmt/Makefile
   mgmt/api/Makefile
   mgmt/api/include/Makefile
@@ -1926,6 +1956,7 @@ AC_CONFIG_FILES([
   plugins/experimental/buffer_upload/Makefile
   plugins/experimental/channel_stats/Makefile
   plugins/experimental/custom_redirect/Makefile
+  plugins/experimental/escalate/Makefile
   plugins/experimental/esi/Makefile
   plugins/experimental/geoip_acl/Makefile
   plugins/experimental/lua/Makefile
