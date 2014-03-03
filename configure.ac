@@ -32,8 +32,8 @@
 # Version number is calculated as MAJOR * 1000000 + MINOR * 1000 + MICRO
 # Version string is in the form of MAJOR.MINOR.MICRO[sufix]
 #
-m4_define([TS_VERSION_S],[4.2.0])
-m4_define([TS_VERSION_N],[4002000])
+m4_define([TS_VERSION_S],[5.0.0])
+m4_define([TS_VERSION_N],[5000000])
 
 AC_INIT([Apache Traffic Server], TS_VERSION_S(), [dev@trafficserver.apache.org], [trafficserver],[http://trafficserver.apache.org])
 AC_PREREQ([2.59])
@@ -341,21 +341,6 @@ AC_ARG_ENABLE([ccache],
 AC_MSG_RESULT([$enable_ccache])
 
 #
-# Enble traffic_cop debugging
-#
-AC_MSG_CHECKING([whether to enable traffic_cop debugging])
-AC_ARG_ENABLE([cop-debug],
-  [AS_HELP_STRING([--enable-cop-debug],[Enable Traffic Cop debugging (for developers)])],
-  [],
-  [enable_cop_debug="no"]
-)
-AC_MSG_RESULT([$enable_cop_debug])
-TS_ARG_ENABLE_VAR([use], [cop-debug])
-AC_SUBST(use_cop_debug)
-
-
-
-#
 # Use TPROXY for connection transparency.
 #
 AC_MSG_CHECKING([whether to enable TPROXY based transparency])
@@ -473,6 +458,20 @@ AC_ARG_ENABLE([example-plugins],
 AC_MSG_RESULT([$enable_example_plugins])
 AM_CONDITIONAL([BUILD_EXAMPLE_PLUGINS], [ test "x${enable_example_plugins}" = "xyes" ])
 
+
+#
+# Test tools. The test tools are always built, but not always installed. Installing
+# them is useful for QA, but not useful for most users, so we default this to disabled.
+#
+
+AC_MSG_CHECKING([whether to install testing tools])
+AC_ARG_ENABLE([test-tools],
+  [AS_HELP_STRING([--enable-test-tools],[install testing tools])],
+  [],
+  [enable_test_tools=no]
+)
+AC_MSG_RESULT([$enable_test_tools])
+AM_CONDITIONAL([BUILD_TEST_TOOLS], [ test "x${enable_test_tools}" = "xyes" ])
 
 #
 # build c++ api
@@ -1131,16 +1130,15 @@ TS_CHECK_CRYPTO
 TS_CHECK_CRYPTO_NEXTPROTONEG
 
 #
+# Check for ALPN TLS extension support.
+TS_CHECK_CRYPTO_ALPN
+#
 # Check for EC key support.
 TS_CHECK_CRYPTO_EC_KEYS
 
 #
 # Check for ServerNameIndication TLS extension support.
 TS_CHECK_CRYPTO_SNI
-
-#
-# Check for RFC5077 TLS session ticket support.
-TS_CHECK_CRYPTO_TICKETS
 
 #
 # Check for zlib presence and usability
@@ -1971,7 +1969,6 @@ AC_CONFIG_FILES([
   plugins/experimental/xdebug/Makefile
   plugins/gzip/Makefile
   plugins/libloader/Makefile
-  plugins/header_filter/Makefile
   plugins/header_rewrite/Makefile
   plugins/regex_remap/Makefile
   plugins/stats_over_http/Makefile

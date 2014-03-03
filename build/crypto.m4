@@ -62,45 +62,25 @@ AC_DEFUN([TS_CHECK_CRYPTO_NEXTPROTONEG], [
   )
   LIBS=$_npn_saved_LIBS
 
-  AC_MSG_CHECKING(whether to enable NextProtocolNegotiation TLS extension support)
+  AC_MSG_CHECKING(whether to enable Next Protocol Negotiation TLS extension support)
   AC_MSG_RESULT([$enable_tls_npn])
   TS_ARG_ENABLE_VAR([use], [tls-npn])
   AC_SUBST(use_tls_npn)
 ])
 
-AC_DEFUN([TS_CHECK_CRYPTO_TICKETS], [
-  _tickets_saved_LIBS=$LIBS
-  enable_tls_tickets=yes
-
+AC_DEFUN([TS_CHECK_CRYPTO_ALPN], [
+  enable_tls_alpn=yes
+  _alpn_saved_LIBS=$LIBS
   TS_ADDTO(LIBS, [$OPENSSL_LIBS])
-  AC_CHECK_HEADERS(openssl/tls1.h openssl/ssl.h openssl/ts.h openssl/hmac.h openssl/evp.h)
-  AC_MSG_CHECKING([for SSL_CTX_set_tlsext_ticket_key_cb])
-  AC_COMPILE_IFELSE(
-  [
-    AC_LANG_PROGRAM([[
-#if HAVE_OPENSSL_SSL_H
-#include <openssl/ssl.h>
-#endif
-#if HAVE_OPENSSL_TLS1_H
-#include <openssl/tls1.h>
-#endif
-      ]],
-      [[SSL_CTX_set_tlsext_ticket_key_cb(NULL, NULL);]])
-  ],
-  [
-    AC_MSG_RESULT([yes])
-  ],
-  [
-    AC_MSG_RESULT([no])
-    enable_tls_tickets=no
-  ])
+  AC_CHECK_FUNCS(SSL_CTX_set_alpn_protos SSL_CTX_set_alpn_select_cb SSL_get0_alpn_selected SSL_select_next_proto,
+    [], [enable_tls_alpn=no]
+  )
+  LIBS=$_alpn_saved_LIBS
 
-  LIBS=$_tickets_saved_LIBS
-
-  AC_MSG_CHECKING(whether to enable TLS session ticket support)
-  AC_MSG_RESULT([$enable_tls_tickets])
-  TS_ARG_ENABLE_VAR([use], [tls-tickets])
-  AC_SUBST(use_tls_tickets)
+  AC_MSG_CHECKING(whether to enable Application Layer Protocol Negotiation TLS extension support)
+  AC_MSG_RESULT([$enable_tls_alpn])
+  TS_ARG_ENABLE_VAR([use], [tls-alpn])
+  AC_SUBST(use_tls_alpn)
 ])
 
 AC_DEFUN([TS_CHECK_CRYPTO_SNI], [
