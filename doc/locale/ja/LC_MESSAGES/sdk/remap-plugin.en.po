@@ -23,10 +23,10 @@ msgid ""
 "configured on a per-remap rule basis, which enables you to customize how "
 "URLs are redirected based on individual rules in the ``remap.config`` file."
 msgstr ""
-"リマッププラグインはよりフレキシブルな、動的なリマップルールの指定方法を提供"
+"リマッププラグインはよりフレキシブルかつ動的なリマップルールの指定方法を提供"
 "します。このプラグインは Traffic Server API 上に組込まれてはおらず、 URL "
 "リマップを目的として独立して存在します。リマッププラグインはグローバルでは"
-"なく、基本的にリマップルールの前処理として設定され ``remap.config`` ファイル"
+"なく、基本的にリマップルール毎の処理として設定され ``remap.config`` ファイル"
 "の個々のルールに基づき URL がどのようにリダイレクトされるかをカスタマイズする"
 "ことを可能にします。"
 
@@ -74,7 +74,7 @@ msgstr "必要となる関数"
 
 #: ../../sdk/remap-plugin.en.rst:55
 msgid "A remap plugin is required to implement the following functions:"
-msgstr "リマッププラグインは下記の関数の実装を必要とします:"
+msgstr "リマッププラグインには下記の関数の実装が求められます:"
 
 #: ../../sdk/remap-plugin.en.rst:71
 msgid "Configuration"
