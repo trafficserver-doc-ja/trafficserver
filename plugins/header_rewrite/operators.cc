@@ -144,7 +144,6 @@ OperatorSetStatusReason::exec(const Resources& res) const
 }
 
 
-/// TODO and XXX: These currently only support when running as remap plugin.
 // OperatorSetDestination
 void
 OperatorSetDestination::initialize(Parser& p)
@@ -153,15 +152,30 @@ OperatorSetDestination::initialize(Parser& p)
 
   _url_qual = parse_url_qualifier(p.get_arg());
   _value.set_value(p.get_value());
-  // TODO: What resources would we require here?
+  require_resources(RSRC_CLIENT_REQUEST_HEADERS);
+  require_resources(RSRC_SERVER_REQUEST_HEADERS);
 }
 
 
 void
 OperatorSetDestination::exec(const Resources& res) const
 {
-  if (res._rri) {
+  if (res._rri || (res.bufp && res.hdr_loc)) {
     std::string value;
+
+    // Determine which TSMBuffer and TSMLoc to use
+    TSMBuffer bufp;
+    TSMLoc url_m_loc;
+    if (res._rri) {
+      bufp = res._rri->requestBufp;
+      url_m_loc = res._rri->requestUrl;
+    } else {
+      bufp = res.bufp;
+      if (TSHttpHdrUrlGet(res.bufp, res.hdr_loc, &url_m_loc) != TS_SUCCESS) {
+        TSDebug(PLUGIN_NAME, "TSHttpHdrUrlGet was unable to return the url m_loc");
+        return;
+      }
+    }
 
     // Never set an empty destination value (I don't think that ever makes sense?)
     switch (_url_qual) {
@@ -172,8 +186,8 @@ OperatorSetDestination::exec(const Resources& res) const
         TSDebug(PLUGIN_NAME, "Would set destination HOST to an empty value, skipping");
       } else {
         const_cast<Resources&>(res).changed_url = true;
-        TSUrlHostSet(res._rri->requestBufp, res._rri->requestUrl, value.c_str(), value.size());
-        TSDebug(PLUGIN_NAME, "OperatorSetHost::exec() invoked with HOST: %s", value.c_str());
+        TSUrlHostSet(bufp, url_m_loc, value.c_str(), value.size());
+        TSDebug(PLUGIN_NAME, "OperatorSetDestination::exec() invoked with HOST: %s", value.c_str());
       }
       break;
 
@@ -183,8 +197,8 @@ OperatorSetDestination::exec(const Resources& res) const
         TSDebug(PLUGIN_NAME, "Would set destination PATH to an empty value, skipping");
       } else {
         const_cast<Resources&>(res).changed_url = true;
-        TSUrlPathSet(res._rri->requestBufp, res._rri->requestUrl, value.c_str(), value.size());
-        TSDebug(PLUGIN_NAME, "OperatorSetHost::exec() invoked with PATH: %s", value.c_str());
+        TSUrlPathSet(bufp, url_m_loc, value.c_str(), value.size());
+        TSDebug(PLUGIN_NAME, "OperatorSetDestination::exec() invoked with PATH: %s", value.c_str());
       }
       break;
 
@@ -196,7 +210,7 @@ OperatorSetDestination::exec(const Resources& res) const
         //1.6.4--Support for preserving QSA in case of set-destination
         if (get_oper_modifiers() & OPER_QSA) {
           int query_len = 0;
-          const char* query = TSUrlHttpQueryGet(res._rri->requestBufp, res._rri->requestUrl, &query_len);
+          const char* query = TSUrlHttpQueryGet(bufp, url_m_loc, &query_len);
           TSDebug(PLUGIN_NAME, "QSA mode, append original query string: %.*s", query_len, query);
           //std::string connector = (value.find("?") == std::string::npos)? "?" : "&";
           value.append("&");
@@ -204,18 +218,18 @@ OperatorSetDestination::exec(const Resources& res) const
         }
 
         const_cast<Resources&>(res).changed_url = true;
-        TSUrlHttpQuerySet(res._rri->requestBufp, res._rri->requestUrl, value.c_str(), value.size());
-        TSDebug(PLUGIN_NAME, "OperatorSetHost::exec() invoked with QUERY: %s", value.c_str());
+        TSUrlHttpQuerySet(bufp, url_m_loc, value.c_str(), value.size());
+        TSDebug(PLUGIN_NAME, "OperatorSetDestination::exec() invoked with QUERY: %s", value.c_str());
       }
       break;
 
     case URL_QUAL_PORT:
-      if (_value.get_int_value() <= 0) {
+      if (_value.get_int_value() <= 0 || _value.get_int_value() > 0xFFFF) {
         TSDebug(PLUGIN_NAME, "Would set destination PORT to an invalid range, skipping");
       } else {
         const_cast<Resources&>(res).changed_url = true;
-        TSUrlPortSet(res._rri->requestBufp, res._rri->requestUrl, _value.get_int_value());
-        TSDebug(PLUGIN_NAME, "OperatorSetHost::exec() invoked with PORT: %d", _value.get_int_value());
+        TSUrlPortSet(bufp, url_m_loc, _value.get_int_value());
+        TSDebug(PLUGIN_NAME, "OperatorSetDestination::exec() invoked with PORT: %d", _value.get_int_value());
       }
       break;
     case URL_QUAL_URL:
@@ -225,7 +239,7 @@ OperatorSetDestination::exec(const Resources& res) const
       break;
     }
   } else {
-    // TODO: Handle the non-remap case here (InkAPI hooks)
+    TSDebug(PLUGIN_NAME, "OperatorSetDestination::exec() unable to continue due to missing bufp=%p or hdr_loc=%p, rri=%p!", res.bufp, res.hdr_loc, res._rri);
   }
 }
 
@@ -284,6 +298,9 @@ OperatorSetRedirect::exec(const Resources& res) const
       }
 
       TSHttpTxnSetHttpRetStatus(res.txnp,(TSHttpStatus)_status.get_int_value());
+      const_cast<Resources&>(res).changed_url = true;
+      res._rri->redirect = 1;
+
       //TSHttpHdrStatusSet(res.bufp, res.hdr_loc, (TSHttpStatus)_status.get_int_value());
       const char *start = value.c_str();
       const char *end = value.size() + start;
@@ -350,6 +367,24 @@ OperatorSetTimeoutOut::exec(const Resources& res) const
   }
 }
 
+// OperatorSkipRemap
+void
+OperatorSkipRemap::initialize(Parser& p)
+{
+  Operator::initialize(p);
+
+  if (p.get_arg() == "1" || p.get_arg() == "true" || p.get_arg() == "TRUE") {
+    _skip_remap = true;
+  }
+}
+
+void
+OperatorSkipRemap::exec(const Resources& res) const
+{
+  TSDebug(PLUGIN_NAME, "OperatorSkipRemap::exec() skipping remap: %s", _skip_remap ? "True" : "False");
+  TSSkipRemappingSet(res.txnp, _skip_remap ? 1 : 0);
+}
+
 
 // OperatorRMHeader
 void
@@ -361,7 +396,7 @@ OperatorRMHeader::exec(const Resources& res) const
     TSDebug(PLUGIN_NAME, "OperatorRMHeader::exec() invoked on header %s", _header.c_str());
     field_loc = TSMimeHdrFieldFind(res.bufp, res.hdr_loc, _header.c_str(), _header.size());
     while (field_loc) {
-      TSDebug(PLUGIN_NAME, "\tdeleting header %s", _header.c_str());
+      TSDebug(PLUGIN_NAME, "   Deleting header %s", _header.c_str());
       tmp = TSMimeHdrFieldNextDup(res.bufp, res.hdr_loc, field_loc);
       TSMimeHdrFieldDestroy(res.bufp, res.hdr_loc, field_loc);
       TSHandleMLocRelease(res.bufp, res.hdr_loc, field_loc);
@@ -405,7 +440,7 @@ OperatorAddHeader::exec(const Resources& res) const
 
     if (TS_SUCCESS == TSMimeHdrFieldCreateNamed(res.bufp, res.hdr_loc, _header.c_str(), _header.size(), &field_loc)) {
       if (TS_SUCCESS == TSMimeHdrFieldValueStringSet(res.bufp, res.hdr_loc, field_loc, -1, value.c_str(), value.size())) {
-        TSDebug(PLUGIN_NAME, "   adding header %s", _header.c_str());
+        TSDebug(PLUGIN_NAME, "   Adding header %s", _header.c_str());
         TSMimeHdrFieldAppend(res.bufp, res.hdr_loc, field_loc);
       }
       TSHandleMLocRelease(res.bufp, res.hdr_loc, field_loc);
@@ -445,7 +480,7 @@ OperatorSetHeader::exec(const Resources& res) const
       // No existing header, so create one
       if (TS_SUCCESS == TSMimeHdrFieldCreateNamed(res.bufp, res.hdr_loc, _header.c_str(), _header.size(), &field_loc)) {
         if (TS_SUCCESS == TSMimeHdrFieldValueStringSet(res.bufp, res.hdr_loc, field_loc, -1, value.c_str(), value.size())) {
-          TSDebug(PLUGIN_NAME, "   adding header %s", _header.c_str());
+          TSDebug(PLUGIN_NAME, "   Adding header %s", _header.c_str());
           TSMimeHdrFieldAppend(res.bufp, res.hdr_loc, field_loc);
         }
         TSHandleMLocRelease(res.bufp, res.hdr_loc, field_loc);
@@ -458,7 +493,7 @@ OperatorSetHeader::exec(const Resources& res) const
         if (first) {
           first = false;
           if (TS_SUCCESS == TSMimeHdrFieldValueStringSet(res.bufp, res.hdr_loc, field_loc, -1, value.c_str(), value.size())) {
-            TSDebug(PLUGIN_NAME, "   overwriting header %s", _header.c_str());
+            TSDebug(PLUGIN_NAME, "   Overwriting header %s", _header.c_str());
           }
         } else {
           TSMimeHdrFieldDestroy(res.bufp, res.hdr_loc, field_loc);

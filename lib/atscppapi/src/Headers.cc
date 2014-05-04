@@ -21,7 +21,6 @@
  */
 #include "atscppapi/Headers.h"
 #include "atscppapi/shared_ptr.h"
-#include "InitializableValue.h"
 #include "logging_internal.h"
 #include <string>
 #include <cstring>
@@ -372,10 +371,23 @@ HeaderField header_field_iterator::operator*() {
 struct HeadersState: noncopyable {
   TSMBuffer hdr_buf_;
   TSMLoc hdr_loc_;
-  HeadersState() : hdr_buf_(NULL), hdr_loc_(NULL) { }
+  bool self_created_structures_;
+  HeadersState() {
+    hdr_buf_ = TSMBufferCreate();
+    hdr_loc_ = TSHttpHdrCreate(hdr_buf_);
+    self_created_structures_ = true;
+  }
   void reset(TSMBuffer bufp, TSMLoc hdr_loc) {
+    if (self_created_structures_) {
+      TSHandleMLocRelease(hdr_buf_, TS_NULL_MLOC /* no parent */, hdr_loc_);
+      TSMBufferDestroy(hdr_buf_);
+      self_created_structures_ = false;
+    }
     hdr_buf_ = bufp;
     hdr_loc_ = hdr_loc;
+  }
+  ~HeadersState() {
+    reset(NULL, NULL);
   }
 };
 
@@ -526,6 +538,18 @@ std::string Headers::str() {
   return oss.str();
 }
 
+std::string Headers::wireStr() {
+  string retval;
+  for (iterator iter = begin(), last = end(); iter != last; ++iter) {
+    HeaderField hf = *iter;
+    retval += hf.name().str();
+    retval += ": ";
+    retval += hf.values(", ");
+    retval += "\r\n";
+  }
+  return retval;
+}
+
 std::ostream& operator<<(std::ostream &os, atscppapi::Headers &obj) {
   for(header_field_iterator it = obj.begin(); it != obj.end(); ++it) {
     HeaderField hf = *it;
@@ -533,5 +557,6 @@ std::ostream& operator<<(std::ostream &os, atscppapi::Headers &obj) {
   }
   return os;
 }
+
 } /* atscppapi namespace */
 

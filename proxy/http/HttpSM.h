@@ -263,20 +263,20 @@ public:
   void add_history_entry(const char *fileline, int event, int reentrant);
   void add_cache_sm();
   bool is_private();
-  bool decide_cached_url(URL * s_url);
+  bool is_redirect_required();
 
+  TSClientProtoStack proto_stack;
   int64_t sm_id;
   unsigned int magic;
 
   //YTS Team, yamsat Plugin
   bool enable_redirection;      //To check if redirection is enabled
-  bool api_enable_redirection;  //To check if redirection is enabled
-  char *redirect_url;           //url for force redirect (provide users a functionality to redirect to another url when needed)
+  char *redirect_url;     //url for force redirect (provide users a functionality to redirect to another url when needed)
   int redirect_url_len;
   int redirection_tries;        //To monitor number of redirections
-  int64_t transfered_bytes;         //Added to calculate POST data
+  int64_t transfered_bytes;     //Added to calculate POST data
   bool post_failed;             //Added to identify post failure
-  bool debug_on;              //Transaction specific debug flag
+  bool debug_on;               //Transaction specific debug flag
 
   // Tunneling request to plugin
   HttpPluginTunnel_t plugin_tunnel_type;

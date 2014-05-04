@@ -1,4 +1,19 @@
 #
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
@@ -2336,7 +2351,7 @@ msgstr ""
 
 #: ../../reference/configuration/records.config.en.rst:1581
 msgid ""
-"When max_space_mb_for_orphan_logs is take as the maximum allowedlog space "
+"When max_space_mb_for_orphan_logs is take as the maximum allowed log space "
 "in the logging system, the same rule apply to proxy.config.log."
 "max_space_mb_for_logs also apply to proxy.config.log."
 "max_space_mb_for_orphan_logs, ie: All files in the logging directory "
@@ -2643,8 +2658,8 @@ msgstr ""
 
 #: ../../reference/configuration/records.config.en.rst:1792
 msgid ""
-"The log file rolling interval, in seconds. The minimum value is ``300`` (5 "
-"minutes). The maximum, and default, value is 86400 seconds (one day)."
+"The log file rolling interval, in seconds. The minimum value is ``60`` (1 "
+"minute). The maximum, and default, value is 86400 seconds (one day)."
 msgstr ""
 
 #: ../../reference/configuration/records.config.en.rst:1794
@@ -3206,7 +3221,7 @@ msgstr ""
 
 #: ../../reference/configuration/records.config.en.rst:886
 msgid ""
-"``Cache-Control`` directives from the server forbidding ache are ignored "
+"``Cache-Control`` directives from the server forbidding cache are ignored "
 "for the following HTTP response codes, regardless of the value specified "
 "for the :ts:cv:`proxy.config.http.negative_caching_enabled` variable."
 msgstr ""

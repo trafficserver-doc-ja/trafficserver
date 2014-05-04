@@ -198,7 +198,7 @@ cop_log(int priority, const char *format, ...)
 void
 chown_file_to_admin_user(const char *file) {
   if (admin_user_p) {
-    if (chown(file, admin_uid, admin_gid) < 0) {
+    if (chown(file, admin_uid, admin_gid) < 0 && errno != ENOENT) {
       cop_log(COP_FATAL, "cop couldn't chown the file: '%s' for '%s' (%d/%d) : [%d] %s\n",
               file, admin_user, admin_uid, admin_gid, errno, strerror(errno));
     }
@@ -737,7 +737,9 @@ spawn_manager()
   } else if (err == -1) {
     cop_log(COP_FATAL, "unable to fork [%d '%s']\n", errno, strerror(errno));
     exit(1);
-  } else {
+  }
+
+  if (log_fd >= 0) {
     close(log_fd);
   }
 

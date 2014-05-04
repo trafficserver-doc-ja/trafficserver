@@ -60,7 +60,6 @@ TSError send_and_parse_basic(OpType op);
 TSError send_and_parse_list(OpType op, LLQ * list);
 TSError send_and_parse_name(OpType op, char *name);
 TSError mgmt_record_set(const char *rec_name, const char *rec_val, TSActionNeedT * action_need);
-bool start_binary(const char *abs_bin_path);
 
 // global variables
 // need to store the thread id associated with socket_test_thread
@@ -192,39 +191,6 @@ mgmt_record_set(const char *rec_name, const char *rec_val, TSActionNeedT * actio
   return err;
 }
 
-
-/*-------------------------------------------------------------------------
- * start_binary
- *-------------------------------------------------------------------------
- * helper function which calls the executable specified by abs_bin_path;
- * used by HardRestart to call the stop/start_traffic_server scripts
- * Output: returns false if fail, true if successful
- */
-bool
-start_binary(const char *abs_bin_path)
-{
-  TSDiags(TS_DIAG_NOTE, "[start_binary] abs_bin_path = %s", abs_bin_path);
-  // before doing anything, check for existence of binary and its execute
-  // permissions
-  if (access(abs_bin_path, F_OK) < 0) {
-    // ERROR: can't find binary
-    TSDiags(TS_DIAG_ERROR, "Cannot find executable %s", abs_bin_path);
-    return false;
-  }
-  // binary exists, check permissions
-  else if (access(abs_bin_path, R_OK | X_OK) < 0) {
-    // ERROR: doesn't have proper permissions
-    TSDiags(TS_DIAG_ERROR, "Cannot execute %s", abs_bin_path);
-    return false;
-  }
-
-  if (system(abs_bin_path) == -1) {
-    TSDiags(TS_DIAG_ERROR, "Cannot system(%s)", abs_bin_path);
-    return false;
-  }
-
-  return true;
-}
 
 
 /***************************************************************************
@@ -416,37 +382,6 @@ Restart(bool cluster)
 
 
 /*-------------------------------------------------------------------------
- * HardRestart
- *-------------------------------------------------------------------------
- * Restarts Traffic Cop by using the stop_traffic_server, start_traffic_server script
- */
-TSError
-HardRestart()
-{
-  char start_path[1024];
-  char stop_path[1024];
-
-  if (!Layout::get() || !Layout::get()->bindir)
-    return TS_ERR_FAIL;
-  // determine the path of where start and stop TS scripts stored
-  TSDiags(TS_DIAG_NOTE, "Root Directory: %s", Layout::get()->bindir);
-
-  Layout::relative_to(start_path, sizeof(start_path), Layout::get()->bindir, "start_traffic_server");
-  Layout::relative_to(stop_path, sizeof(stop_path), Layout::get()->bindir, "stop_traffic_server");
-
-  TSDiags(TS_DIAG_NOTE, "[HardRestart] start_path = %s", start_path);
-  TSDiags(TS_DIAG_NOTE, "[HardRestart] stop_path = %s", stop_path);
-
-  if (!start_binary(stop_path)) // call stop_traffic_server script
-    return TS_ERR_FAIL;
-
-  if (!start_binary(start_path))        // call start_traffic_server script
-    return TS_ERR_FAIL;
-
-  return TS_ERR_OKAY;
-}
-
-/*-------------------------------------------------------------------------
  * Bounce
  *-------------------------------------------------------------------------
  * Restart the traffic_server process(es) only.
@@ -476,54 +411,113 @@ StorageDeviceCmdOffline(char const* dev)
   ret = send_request_name(main_socket_fd, STORAGE_DEVICE_CMD_OFFLINE, dev);
   return TS_ERR_OKAY != ret ? ret : parse_reply(main_socket_fd);
 }
+
 /***************************************************************************
  * Record Operations
  ***************************************************************************/
-// note that the record value is being sent as chunk of memory, regardless of
-// record type; it's not being converted to a string!!
-TSError
-MgmtRecordGet(const char *rec_name, TSRecordEle * rec_ele)
+static TSError
+mgmt_record_get_reply(TSRecordEle * rec_ele)
 {
   TSError ret;
   void *val;
+  char *name;
 
-  if (!rec_name || !rec_ele)
-    return TS_ERR_PARAMS;
-
-  rec_ele->rec_name = ats_strdup(rec_name);
-
-  // create and send request
-  ret = send_record_get_request(main_socket_fd, rec_ele->rec_name);
-  if (ret != TS_ERR_OKAY)
-    return ret;
+  ink_zero(*rec_ele);
+  rec_ele->rec_type = TS_REC_UNDEFINED;
 
   // parse the reply to get record value and type
-  ret = parse_record_get_reply(main_socket_fd, &(rec_ele->rec_type), &val);
-  if (ret != TS_ERR_OKAY)
+  ret = parse_record_get_reply(main_socket_fd, &(rec_ele->rec_type), &val, &name);
+  if (ret != TS_ERR_OKAY) {
     return ret;
+  }
 
   // convert the record value to appropriate type
-  switch (rec_ele->rec_type) {
-  case TS_REC_INT:
-    rec_ele->int_val = *(TSInt *) val;
-    break;
-  case TS_REC_COUNTER:
-    rec_ele->counter_val = *(TSCounter *) val;
-    break;
-  case TS_REC_FLOAT:
-    rec_ele->float_val = *(TSFloat *) val;
-    break;
-  case TS_REC_STRING:
-    rec_ele->string_val = ats_strdup((char *) val);
-    break;
-  default:                     // ERROR - invalid record type
-    return TS_ERR_FAIL;
+  if (val) {
+    switch (rec_ele->rec_type) {
+    case TS_REC_INT:
+      rec_ele->int_val = *(TSInt *) val;
+      break;
+    case TS_REC_COUNTER:
+      rec_ele->counter_val = *(TSCounter *) val;
+      break;
+    case TS_REC_FLOAT:
+      rec_ele->float_val = *(TSFloat *) val;
+      break;
+    case TS_REC_STRING:
+      rec_ele->string_val = ats_strdup((char *) val);
+      break;
+    default:
+      ; // nothing ... shut up compiler!
+    }
+  }
+
+  if (name) {
+    rec_ele->rec_name = name;
   }
 
   ats_free(val);
   return TS_ERR_OKAY;
 }
 
+// note that the record value is being sent as chunk of memory, regardless of
+// record type; it's not being converted to a string!!
+TSError
+MgmtRecordGet(const char *rec_name, TSRecordEle * rec_ele)
+{
+  TSError ret;
+
+  if (!rec_name || !rec_ele) {
+    return TS_ERR_PARAMS;
+  }
+
+  // create and send request
+  ret = send_record_get_request(main_socket_fd, rec_name);
+  if (ret != TS_ERR_OKAY) {
+    return ret;
+  }
+
+  return mgmt_record_get_reply(rec_ele);
+}
+
+TSError
+MgmtRecordGetMatching(const char * regex, TSList rec_vals)
+{
+  TSError       ret;
+  TSRecordEle * rec_ele;
+
+  ret = send_record_match_request(main_socket_fd, regex);
+  if (ret != TS_ERR_OKAY) {
+    return ret;
+  }
+
+  for (;;) {
+    rec_ele = TSRecordEleCreate();
+
+    // parse the reply to get record value and type
+    ret = mgmt_record_get_reply(rec_ele);
+    if (ret != TS_ERR_OKAY) {
+      goto fail;
+    }
+
+    // A NULL record ends the list.
+    if (rec_ele->rec_type == TS_REC_UNDEFINED) {
+      break;
+    }
+
+    enqueue((LLQ *) rec_vals, rec_ele);
+  }
+
+  return TS_ERR_OKAY;
+
+fail:
+
+  TSRecordEleDestroy(rec_ele);
+  for (rec_ele = (TSRecordEle *) dequeue((LLQ *) rec_vals); rec_ele; rec_ele = (TSRecordEle *) dequeue((LLQ *) rec_vals)) {
+      TSRecordEleDestroy(rec_ele);
+  }
+
+  return ret;
+}
 
 TSError
 MgmtRecordSet(const char *rec_name, const char *val, TSActionNeedT * action_need)

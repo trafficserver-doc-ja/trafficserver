@@ -18,22 +18,23 @@ if BUILD_EXPERIMENTAL_PLUGINS
 
 SUBDIRS = \
  authproxy \
+ background_fetch \
  balancer \
- escalate \
  buffer_upload \
  channel_stats \
  custom_redirect \
+ escalate \
  esi \
  geoip_acl \
  healthchecks \
- lua \
  hipes \
  metalink \
  remap_stats \
  rfc5861 \
+ s3_auth \
  spdy \
- tcp_info \
  ts_lua \
+ url_sig \
  xdebug
 
 endif

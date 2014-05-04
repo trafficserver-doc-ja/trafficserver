@@ -31,17 +31,13 @@
 #include "List.h"
 #include "I_IOBuffer.h"
 #include "I_Socks.h"
+#include "apidefs.h"
 
 #define CONNECT_SUCCESS   1
 #define CONNECT_FAILURE   0
 
 #define SSL_EVENT_SERVER 0
 #define SSL_EVENT_CLIENT 1
-
-enum NetDataType
-{
-  NET_DATA_ATTRIBUTES = VCONNECTION_NET_DATA_BASE
-};
 
 /** Holds client options for NetVConnection.
 
@@ -412,6 +408,9 @@ public:
 
   /** Returns local port. */
   uint16_t get_local_port();
+
+  /** Client protocol stack of this VC */
+  TSClientProtoStack proto_stack;
 
   /** Returns remote sockaddr storage. */
   sockaddr const* get_remote_addr();

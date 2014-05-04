@@ -28,6 +28,7 @@ CONFIG proxy.config.syslog_facility STRING LOG_DAEMON
 CONFIG proxy.config.output.logfile STRING traffic.out
 CONFIG proxy.config.snapshot_dir STRING snapshots
 CONFIG proxy.config.system.mmap_max INT 2097152
+CONFIG proxy.config.system.file_max_pct FLOAT 0.9
 ##############################################################################
 #
 # Main threads configuration (worker threads). Also see configurations for
@@ -523,11 +524,6 @@ CONFIG proxy.config.ssl.server.cert.path STRING @rel_sysconfdir@
    # fill in the private key path. Private key names specified in
    # ssl_multicert.config will be located relative to this path.
 CONFIG proxy.config.ssl.server.private_key.path STRING @rel_sysconfdir@
-   # The CA file name and path are the
-   # certificate authority certificate that
-   # client certificates will be verified against.
-CONFIG proxy.config.ssl.CA.cert.filename STRING NULL
-CONFIG proxy.config.ssl.CA.cert.path STRING @rel_sysconfdir@
    ################################
    # client related configuration #
    ################################
@@ -545,7 +541,7 @@ CONFIG proxy.config.ssl.client.CA.cert.filename STRING NULL
 CONFIG proxy.config.ssl.client.CA.cert.path STRING @rel_sysconfdir@
 ##############################################################################
 #
-# ICP Configuration. NOTE! ICP is currently broken NOTE!
+# ICP Configuration.
 #
 ##############################################################################
    # icp modes

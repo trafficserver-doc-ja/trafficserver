@@ -21,9 +21,6 @@
   limitations under the License.
  */
 
-// Avoid complaining about the deprecated APIs.
-// #define TS_DEPRECATED
-
 #include <stdio.h>
 
 #include "libts.h"
@@ -54,7 +51,7 @@
 #include "PluginVC.h"
 #include "api/ts/experimental.h"
 #include "ICP.h"
-#include "HttpAccept.h"
+#include "HttpSessionAccept.h"
 #include "PluginVC.h"
 #include "FetchSM.h"
 #include "HttpDebugNames.h"
@@ -364,8 +361,9 @@ tsapi int TS_HTTP_LEN_PUSH;
 tsapi const char * TS_NPN_PROTOCOL_HTTP_1_0 = "http/1.0";
 tsapi const char * TS_NPN_PROTOCOL_HTTP_1_1 = "http/1.1";
 tsapi const char * TS_NPN_PROTOCOL_SPDY_1   = "spdy/1";   // obsolete
-tsapi const char * TS_NPN_PROTOCOL_SPDY_2   = "spdy/2";   // shipping
-tsapi const char * TS_NPN_PROTOCOL_SPDY_3   = "spdy/3";   // upcoming
+tsapi const char * TS_NPN_PROTOCOL_SPDY_2   = "spdy/2";
+tsapi const char * TS_NPN_PROTOCOL_SPDY_3   = "spdy/3";
+tsapi const char * TS_NPN_PROTOCOL_SPDY_3_1 = "spdy/3.1";
 
 /* MLoc Constants */
 tsapi const TSMLoc TS_NULL_MLOC = (TSMLoc)NULL;
@@ -418,12 +416,14 @@ int
 _TSAssert(const char *text, const char *file, int line)
 {
   _ink_assert(text, file, line);
+  return 0;
+}
 #else
 _TSAssert(const char *, const char *, int)
 {
-#endif
- return 0;
+  return 0;
 }
+#endif
 
 // This assert is for internal API use only.
 #if TS_USE_FAST_SDK
@@ -432,7 +432,6 @@ _TSAssert(const char *, const char *, int)
 #define sdk_assert(EX)                                          \
   ( (void)((EX) ? (void)0 : _TSReleaseAssert(#EX, __FILE__, __LINE__)) )
 #endif
-
 
 ////////////////////////////////////////////////////////////////////
 //
@@ -579,6 +578,15 @@ TSReturnCode
 sdk_sanity_check_continuation(TSCont cont)
 {
   if ((cont == NULL) || (((INKContInternal *) cont)->m_free_magic == INKCONT_INTERN_MAGIC_DEAD))
+    return TS_ERROR;
+
+  return TS_SUCCESS;
+}
+
+TSReturnCode
+sdk_sanity_check_fetch_sm(TSFetchSM fetch_sm)
+{
+  if (fetch_sm == NULL)
     return TS_ERROR;
 
   return TS_SUCCESS;
@@ -4930,17 +4938,6 @@ TSHttpTxnSecondUrlTryLock(TSHttpTxn txnp)
 }
 
 TSReturnCode
-TSHttpTxnFollowRedirect(TSHttpTxn txnp, int on)
-{
-  sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
-
-  HttpSM *sm = (HttpSM *) txnp;
-
-  sm->api_enable_redirection = (on ? true : false);
-  return TS_SUCCESS;
-}
-
-TSReturnCode
 TSHttpTxnRedirectRequest(TSHttpTxn txnp, TSMBuffer bufp, TSMLoc url_loc)
 {
   sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
@@ -4980,7 +4977,7 @@ TSHttpTxnRedirectRequest(TSHttpTxn txnp, TSMBuffer bufp, TSMLoc url_loc)
   s->request_sent_time = 0;
   s->response_received_time = 0;
   s->cache_info.write_lock_state = HttpTransact::CACHE_WL_INIT;
-  s->next_action = HttpTransact::REDIRECT_READ;
+  s->next_action = HttpTransact::SM_ACTION_REDIRECT_READ;
 
   return TS_SUCCESS;
 }
@@ -5415,46 +5412,46 @@ TSHttpTxnServerPacketTosSet(TSHttpTxn txnp, int tos)
   return TS_SUCCESS;
 }
 
+// Set the body, or, if you provide a NULL buffer, clear the body message
 void
-TSHttpTxnErrorBodySet(TSHttpTxn txnp, char *buf, int buflength, char *mimetype)
+TSHttpTxnErrorBodySet(TSHttpTxn txnp, char *buf, size_t buflength, char *mimetype)
 {
   sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
-  sdk_assert(sdk_sanity_check_null_ptr((void*)buf) == TS_SUCCESS);
-  sdk_assert(buflength > 0);
 
   HttpSM *sm = (HttpSM *) txnp;
   HttpTransact::State *s = &(sm->t_state);
 
-  if (s->internal_msg_buffer)
-    HttpTransact::free_internal_msg_buffer(s->internal_msg_buffer, s->internal_msg_buffer_fast_allocator_size);
-
-  ats_free_null(s->internal_msg_buffer_type);
+  // Cleanup anything already set.
+  s->free_internal_msg_buffer();
+  ats_free(s->internal_msg_buffer_type);
 
   s->internal_msg_buffer = buf;
-  s->internal_msg_buffer_type = mimetype;
-  s->internal_msg_buffer_size = buflength;
+  s->internal_msg_buffer_size = buf ? buflength : 0;
   s->internal_msg_buffer_fast_allocator_size = -1;
+
+  s->internal_msg_buffer_type = mimetype;
 }
 
 void
 TSHttpTxnServerRequestBodySet(TSHttpTxn txnp, char *buf, int64_t buflength)
 {
   sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
-  sdk_assert(sdk_sanity_check_null_ptr((void*)buf) == TS_SUCCESS);
-  sdk_assert(buflength > 0);
 
   HttpSM *sm = (HttpSM *) txnp;
   HttpTransact::State *s = &(sm->t_state);
 
-  if (s->method != HTTP_WKSIDX_GET)
-    return;
+  // Cleanup anything already set.
+  s->free_internal_msg_buffer();
 
-  if (s->internal_msg_buffer)
-    HttpTransact::free_internal_msg_buffer(s->internal_msg_buffer, s->internal_msg_buffer_fast_allocator_size);
-
-  s->api_server_request_body_set = true;
-  s->internal_msg_buffer = buf;
-  s->internal_msg_buffer_size = buflength;
+  if (buf) {
+    s->api_server_request_body_set = true;
+    s->internal_msg_buffer = buf;
+    s->internal_msg_buffer_size = buflength;
+  } else {
+    s->api_server_request_body_set = false;
+    s->internal_msg_buffer = NULL;
+    s->internal_msg_buffer_size = 0;
+  }
   s->internal_msg_buffer_fast_allocator_size = -1;
 }
 
@@ -5653,30 +5650,6 @@ TSHttpTxnSetHttpRetStatus(TSHttpTxn txnp, TSHttpStatus http_retstatus)
 
   HttpSM *sm = (HttpSM *) txnp;
   sm->t_state.http_return_code = (HTTPStatus) http_retstatus;
-}
-
-int
-TSHttpTxnGetMaxHttpRetBodySize(void)
-{
-  return HTTP_TRANSACT_STATE_MAX_XBUF_SIZE;
-}
-
-void
-TSHttpTxnSetHttpRetBody(TSHttpTxn txnp, const char *body_msg, int plain_msg_flag)
-{
-  sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
-
-  HttpSM *sm = (HttpSM *) txnp;
-  HttpTransact::State *s = &(sm->t_state);
-
-  s->return_xbuf_size = 0;
-  s->return_xbuf[0] = 0;
-  s->return_xbuf_plain = false;
-  if (body_msg) {
-    ink_strlcpy(s->return_xbuf, body_msg, HTTP_TRANSACT_STATE_MAX_XBUF_SIZE);
-    s->return_xbuf_size = strlen(s->return_xbuf);
-    s->return_xbuf_plain = plain_msg_flag;
-  }
 }
 
 /* control channel for HTTP */
@@ -6075,11 +6048,54 @@ TSHttpAltInfoQualitySet(TSHttpAltInfo infop, float quality)
   info->m_qvalue = quality;
 }
 
-extern HttpAccept *plugin_http_accept;
-extern HttpAccept *plugin_http_transparent_accept;
+TSClientProtoStack
+TSClientProtoStackCreate(TSProtoType ptype, ...)
+{
+  unsigned  pstack = 0;
+  va_list   args;
+  const int pmax = (sizeof(TSClientProtoStack) * CHAR_BIT) - 1;
+
+  if (ptype == TS_PROTO_NULL || ptype > pmax) {
+    return 0;
+  }
+
+  pstack |= (1u << ptype);
+
+  va_start(args, ptype);
+  for (;;) {
+    ptype = (TSProtoType)va_arg(args, int);
+
+    // TS_PROTO_NULL ends the list.
+    if (ptype == TS_PROTO_NULL) {
+      va_end(args);
+      return pstack;
+    }
+
+    // Protocol stack value is out of range.
+    if (ptype > pmax) {
+      va_end(args);
+      return 0;
+    }
+
+    pstack |= (1u << ptype);
+  }
+
+  // We can't get here.
+  ink_release_assert(0);
+}
+
+extern HttpSessionAccept *plugin_http_accept;
+extern HttpSessionAccept *plugin_http_transparent_accept;
 
 TSVConn
 TSHttpConnect(sockaddr const* addr)
+{
+  return TSHttpConnectWithProtoStack(addr, (1u << TS_PROTO_HTTP));
+}
+
+TSVConn
+TSHttpConnectWithProtoStack(sockaddr const* addr,
+                            TSClientProtoStack proto_stack)
 {
   sdk_assert(addr);
 
@@ -6091,6 +6107,9 @@ TSHttpConnect(sockaddr const* addr)
 
     new_pvc->set_active_addr(addr);
     new_pvc->set_accept_cont(plugin_http_accept);
+
+    new_pvc->active_vc.proto_stack = proto_stack;
+    new_pvc->passive_vc.proto_stack = proto_stack;
 
     PluginVC *return_vc = new_pvc->connect();
 
@@ -6782,7 +6801,7 @@ TSTextLogObjectCreate(const char *filename, int mode, TSTextLogObject *new_objec
   sdk_assert(sdk_sanity_check_null_ptr((void*)filename) == TS_SUCCESS);
   sdk_assert(sdk_sanity_check_null_ptr((void*)new_object) == TS_SUCCESS);
 
-  if (mode<0 || mode>= TS_LOG_MODE_INVALID_FLAG) {
+  if (mode <0 || mode >= TS_LOG_MODE_INVALID_FLAG) {
     *new_object = NULL;
     return TS_ERROR;
   }
@@ -6795,21 +6814,21 @@ TSTextLogObjectCreate(const char *filename, int mode, TSTextLogObject *new_objec
                                               Log::config->rolling_interval_sec,
                                               Log::config->rolling_offset_hr,
                                               Log::config->rolling_size_mb));
-  if (tlog) {
-    int err = (mode & TS_LOG_MODE_DO_NOT_RENAME ?
-               Log::config->log_object_manager.manage_api_object(tlog, 0) :
-               Log::config->log_object_manager.manage_api_object(tlog));
-    if (err != LogObjectManager::NO_FILENAME_CONFLICTS) {
-      delete tlog;
-      *new_object = NULL;
-      return TS_ERROR;
-    }
-  } else {
+  if (tlog == NULL) {
     *new_object = NULL;
     return TS_ERROR;
   }
-  *new_object = (TSTextLogObject) tlog;
 
+  int err = (mode & TS_LOG_MODE_DO_NOT_RENAME ?
+             Log::config->log_object_manager.manage_api_object(tlog, 0) :
+             Log::config->log_object_manager.manage_api_object(tlog));
+  if (err != LogObjectManager::NO_FILENAME_CONFLICTS) {
+    delete tlog;
+    *new_object = NULL;
+    return TS_ERROR;
+  }
+
+  *new_object = (TSTextLogObject) tlog;
   return TS_SUCCESS;
 }
 
@@ -6869,12 +6888,17 @@ TSTextLogObjectHeaderSet(TSTextLogObject the_object, const char *header)
   ((TextLogObject *) the_object)->set_log_file_header(header);
 }
 
-void
+TSReturnCode
 TSTextLogObjectRollingEnabledSet(TSTextLogObject the_object, int rolling_enabled)
 {
   sdk_assert(sdk_sanity_check_iocore_structure(the_object) == TS_SUCCESS);
 
-  ((TextLogObject *) the_object)->set_rolling_enabled(rolling_enabled);
+  if (LogRollingEnabledIsValid(rolling_enabled)) {
+    ((TextLogObject *) the_object)->set_rolling_enabled((Log::RollingEnabledValues)rolling_enabled);
+    return TS_SUCCESS;
+  }
+
+  return TS_ERROR;
 }
 
 void
@@ -7122,7 +7146,41 @@ TSCacheHttpInfoSizeSet(TSCacheHttpInfo infop, int64_t size)
   info->object_size_set(size);
 }
 
+// This API tells the core to follow normal (301/302) redirects using the
+// standard Location: URL. This does not need to be called if you set an
+// explicit URL using TSRedirectUrlSet().
+TSReturnCode
+TSHttpTxnFollowRedirect(TSHttpTxn txnp, int on)
+{
+  sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
+
+  HttpSM *sm = (HttpSM *) txnp;
+
+  sm->enable_redirection = (on ? true : false);
+  return TS_SUCCESS;
+}
+
 // this function should be called at TS_EVENT_HTTP_READ_RESPONSE_HDR
+void
+TSHttpTxnRedirectUrlSet(TSHttpTxn txnp, const char* url, const int url_len)
+{
+  sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
+  sdk_assert(sdk_sanity_check_null_ptr((void*)url) == TS_SUCCESS);
+
+  HttpSM *sm = (HttpSM*) txnp;
+
+  if (sm->redirect_url != NULL) {
+    ats_free(sm->redirect_url);
+    sm->redirect_url = NULL;
+    sm->redirect_url_len = 0;
+  }
+
+  sm->redirect_url = (char*)url;
+  sm->redirect_url_len = url_len;
+  sm->enable_redirection = true;
+}
+
+// Deprecated, remove for v6.0.0
 void
 TSRedirectUrlSet(TSHttpTxn txnp, const char* url, const int url_len)
 {
@@ -7138,7 +7196,7 @@ TSRedirectUrlSet(TSHttpTxn txnp, const char* url, const int url_len)
   }
 
   sm->redirect_url = (char*)ats_malloc(url_len + 1);
-  ink_strlcpy(sm->redirect_url, (char*)url, url_len + 1);
+  ink_strlcpy(sm->redirect_url, url, url_len + 1);
   sm->redirect_url_len = url_len;
   // have to turn redirection on for this transaction if user wants to redirect to another URL
   if (sm->enable_redirection == false) {
@@ -7150,14 +7208,31 @@ TSRedirectUrlSet(TSHttpTxn txnp, const char* url, const int url_len)
 }
 
 const char*
-TSRedirectUrlGet(TSHttpTxn txnp, int *url_len_ptr)
+TSHttpTxnRedirectUrlGet(TSHttpTxn txnp, int *url_len_ptr)
 {
   sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
 
   HttpSM *sm = (HttpSM*)txnp;
 
   *url_len_ptr = sm->redirect_url_len;
-  return (const char*)sm->redirect_url;
+  return sm->redirect_url;
+}
+
+// Deprecated, remove for v6.0.0
+const char*
+TSRedirectUrlGet(TSHttpTxn txnp, int *url_len_ptr)
+{
+  return TSHttpTxnRedirectUrlGet(txnp, url_len_ptr);
+}
+
+int
+TSHttpTxnRedirectRetries(TSHttpTxn txnp)
+{
+  sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
+
+  HttpSM *sm = (HttpSM*)txnp;
+
+  return sm->redirection_tries;
 }
 
 char*
@@ -7214,6 +7289,112 @@ TSFetchUrl(const char* headers, int request_len, sockaddr const* ip , TSCont con
 
   fetch_sm->init((Continuation*)contp, callback_options, events, headers, request_len, ip);
   fetch_sm->httpConnect();
+}
+
+TSFetchSM
+TSFetchCreate(TSCont contp, TSFetchMethod method,
+              const char *url, const char *version,
+              struct sockaddr const* client_addr, int flags)
+{
+  sdk_assert(sdk_sanity_check_continuation(contp) == TS_SUCCESS);
+  sdk_assert(ats_is_ip(client_addr));
+
+  FetchSM *fetch_sm = FetchSMAllocator.alloc();
+
+  fetch_sm->ext_init((Continuation*)contp, method, url, version,
+                     client_addr, flags);
+
+  return (TSFetchSM)fetch_sm;
+}
+
+void
+TSFetchHeaderAdd(TSFetchSM fetch_sm,
+                 const char *name, int name_len,
+                 const char *value, int value_len)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  ((FetchSM*)fetch_sm)->ext_add_header(name, name_len, value, value_len);
+}
+
+void
+TSFetchWriteData(TSFetchSM fetch_sm, const void *data, size_t len)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  ((FetchSM*)fetch_sm)->ext_write_data(data, len);
+}
+
+ssize_t
+TSFetchReadData(TSFetchSM fetch_sm, void *buf, size_t len)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  return ((FetchSM*)fetch_sm)->ext_read_data((char *)buf, len);
+}
+
+void
+TSFetchLaunch(TSFetchSM fetch_sm)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  ((FetchSM*)fetch_sm)->ext_lanuch();
+}
+
+void
+TSFetchDestroy(TSFetchSM fetch_sm)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  ((FetchSM*)fetch_sm)->ext_destroy();
+}
+
+void
+TSFetchUserDataSet(TSFetchSM fetch_sm, void *data)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  ((FetchSM*)fetch_sm)->ext_set_user_data(data);
+}
+
+void
+TSFetchClientProtoStackSet(TSFetchSM fetch_sm, TSClientProtoStack proto_stack)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  ((FetchSM*)fetch_sm)->ext_set_proto_stack(proto_stack);
+}
+
+TSClientProtoStack
+TSFetchClientProtoStackGet(TSFetchSM fetch_sm)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  return ((FetchSM*)fetch_sm)->ext_get_proto_stack();
+}
+
+void*
+TSFetchUserDataGet(TSFetchSM fetch_sm)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  return ((FetchSM*)fetch_sm)->ext_get_user_data();
+}
+
+TSMBuffer
+TSFetchRespHdrMBufGet(TSFetchSM fetch_sm)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  return ((FetchSM*)fetch_sm)->resp_hdr_bufp();
+}
+
+TSMLoc
+TSFetchRespHdrMLocGet(TSFetchSM fetch_sm)
+{
+  sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
+
+  return ((FetchSM*)fetch_sm)->resp_hdr_mloc();
 }
 
 TSReturnCode
@@ -8362,26 +8543,46 @@ TSHttpTxnBackgroundFillStarted(TSHttpTxn txnp)
 
 int
 TSHttpTxnIsCacheable(TSHttpTxn txnp, TSMBuffer request, TSMBuffer response)
- {
-   sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
-   HttpSM *sm = (HttpSM *) txnp;
-   HTTPHdr *req, *resp;
+{
+  sdk_assert(sdk_sanity_check_txn(txnp) == TS_SUCCESS);
+  HttpSM *sm = (HttpSM *) txnp;
+  HTTPHdr *req, *resp;
 
-   // We allow for either request or response to be empty (or both), in
-   // which case we default to the transactions request or response.
-   if (request) {
-     sdk_sanity_check_mbuffer(request);
-     req = reinterpret_cast<HTTPHdr*>(request);
-   } else {
-     req = &(sm->t_state.hdr_info.client_request);
-   }
-   if (response) {
-     sdk_sanity_check_mbuffer(response);
-     resp = reinterpret_cast<HTTPHdr*>(response);
-   } else {
-     resp = &(sm->t_state.hdr_info.server_response);
-   }
+  // We allow for either request or response to be empty (or both), in
+  // which case we default to the transactions request or response.
+  if (request) {
+    sdk_sanity_check_mbuffer(request);
+    req = reinterpret_cast<HTTPHdr*>(request);
+  } else {
+    req = &(sm->t_state.hdr_info.client_request);
+  }
+  if (response) {
+    sdk_sanity_check_mbuffer(response);
+    resp = reinterpret_cast<HTTPHdr*>(response);
+  } else {
+    resp = &(sm->t_state.hdr_info.server_response);
+  }
 
-   // Make sure these are valid response / requests, then verify if it's cacheable.
-   return (req->valid() && resp->valid() && HttpTransact::is_response_cacheable(&(sm->t_state), req, resp)) ? 1: 0;
- }
+  // Make sure these are valid response / requests, then verify if it's cacheable.
+  return (req->valid() && resp->valid() && HttpTransact::is_response_cacheable(&(sm->t_state), req, resp)) ? 1: 0;
+}
+
+
+// Lookup various debug names for common HTTP types.
+const char*
+TSHttpServerStateNameLookup(TSServerState state)
+{
+  return HttpDebugNames::get_server_state_name(static_cast<HttpTransact::ServerState_t>(state));
+}
+
+const char*
+TSHttpHookNameLookup(TSHttpHookID hook)
+{
+  return HttpDebugNames::get_api_hook_name(static_cast<TSHttpHookID>(hook));
+}
+
+const char*
+TSHttpEventNameLookup(TSEvent event)
+{
+  return HttpDebugNames::get_event_name(static_cast<int>(event));
+}

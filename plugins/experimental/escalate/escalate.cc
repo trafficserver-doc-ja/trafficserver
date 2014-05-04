@@ -1,6 +1,6 @@
 /** @file
 
-  Escalation plugin.
+  This plugin allows retrying requests against different destinations.
 
   @section license License
 
@@ -20,126 +20,178 @@
   See the License for the specific language governing permissions and
   limitations under the License.
  */
-
 #include <ts/ts.h>
 #include <ts/remap.h>
 #include <ts/experimental.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
 #include <string>
-#include <sstream>
 #include <iterator>
 #include <map>
 
+
+// Constants and some declarations
+const char PLUGIN_NAME[] = "escalate";
+static int EscalateResponse(TSCont, TSEvent, void *);
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Hold information about the escalation / retry states for a remap rule.
+//
 struct EscalationState
 {
-  typedef std::map<unsigned, TSMLoc> urlmap_type;
+  enum RetryType {
+    RETRY_URL,
+    RETRY_HOST
+  };
 
-  EscalationState() {
-    this->mbuf = TSMBufferCreate();
+  struct RetryInfo
+  {
+    RetryType type;
+    std::string target;
+  };
+
+  typedef std::map<unsigned, RetryInfo*> StatusMapType;
+
+  EscalationState()
+  {
+    cont = TSContCreate(EscalateResponse, NULL);
+    TSContDataSet(cont, this);
   }
 
-  ~EscalationState() {
-    TSMBufferDestroy(this->mbuf);
+  ~EscalationState()
+  {
+    for (StatusMapType::iterator iter = status_map.begin(); iter != status_map.end(); ++iter) {
+      delete(iter->second);
+    }
+    TSContDestroy(cont);
   }
 
-  TSCont      handler;
-  urlmap_type urlmap;
-  TSMBuffer   mbuf;
+  TSCont cont;
+  StatusMapType status_map;
 };
 
-static unsigned
-toint(const std::string& str)
-{
-  std::istringstream istr(str);
-  unsigned val;
 
-  istr >> val;
-  return val;
-}
-
+//////////////////////////////////////////////////////////////////////////////////////////
+// Main continuation for the plugin, examining an origin response for a potential retry.
+//
 static int
-EscalateResponse(TSCont cont, TSEvent event, void * edata)
+EscalateResponse(TSCont cont, TSEvent event, void* edata)
 {
-  EscalationState * es = (EscalationState *)TSContDataGet(cont);
-  TSHttpTxn         txn = (TSHttpTxn)edata;
-  TSMBuffer         buffer;
-  TSMLoc            hdr;
-  TSHttpStatus      status;
+  TSHttpTxn txn = (TSHttpTxn)edata;
+  EscalationState* es = static_cast<EscalationState*>(TSContDataGet(cont));
+  EscalationState::StatusMapType::iterator entry;
+  TSMBuffer mbuf;
+  TSMLoc hdrp, url;
+  TSHttpStatus status;
+  char* url_str = NULL;
+  int url_len, tries;
 
-  TSDebug("escalate", "hit escalation hook with event %d", (int)event);
-  TSReleaseAssert(event == TS_EVENT_HTTP_READ_RESPONSE_HDR);
+  TSAssert(event == TS_EVENT_HTTP_READ_RESPONSE_HDR);
 
   // First, we need the server response ...
-  TSReleaseAssert(
-    TSHttpTxnServerRespGet(txn, &buffer, &hdr) == TS_SUCCESS
-  );
+  if (TS_SUCCESS != TSHttpTxnServerRespGet(txn, &mbuf, &hdrp)) {
+    goto no_action;
+  }
 
-  // Next, the respose status ...
-  status = TSHttpHdrStatusGet(buffer, hdr);
+  tries = TSHttpTxnRedirectRetries(txn);
+  if (0 != tries) { // ToDo: Future support for more than one retry-URL
+    goto no_action;
+  }
+  TSDebug(PLUGIN_NAME, "This is try %d, proceeding", tries);
 
-  // If we have an escalation URL for this response code, set the redirection URL and force it
-  // to be followed.
-  EscalationState::urlmap_type::iterator entry = es->urlmap.find((unsigned)status);
-  if (entry != es->urlmap.end()) {
-    TSDebug("escalate", "found an escalation entry for HTTP status %u", (unsigned)status);
-    TSHttpTxnRedirectRequest(txn, es->mbuf, entry->second);
-    TSHttpTxnFollowRedirect(txn, 1 /* on */);
+  // Next, the response status ...
+  status = TSHttpHdrStatusGet(mbuf, hdrp);
+  TSHandleMLocRelease(mbuf, TS_NULL_MLOC, hdrp);  // Don't need this any more
+
+  // See if we have an escalation retry config for this response code
+  entry  = es->status_map.find((unsigned)status);
+  if (entry == es->status_map.end()) {
+    goto no_action;
+  }
+
+  TSDebug(PLUGIN_NAME, "Found an entry for HTTP status %u", (unsigned)status);
+  if (EscalationState::RETRY_URL == entry->second->type) {
+    url_str = TSstrdup(entry->second->target.c_str());
+    url_len = entry->second->target.size();
+    TSDebug(PLUGIN_NAME, "Setting new URL to %.*s", url_len, url_str);
+  } else if (EscalationState::RETRY_HOST == entry->second->type) {
+    if (TS_SUCCESS == TSHttpTxnClientReqGet(txn, &mbuf, &hdrp)) {
+      if (TS_SUCCESS == TSHttpHdrUrlGet(mbuf, hdrp, &url)) {
+        // Update the request URL with the new Host to try.
+        TSUrlHostSet(mbuf, url, entry->second->target.c_str(), entry->second->target.size());
+        url_str = TSUrlStringGet(mbuf, url, &url_len);
+        TSDebug(PLUGIN_NAME, "Setting new Host: to %.*s", url_len, url_str);
+      }
+      // Release the request MLoc
+      TSHandleMLocRelease(mbuf, TS_NULL_MLOC, hdrp);
+    }
+  }
+
+  // Now update the Redirect URL, if set
+  if (url_str) {
+    TSHttpTxnRedirectUrlSet(txn, url_str, url_len); // Transfers ownership
   }
 
   // Set the transaction free ...
+ no_action:
   TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
   return TS_EVENT_NONE;
 }
 
+
 TSReturnCode
-TSRemapInit(TSRemapInterface * /* api */, char * /* errbuf */, int /* bufsz */)
+TSRemapInit(TSRemapInterface* /* api */, char* /* errbuf */, int /* bufsz */)
 {
   return TS_SUCCESS;
 }
 
-TSReturnCode
-TSRemapNewInstance(int argc, char * argv[], void ** instance, char * errbuf, int errbuf_size)
-{
-  EscalationState * es((EscalationState *)instance);
 
-  es = new EscalationState();
-  es->handler = TSContCreate(EscalateResponse, NULL);
-  TSContDataSet(es->handler, es);
+TSReturnCode
+TSRemapNewInstance(int argc, char* argv[], void** instance, char* errbuf, int errbuf_size)
+{
+  EscalationState* es = new EscalationState();
 
   // The first two arguments are the "from" and "to" URL string. We can just
   // skip those, since we only ever remap on the error path.
   for (int i = 2; i < argc; ++i) {
-    unsigned  status;
-    TSMLoc    url;
-    char *    sep;
+    char *sep, *token, *save;
 
-    // Each token should be a status code then a URL, separated by '='.
-    sep = strchr(argv[i], '=');
+    // Each token should be a status code then a URL, separated by ':'.
+    sep = strchr(argv[i], ':');
     if (sep == NULL) {
-      snprintf(errbuf, errbuf_size, "missing status code: %s", argv[i]);
+      snprintf(errbuf, errbuf_size, "malformed status:target config: %s", argv[i]);
       goto fail;
     }
 
-    status = toint(std::string(argv[i], std::distance(argv[i], sep)));
-    if (status < 100 || status > 599) {
-      snprintf(errbuf, errbuf_size, "invalid status code: %.*s", (int)std::distance(argv[i], sep), argv[i]);
-      goto fail;
-    }
-
-    TSReleaseAssert(TSUrlCreate(es->mbuf, &url) == TS_SUCCESS);
-
-    ++sep; // Skip over the '='.
-
-    TSDebug("escalate", "escalating HTTP status %u to %s", status, sep);
-    if (TSUrlParse(es->mbuf, url, (const char **)&sep, argv[i] + strlen(argv[i])) != TS_PARSE_DONE) {
-      snprintf(errbuf, errbuf_size, "invalid target URL: %s", sep);
-      goto fail;
-    }
+    *sep = '\0';
+    ++sep; // Skip over the ':' (which is now \0)
 
     // OK, we have a valid status/URL pair.
-    es->urlmap[status] = url;
+    EscalationState::RetryInfo* info = new EscalationState::RetryInfo();
+
+    info->target = sep;
+    if (std::string::npos != info->target.find('/')) {
+      info->type = EscalationState::RETRY_URL;
+      TSDebug(PLUGIN_NAME, "Creating Redirect rule with URL = %s", sep);
+    } else {
+      info->type = EscalationState::RETRY_HOST;
+      TSDebug(PLUGIN_NAME, "Creating Redirect rule with Host = %s", sep);
+    }
+
+    for (token = strtok_r(argv[i], ",", &save); token; token = strtok_r(NULL, ",", &save)) {
+      unsigned status = strtol(token, NULL, 10);
+
+      if (status < 100 || status > 599) {
+        snprintf(errbuf, errbuf_size, "invalid status code: %.*s", (int)std::distance(argv[i], sep), argv[i]);
+        goto fail;
+      }
+
+      TSDebug(PLUGIN_NAME, "      added status = %d to rule", status);
+      es->status_map[status] = info;
+    }
   }
 
   *instance = es;
@@ -150,17 +202,19 @@ fail:
   return TS_ERROR;
 }
 
+
 void
-TSRemapDeleteInstance(void * instance)
+TSRemapDeleteInstance(void* instance)
 {
-  delete (EscalationState *)instance;
+  delete static_cast<EscalationState*>(instance);
 }
 
-TSRemapStatus
-TSRemapDoRemap(void * instance, TSHttpTxn txn, TSRemapRequestInfo * /* rri */)
-{
-  EscalationState * es((EscalationState *)instance);
 
-  TSHttpTxnHookAdd(txn, TS_HTTP_READ_RESPONSE_HDR_HOOK, es->handler);
+TSRemapStatus
+TSRemapDoRemap(void* instance, TSHttpTxn txn, TSRemapRequestInfo* /* rri */)
+{
+  EscalationState* es = static_cast<EscalationState*>(instance);
+
+  TSHttpTxnHookAdd(txn, TS_HTTP_READ_RESPONSE_HDR_HOOK, es->cont);
   return TSREMAP_NO_REMAP;
 }

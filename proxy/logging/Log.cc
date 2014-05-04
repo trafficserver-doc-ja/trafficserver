@@ -221,7 +221,7 @@ Log::periodic_tasks(long time_now)
     // so that log objects are flushed
     //
     change_configuration();
-  } else if (logging_mode > LOG_MODE_NONE || config->collation_mode == LogConfig::COLLATION_HOST ||
+  } else if (logging_mode > LOG_MODE_NONE || config->collation_mode == Log::COLLATION_HOST ||
              config->has_api_objects()) {
     Debug("log-periodic", "Performing periodic tasks");
 
@@ -364,6 +364,26 @@ Log::init_fields()
                              (LogField::UnmarshalFunc)&LogAccess::unmarshal_str));
   global_field_list.add (field, false);
   ink_hash_table_insert (field_symbol_hash, "caun", field);
+
+  Ptr<LogFieldAliasTable> proto_type_map = make_ptr(NEW(new LogFieldAliasTable));
+  proto_type_map->init(7,
+                       // Transport protocols
+                       TS_PROTO_UDP, "UDP",
+                       TS_PROTO_TCP, "TCP",
+                       TS_PROTO_TLS, "TLS",
+                       // Application protocols
+                       TS_PROTO_HTTP, "HTTP",
+                       TS_PROTO_SPDY, "SPDY",
+                       TS_PROTO_RTMP, "RTMP",
+                       TS_PROTO_WS,   "WS");
+
+  field = NEW(new LogField("client_protocol_stack", "cps",
+                           LogField::sINT,
+                           &LogAccess::marshal_client_protocol_stack,
+                           &LogAccess::unmarshal_client_protocol_stack,
+                           (Ptr<LogFieldAliasMap>) proto_type_map));
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cps", field);
 
   field = NEW(new LogField("client_req_timestamp_sec", "cqts",
                            LogField::sINT,
@@ -942,7 +962,7 @@ Log::init(int flags)
         "init status = %d", logging_mode, init_status);
     init_when_enabled();
     if (config_flags & STANDALONE_COLLATOR) {
-      config->collation_mode = LogConfig::COLLATION_HOST;
+      config->collation_mode = Log::COLLATION_HOST;
     }
     config->init();
   }
@@ -1458,7 +1478,7 @@ Log::match_logobject(LogBufferHeader * header)
 
       obj = NEW(new LogObject(fmt, Log::config->logfile_dir,
                               header->log_filename(), file_format, NULL,
-                              Log::config->rolling_enabled,
+                              (Log::RollingEnabledValues)Log::config->rolling_enabled,
                               Log::config->collation_preproc_threads,
                               Log::config->rolling_interval_sec,
                               Log::config->rolling_offset_hr,

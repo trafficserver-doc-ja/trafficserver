@@ -359,6 +359,23 @@ URLImpl::move_strings(HdrStrHeap * new_heap)
 //    HDR_MOVE_STR(m_ptr_printed_string, m_len_printed_string);
 }
 
+size_t
+URLImpl::strings_length()
+{
+  size_t ret = 0;
+
+  ret += m_len_scheme;
+  ret += m_len_user;
+  ret += m_len_password;
+  ret += m_len_host;
+  ret += m_len_port;
+  ret += m_len_path;
+  ret += m_len_params;
+  ret += m_len_query;
+  ret += m_len_fragment;
+  return ret;
+}
+
 void
 URLImpl::check_strings(HeapCheck * heaps, int num_heaps)
 {
@@ -396,9 +413,9 @@ url_scheme_set(HdrHeap * heap, URLImpl * url, const char *scheme_str, int scheme
   else
     scheme_wks = NULL;
 
-  if (scheme_wks == URL_SCHEME_HTTP)
+  if (scheme_wks == URL_SCHEME_HTTP || scheme_wks == URL_SCHEME_WS)
     url->m_url_type = URL_TYPE_HTTP;
-  else if (scheme_wks == URL_SCHEME_HTTPS)
+  else if (scheme_wks == URL_SCHEME_HTTPS || scheme_wks == URL_SCHEME_WSS)
     url->m_url_type = URL_TYPE_HTTPS;
   else
     url->m_url_type = URL_TYPE_HTTP;

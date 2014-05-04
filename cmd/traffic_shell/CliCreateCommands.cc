@@ -133,9 +133,6 @@ CliCreateCommands()
 
   createCommand("config:stop", Cmd_ConfigStop, NULL, CLI_COMMAND_EXTERNAL, "config:stop", "Stop proxy software");
 
-  createCommand("config:hard-restart", Cmd_ConfigHardRestart, NULL, CLI_COMMAND_EXTERNAL,
-                "config:hard-restart", "Perform Hard Restart of all software components");
-
   createCommand("config:restart", Cmd_ConfigRestart, CmdArgs_ConfigRestart, CLI_COMMAND_EXTERNAL,
                 "config:restart [cluster]", "Perform Restart of proxy software");
 
@@ -149,11 +146,6 @@ CliCreateCommands()
 
   createCommand("config:remap", Cmd_ConfigRemap, NULL, CLI_COMMAND_EXTERNAL,
                 "config:remap <url>", "Update remap configuration file <url>");
-
-  createCommand("config:clock", Cmd_ConfigClock, CmdArgs_ConfigClock, CLI_COMMAND_EXTERNAL,
-                "config:clock date <mm/dd/yyyy>\n"
-                "config:clock time <hh:mm:ss>\n"
-                "config:clock timezone <number from list | list>", "Configure date, time, timezone");
 
   createCommand("config:security", Cmd_ConfigSecurity, CmdArgs_ConfigSecurity, CLI_COMMAND_EXTERNAL,
                 "config:security <ip-allow | mgmt-allow | admin> <url-config-file>\n"

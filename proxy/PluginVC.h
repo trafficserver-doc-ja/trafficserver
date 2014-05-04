@@ -87,11 +87,6 @@ public:
 
   virtual VIO *do_io_write(Continuation * c = NULL, int64_t nbytes = INT64_MAX, IOBufferReader * buf = 0, bool owner = false);
 
-  virtual bool is_over_ssl()
-  {
-    return (false);
-  }
-
   virtual void do_io_close(int lerrno = -1);
   virtual void do_io_shutdown(ShutdownHowTo_t howto);
 
@@ -203,15 +198,15 @@ public:
 
   void set_transparent(bool passive_side, bool active_side);
 
-private:
-
-  void destroy();
-
   // The active vc is handed to the initiator of
   //   connection.  The passive vc is handled to
   //   receiver of the connection
   PluginVC active_vc;
   PluginVC passive_vc;
+private:
+
+  void destroy();
+
   Continuation *connect_to;
   bool connected;
 

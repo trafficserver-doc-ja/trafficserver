@@ -17,7 +17,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-SUBDIRS = cluster preparse utils web2 stats api
+SUBDIRS = cluster utils web2 stats api
 
 # This is for traffic_manager only (local manager)
 AM_CPPFLAGS = $(ink_with_modules_local) \
@@ -30,7 +30,6 @@ AM_CPPFLAGS = $(ink_with_modules_local) \
   -I$(top_srcdir)/mgmt \
   -I$(top_srcdir)/mgmt/api/include \
   -I$(top_srcdir)/mgmt/cluster \
-  -I$(top_srcdir)/mgmt/preparse \
   -I$(top_srcdir)/mgmt/stats \
   -I$(top_srcdir)/mgmt/utils \
   -I$(top_srcdir)/mgmt/web2 \
@@ -48,11 +47,9 @@ libmgmt_p_a_CPPFLAGS = \
   $(iocore_include_dirs) \
   -I$(top_srcdir)/mgmt/api/include \
   -I$(top_srcdir)/mgmt/cluster \
-  -I$(top_srcdir)/mgmt/preparse \
   -I$(top_srcdir)/mgmt/utils \
   -I$(top_srcdir)/mgmt/web2 \
-  -I$(top_builddir)/proxy \
-  -I$(top_builddir)/proxy/api/ts \
+  -I$(top_srcdir)/proxy/api/ts \
   -I$(top_srcdir)/proxy \
   -I$(top_srcdir)/proxy/hdrs \
   -I$(top_srcdir)/lib/records \
@@ -104,7 +101,7 @@ traffic_manager_LDADD = \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
   $(top_builddir)/proxy/shared/liberror.a \
   $(top_builddir)/proxy/shared/libdiagsconfig.a \
-  @LIBRESOLV@ @LIBEXPAT@ @LIBPCRE@ @LIBTCL@ @LIBCAP@ \
+  @LIBRESOLV@ @LIBEXPAT@ @LIBPCRE@ @LIBTCL@ @LIBCAP@ @hwloc_LIBS@ \
   -lm
 
 # Must do it this way or the dependencies aren't detected.

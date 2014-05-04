@@ -215,19 +215,6 @@ TS_ARG_ENABLE_VAR([has], [tests])
 AC_SUBST(has_tests)
 AM_CONDITIONAL([BUILD_TESTS], [test 0 -ne $has_tests])
 
-#
-# Micro
-#
-AC_MSG_CHECKING([whether to enable micro-TS])
-AC_ARG_ENABLE([micro],
-  [AS_HELP_STRING([--enable-micro],[enable micro-TS build [default=no]])],
-  [],
-  [enable_micro=no]
-)
-AC_MSG_RESULT([$enable_micro])
-AS_IF([test "x$enable_micro" = "xyes"], [is_micro_build=1], [is_micro_build=0])
-AC_SUBST(is_micro_build)
-
 AC_SUBST([ink_with_modules_def],["-DREC_BUILD_MGMT"])
 AC_SUBST([ink_with_modules_local],["-DLOCAL_MANAGER"])
 AC_SUBST([ink_with_modules_process],["-DPROCESS_MANAGER"])
@@ -394,6 +381,20 @@ fi
 TS_ARG_ENABLE_VAR([use], [reclaimable_freelist])
 AC_SUBST(use_reclaimable_freelist)
 
+#
+# Options for SPDY
+#
+AC_MSG_CHECKING([whether to enable spdy])
+AC_ARG_ENABLE([spdy],
+	[AS_HELP_STRING([--enable-spdy], [turn on spdy protocol])],
+	[],
+	[enable_spdy="no"])
+AC_MSG_RESULT([$enable_spdy])
+TS_ARG_ENABLE_VAR([has], [spdy])
+AC_SUBST(has_spdy)
+AM_CONDITIONAL([BUILD_SPDY], [test 0 -ne $has_spdy])
+
+#
 # Configure how many stats to allocate for plugins. Default is 512.
 #
 AC_ARG_WITH([max-api-stats],
@@ -1356,20 +1357,36 @@ AC_SUBST(use_linux_native_aio)
 # If we don't find it, disable checking for header.
 use_hwloc=0
 AS_IF([test "x$enable_hwloc" = "xyes"], [
-  AC_CHECK_HEADERS([hwloc.h], [],
-    [AC_MSG_WARN([hwloc.h header not found, try --disable-hwloc])], []
-  )
-
-  # Old versions of libhwloc don't have HWLOC_OBJ_PU.
-  AC_CHECK_DECL(HWLOC_OBJ_PU,
-    [AC_DEFINE(HAVE_HWLOC_OBJ_PU, 1, [Whether HWLOC_OBJ_PU is available])], [],
-    [#include <hwloc.h>]
-  )
-
   # Use pkg-config, because some distros (*cough* Ubuntu) put hwloc in unusual places.
-  PKG_CHECK_MODULES([hwloc], [hwloc], [use_hwloc=yes], [use_hwloc=no])
-  AC_SUBST([hwloc_CFLAGS])
-  AC_SUBST([hwloc_LIBS])
+  PKG_CHECK_MODULES([hwloc], [hwloc], [
+    SAVE_LIBS="$LIBS"
+    LIBS="-lhwloc"
+    AC_LANG_PUSH([C++])
+    AC_MSG_CHECKING([for hwloc C++ linking])
+    AC_LINK_IFELSE([
+      AC_LANG_PROGRAM([#include <hwloc.h>],[hwloc_topology_t t; hwloc_topology_init(&t); hwloc_get_type_depth(t, HWLOC_OBJ_SOCKET);])],[
+      use_hwloc=1
+      AC_SUBST([hwloc_CFLAGS])
+      AC_SUBST([hwloc_LIBS])
+      AC_MSG_RESULT([yes])
+      # Old versions of libhwloc don't have HWLOC_OBJ_PU.
+      AC_CHECK_DECL(HWLOC_OBJ_PU,
+        [AC_DEFINE(HAVE_HWLOC_OBJ_PU, 1, [Whether HWLOC_OBJ_PU is available])], [],
+        [#include <hwloc.h>]
+      )
+    ], [
+      AC_MSG_RESULT([no])
+      AC_MSG_WARN([hwloc not linkable, try --disable-hwloc])
+      AC_SUBST([hwloc_CFLAGS],[""])
+      AC_SUBST([hwloc_LIBS],[""])
+    ])
+    AC_LANG_POP()
+    LIBS="$SAVE_LIBS"
+  ], [
+    AC_MSG_WARN([hwloc not found, try --disable-hwloc])
+    AC_SUBST([hwloc_CFLAGS],[""])
+    AC_SUBST([hwloc_LIBS],[""])
+  ])
 ])
 
 AC_SUBST(use_hwloc)
@@ -1400,63 +1417,11 @@ TS_CHECK_TCMALLOC
 # Check for libreadline/libedit
 AX_LIB_READLINE
 
-#
-# Check for Lua, at least version 5.1, sets LUA_CFLAGS and LUA_LIBS. We support both standard
-# Lua and LuaJIT, preferring LuaJIT if the user did not indicate a preference.
-AC_MSG_CHECKING([whether to enable Linux LuaJIT support])
-AC_ARG_ENABLE([luajit],
-  [AS_HELP_STRING([--enable-luajit], [enable LuaJIT support @<:@default=check@:>@])],
-  [enable_luajit="${enableval}"],
-  [enable_luajit=check]
-)
-AC_MSG_RESULT([$enable_luajit])
-
-PKG_CHECK_MODULES([luajit], [luajit], [have_luajit=yes], [have_luajit=no])
-CHECK_LUA([have_lua=yes], [have_lua=no])
-
-case $enable_luajit in
-yes)
-  # LuaJIT required. Fail if it's not available.
-  AS_IF([ test "x${have_luajit}" = "xyes" ], [
-    LUA_CFLAGS="${luajit_CFLAGS}"
-    LUA_LIBS="${luajit_LIBS}"
-    enable_lua_support=LuaJIT
-  ], [
-    AC_MSG_ERROR([LuaJIT package not available])
-  ])
-  ;;
-
-no)
-  # LuaJIT disabled, just check for the regular Lua support.
-  enable_lua_support="${have_lua}"
-  ;;
-
-*)
-  # No user preference, prefer LuaJIT over standard Lua.
-  AS_IF([ test "x${have_luajit}" = "xyes" ], [
-    LUA_CFLAGS="${luajit_CFLAGS}"
-    LUA_LIBS="${luajit_LIBS}"
-    enable_lua_support=LuaJIT
-  ], [
-    enable_lua_support="${have_lua}"
-  ])
-  ;;
-esac
-
-AC_SUBST(LUA_CFLAGS)
-AC_SUBST(LUA_LIBS)
-AC_MSG_CHECKING([whether to enable Lua support])
-AM_CONDITIONAL([BUILD_LUA_SUPPORT], [ test "x${enable_lua_support}" != "xno" ])
-AM_CONDITIONAL([BUILD_HAVE_LUAJIT], [ test "x${have_luajit}" = "xyes" ])
-AC_MSG_RESULT([$enable_lua_support])
-
 # On Darwin LuaJIT requires magic link options, otherwise it will crash in luaL_openlibs() at startup. See
 # http://luajit.org/install.html.
-case $host_os in
+case $host_os_def in
   darwin)
-    if test "x${enable_lua_support}" = "xLuaJIT"; then
-      LUA_LUAJIT_LDFLAGS="-Wl,-pagezero_size,10000 -Wl,-image_base,100000000"
-    fi
+    LUA_LUAJIT_LDFLAGS="-Wl,-pagezero_size,10000 -Wl,-image_base,100000000"
     ;;
 esac
 
@@ -1464,6 +1429,11 @@ AC_SUBST(LUA_LUAJIT_LDFLAGS)
 
 # We should be able to build http_load if epoll(2) is available.
 AM_CONDITIONAL([BUILD_HTTP_LOAD], [test x"$ac_cv_func_epoll_ctl" = x"yes"])
+
+# Check for spdylay library
+if test "x${enable_spdy}" = "xyes"; then
+  PKG_CHECK_MODULES([SPDYLAY],[libspdylay])
+fi
 
 # -----------------------------------------------------------------------------
 # 5. CHECK FOR HEADER FILES
@@ -1831,11 +1801,13 @@ TS_CHECK_GETHOSTBYNAME_R_STYLE
 TS_CHECK_MACRO_IN6_IS_ADDR_UNSPECIFIED
 
 AC_CHECK_TYPE([struct tcp_info],
-  [enable_tcpinfo_plugin=yes],
-  [enable_tcpinfo_plugin=no],
-  [[#include <netinet/tcp.h>]]
+  [AC_DEFINE(HAVE_STRUCT_TCP_INFO, 1, [whether struct tcp_info is available])],
+  [],
+  [[
+   #include <netinet/in.h>
+   #include <netinet/tcp.h>
+  ]]
 )
-AM_CONDITIONAL([BUILD_TCPINFO_PLUGIN], [ test "x${enable_tcpinfo_plugin}" != "xno" ])
 
 # See if we can build the remap_stats plugin
 AS_IF([test "x$enable_experimental_plugins" = xyes],
@@ -1908,48 +1880,56 @@ AC_CONFIG_FILES([
   iocore/net/Makefile
   iocore/utils/Makefile
   lib/Makefile
-  lib/records/Makefile
-  lib/ts/Makefile
-  lib/ts/ink_config.h
-  lib/tsconfig/Makefile
   lib/atscppapi/Makefile
-  lib/atscppapi/src/Makefile
   lib/atscppapi/examples/Makefile
-  lib/atscppapi/examples/helloworld/Makefile
-  lib/atscppapi/examples/globalhook/Makefile
-  lib/atscppapi/examples/transactionhook/Makefile
-  lib/atscppapi/examples/multiple_transaction_hooks/Makefile
-  lib/atscppapi/examples/clientrequest/Makefile
-  lib/atscppapi/examples/data_caching/Makefile
-  lib/atscppapi/examples/serverresponse/Makefile
+  lib/atscppapi/examples/async_http_fetch/Makefile
+  lib/atscppapi/examples/async_timer/Makefile
   lib/atscppapi/examples/clientredirect/Makefile
+  lib/atscppapi/examples/clientrequest/Makefile
   lib/atscppapi/examples/customresponse/Makefile
+  lib/atscppapi/examples/boom/Makefile
+  lib/atscppapi/examples/globalhook/Makefile
+  lib/atscppapi/examples/gzip_transformation/Makefile
+  lib/atscppapi/examples/helloworld/Makefile
+  lib/atscppapi/examples/intercept/Makefile
+  lib/atscppapi/examples/internal_transaction_handling/Makefile
+  lib/atscppapi/examples/logger_example/Makefile
+  lib/atscppapi/examples/multiple_transaction_hooks/Makefile
   lib/atscppapi/examples/null_transformation_plugin/Makefile
   lib/atscppapi/examples/post_buffer/Makefile
-  lib/atscppapi/examples/logger_example/Makefile
-  lib/atscppapi/examples/stat_example/Makefile
-  lib/atscppapi/examples/async_http_fetch/Makefile
   lib/atscppapi/examples/remap_plugin/Makefile
-  lib/atscppapi/examples/gzip_transformation/Makefile
+  lib/atscppapi/examples/serverresponse/Makefile
+  lib/atscppapi/examples/stat_example/Makefile
   lib/atscppapi/examples/timeout_example/Makefile
-  lib/atscppapi/examples/internal_transaction_handling/Makefile
-  lib/atscppapi/examples/async_timer/Makefile
-  lib/wccp/Makefile
+  lib/atscppapi/examples/transactionhook/Makefile
+  lib/atscppapi/src/Makefile
   lib/perl/Makefile
   lib/perl/lib/Apache/TS.pm
+  lib/records/Makefile
+  lib/ts/Makefile
+  lib/ts/apidefs.h
+  lib/ts/ink_config.h
+  lib/tsconfig/Makefile
+  lib/wccp/Makefile
   mgmt/Makefile
   mgmt/api/Makefile
   mgmt/api/include/Makefile
   mgmt/cluster/Makefile
-  mgmt/preparse/Makefile
   mgmt/stats/Makefile
   mgmt/utils/Makefile
   mgmt/web2/Makefile
   plugins/Makefile
   plugins/cacheurl/Makefile
   plugins/conf_remap/Makefile
+  plugins/gzip/Makefile
+  plugins/header_rewrite/Makefile
+  plugins/libloader/Makefile
+  plugins/regex_remap/Makefile
+  plugins/stats_over_http/Makefile
+  plugins/tcpinfo/Makefile
   plugins/experimental/Makefile
   plugins/experimental/authproxy/Makefile
+  plugins/experimental/background_fetch/Makefile
   plugins/experimental/balancer/Makefile
   plugins/experimental/buffer_upload/Makefile
   plugins/experimental/channel_stats/Makefile
@@ -1957,24 +1937,18 @@ AC_CONFIG_FILES([
   plugins/experimental/escalate/Makefile
   plugins/experimental/esi/Makefile
   plugins/experimental/geoip_acl/Makefile
-  plugins/experimental/lua/Makefile
-  plugins/experimental/hipes/Makefile
-  plugins/experimental/ts_lua/Makefile
-  plugins/experimental/metalink/Makefile
-  plugins/experimental/rfc5861/Makefile
-  plugins/experimental/spdy/Makefile
-  plugins/experimental/tcp_info/Makefile
   plugins/experimental/healthchecks/Makefile
+  plugins/experimental/hipes/Makefile
+  plugins/experimental/metalink/Makefile
   plugins/experimental/remap_stats/Makefile
+  plugins/experimental/rfc5861/Makefile
+  plugins/experimental/s3_auth/Makefile
+  plugins/experimental/spdy/Makefile
+  plugins/experimental/ts_lua/Makefile
+  plugins/experimental/url_sig/Makefile
   plugins/experimental/xdebug/Makefile
-  plugins/gzip/Makefile
-  plugins/libloader/Makefile
-  plugins/header_rewrite/Makefile
-  plugins/regex_remap/Makefile
-  plugins/stats_over_http/Makefile
   proxy/Makefile
   proxy/api/ts/Makefile
-  proxy/api/ts/ts.h
   proxy/config/Makefile
   proxy/config/body_factory/Makefile
   proxy/config/body_factory/default/Makefile
@@ -1982,10 +1956,11 @@ AC_CONFIG_FILES([
   proxy/config/storage.config.default
   proxy/congest/Makefile
   proxy/hdrs/Makefile
-  proxy/shared/Makefile
   proxy/http/Makefile
   proxy/http/remap/Makefile
   proxy/logging/Makefile
+  proxy/shared/Makefile
+  proxy/spdy/Makefile
   rc/Makefile
   rc/trafficserver
   rc/trafficserver.conf

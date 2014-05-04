@@ -42,10 +42,11 @@
 #include "api/ts/ts.h"
 #include "api/ts/experimental.h"
 #include "I_RecCore.h"
-#include "I_Layout.h"
+#include <sys/types.h>
 
 #include "InkAPITestTool.cc"
 #include "http/HttpSM.h"
+#include "ts/TestBox.h"
 
 #define TC_PASS 1
 #define TC_FAIL 0
@@ -7608,3 +7609,86 @@ REGRESSION_TEST(SDK_API_ENCODING) (RegressionTest * test, int /* atype ATS_UNUSE
 
   return;
 }
+
+
+
+////////////////////////////////////////////////
+// SDK_API_DEBUG_NAME_LOOKUPS
+//
+// Unit Test for API: TSHttpServerStateNameLookup
+//                    TSHttpHookNameLookup
+//                    TSHttpEventNameLookup
+////////////////////////////////////////////////
+
+REGRESSION_TEST(SDK_API_DEBUG_NAME_LOOKUPS) (RegressionTest * test, int /* atype ATS_UNUSED */, int *pstatus)
+{
+  bool success = true;
+  const char state_name[] = "INACTIVE_TIMEOUT";
+  const char hook_name[] = "TS_HTTP_READ_RESPONSE_HDR_HOOK";
+  const char event_name[] = "VC_EVENT_IMMEDIATE";
+  const char* str;
+
+  *pstatus = REGRESSION_TEST_INPROGRESS;
+
+  str = TSHttpServerStateNameLookup(TS_SRVSTATE_INACTIVE_TIMEOUT);
+  if ((strlen(str) != strlen(state_name) || strcmp(str, state_name))) {
+    SDK_RPRINT(test, "TSHttpServerStateNameLookup", "TestCase1", TC_FAIL, "Failed on %d, expected %s, got %s",
+               TS_SRVSTATE_INACTIVE_TIMEOUT, state_name, str);
+    success = false;
+  } else {
+    SDK_RPRINT(test, "TSHttpServerStateNameLookup", "TestCase1", TC_PASS, "ok");
+  }
+
+
+  str = TSHttpHookNameLookup(TS_HTTP_READ_RESPONSE_HDR_HOOK);
+  if ((strlen(str) != strlen(hook_name) || strcmp(str, hook_name))) {
+    SDK_RPRINT(test, "TSHttpHookNameLookup", "TestCase1", TC_FAIL, "Failed on %d, expected %s, got %s",
+               TS_HTTP_READ_RESPONSE_HDR_HOOK, hook_name, str);
+    success = false;
+  } else {
+    SDK_RPRINT(test, "TSHttpHookNameLookup", "TestCase1", TC_PASS, "ok");
+  }
+
+
+  str = TSHttpEventNameLookup(TS_EVENT_IMMEDIATE);
+  if ((strlen(str) != strlen(event_name) || strcmp(str, event_name))) {
+    SDK_RPRINT(test, "TSHttpEventNameLookup", "TestCase1", TC_FAIL, "Failed on %d, expected %s, got %s",
+               TS_EVENT_IMMEDIATE, hook_name, str);
+    success = false;
+  } else {
+    SDK_RPRINT(test, "TSHttpEventNameLookup", "TestCase1", TC_PASS, "ok");
+  }
+
+
+  *pstatus = success ? REGRESSION_TEST_PASSED : REGRESSION_TEST_FAILED;
+
+  return;
+}
+
+
+////////////////////////////////////////////////
+// SDK_API_PROTO_STACK_CREATE
+//
+// Unit Test for API: TSClientProtoStackCreate
+////////////////////////////////////////////////
+
+REGRESSION_TEST(SDK_API_TSClientProtoStackCreate)(RegressionTest * t, int /* atype ATS_UNUSED */, int * pstatus)
+{
+  TestBox box(t, pstatus);
+
+  box = REGRESSION_TEST_PASSED;
+
+#define CHECK(expr, expected) do {  \
+  TSClientProtoStack ps = (expr); \
+  box.check(ps == expected, "%s: received %u, expected %u", #expr, (unsigned)ps, (unsigned)expected); \
+} while(0)
+
+ CHECK(TSClientProtoStackCreate(TS_PROTO_NULL), 0);
+ CHECK(TSClientProtoStackCreate((TSProtoType)99, TS_PROTO_NULL), 0);
+ CHECK(TSClientProtoStackCreate(TS_PROTO_SPDY, (TSProtoType)99, TS_PROTO_NULL), 0);
+ CHECK(TSClientProtoStackCreate(TS_PROTO_UDP, TS_PROTO_NULL), 1);
+ CHECK(TSClientProtoStackCreate(TS_PROTO_UDP, TS_PROTO_TCP, TS_PROTO_NULL), 3);
+
+}
+
+

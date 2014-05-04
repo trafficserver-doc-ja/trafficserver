@@ -273,8 +273,7 @@ Cli_ConfigEnactChanges(TSActionNeedT action_need)
   case TS_ACTION_SHUTDOWN:
     Cli_Debug("Cli_ConfigEnactChanges: TS_ACTION_SHUTDOWN\n");
     Cli_Printf("\nHard Restart required.\n"
-               "  Change will take effect after next Hard Restart.\n"
-               "  Use the \"config:hard-restart\" command to restart now.\n\n");
+               "  Change will take effect after next Hard Restart.\n");
     break;
 
   case TS_ACTION_RESTART:
@@ -551,43 +550,6 @@ GetTSDirectory(char *ts_path, size_t ts_path_len)
     Cli_Error(" Please set correct path in env variable TS_ROOT \n");
     return -1;
   }
-
-  return 0;
-}
-
-int
-StopTrafficServer()
-{
-  char ts_path[PATH_NAME_MAX + 1];
-  char stop_ts[1024];
-
-  if (GetTSDirectory(ts_path,sizeof(ts_path))) {
-    return CLI_ERROR;
-  }
-  snprintf(stop_ts, sizeof(stop_ts), "%s/stop_traffic_server", ts_path);
-  if (system(stop_ts) == -1)
-    return CLI_ERROR;
-
-  return 0;
-}
-
-int
-StartTrafficServer()
-{
-  char ts_path[PATH_NAME_MAX + 1];
-  char start_ts[1024];
-
-  if (GetTSDirectory(ts_path,sizeof(ts_path))) {
-    return CLI_ERROR;
-  }
-  // root user should start_traffic_shell as inktomi user
-  if (getuid() == 0) {
-    snprintf(start_ts, sizeof(start_ts), "/bin/su - inktomi -c \"%s/start_traffic_server\"", ts_path);
-  } else {
-    snprintf(start_ts, sizeof(start_ts), "%s/start_traffic_server", ts_path);
-  }
-  if (system(start_ts) == -1)
-    return CLI_ERROR;
 
   return 0;
 }

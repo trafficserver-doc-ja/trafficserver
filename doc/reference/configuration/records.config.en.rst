@@ -193,10 +193,18 @@ otherwise, Traffic Server uses the Traffic Server user account name as the defau
 
 A value of ``0`` means no signal will be sent.
 
+.. ts:cv:: CONFIG proxy.config.cop.linux_min_memfree_kb INT 10240
+
+   The minimum amount of free memory space allowed before Traffic Server stops
+   the :program:`traffic_server` and :program:`traffic_manager` processes to 
+   prevent the system from hanging.
+
 .. ts:cv:: CONFIG proxy.config.cop.linux_min_swapfree_kb INT 10240
 
-   The minimum amount of free swap space allowed before Traffic Server stops the :program:`traffic_server` and :program:`traffic_manager` processes to
-   prevent the system from hanging. This configuration variable applies if swap is enabled in Linux 2.2 only.
+   The minimum amount of free swap space allowed before Traffic Server stops
+   the :program:`traffic_server` and :program:`traffic_manager` processes to 
+   prevent the system from hanging. This configuration variable applies if
+   swap is enabled in Linux 2.2 only. 
 
 .. ts:cv:: CONFIG proxy.config.output.logfile  STRING traffic.out
 
@@ -233,23 +241,38 @@ A value of ``0`` means no signal will be sent.
 
 .. ts:cv:: CONFIG proxy.config.exec_thread.affinity INT 0
 
-   Bind threads to specific CPUs or CPU cores.
+   Bind threads to specific processing units.
 
 ===== ====================
 Value Effect
 ===== ====================
-1     assign threads to sockets
-2     assign threads to real cores
-3     assign threads to logical cores
-0     don't assign threads to any cores
+0     assign threads to machine
+1     assign threads to NUMA nodes
+2     assign threads to sockets
+3     assign threads to cores
+4     assign threads to processing units
 ===== ====================
 
 .. note::
 
    This option only has an affect when Traffic Server has been compiled with ``--enable-hwloc``.
 
+.. ts:cv:: CONFIG proxy.config.system.file_max_pct FLOAT 0.9
+
+   Set the maximum number of file handles for the traffic_server process as a percentage of the the fs.file-max proc value in Linux. The default is 90%.
+
 Network
 =======
+
+.. ts:cv:: CONFIG proxy.config.net.connections_throttle INT 10000
+
+   The total number of client and origin server connections that the server
+   can handle simultaneously. This is in fact the max number of file
+   descriptors that the :program:`traffic_server` process can have open at any
+   given time. Roughly 10% of these connections are reserved for origin server
+   connections, i.e. from the default, only ~9,000 client connections can be
+   handled. This should be tuned according to your memory size, and expected
+   work load.
 
 .. ts:cv:: LOCAL proxy.local.incoming_ip_to_bind STRING 0.0.0.0 [::]
 
@@ -309,6 +332,12 @@ Value Effect
 2     management-only mode
 3     no clustering
 ===== ====================
+
+.. ts:cv:: CONFIG proxy.config.cluster.ethernet_interface INT eth0
+
+The network interface to be used for cluster communication. This has to be
+identical on all members of a clsuter. ToDo: Is that reasonable ?? Should
+this be local"
 
 .. ts:cv:: CONFIG proxy.config.cluster.rsport INT 8088
 
@@ -389,11 +418,11 @@ Alarm Configuration
 .. ts:cv:: CONFIG proxy.config.alarm.bin STRING example_alarm_bin.sh
 
    Name of the script file that can execute certain actions when an alarm is signaled. The default file is a sample script named
-   ``example_alarm_bin.sh`` located in the ``bin`` directory. You must dit the script to suit your needs.
+   ``example_alarm_bin.sh`` located in the ``bin`` directory. You must edit the script to suit your needs.
 
 .. ts:cv:: CONFIG proxy.config.alarm.abs_path STRING NULL
 
-   The full path to the script file that sends email to alert someone bout Traffic Server problems.
+   The full path to the script file that sends email to alert someone about Traffic Server problems.
 
 HTTP Engine
 ===========
@@ -626,7 +655,7 @@ Value Effect
 
 .. ts:cv:: CONFIG proxy.config.http.server_session_sharing.pool STRING thread
 
-   Control the scope of server session re-use if it is enabled by :ts:cv:`proxy.config.server_session_sharing.match`. The valid values are
+   Control the scope of server session re-use if it is enabled by :ts:cv:`proxy.config.http.server_session_sharing.match`. The valid values are
 
    global
       Re-use sessions from a global pool of all server sessions.
@@ -785,7 +814,7 @@ HTTP Connection Timeouts
    The maximum amount of time Traffic Server can remain connected to a client. If the transfer to the client is not complete before this
    timeout expires, then Traffic Server closes the connection.
 
-The default value of ``0`` specifies that there is no timeout.
+The value of ``0`` specifies that there is no timeout.
 
 .. ts:cv:: CONFIG proxy.config.http.transaction_active_timeout_out INT 0
    :reloadable:
@@ -831,7 +860,7 @@ Origin Server Connect Attempts
 
    .. note::
         This value is used in determining when and if to prune active origin sessions. Without this value set connections
-        to origins can consume all the way up to ``proxy.config.net.connections_throttle`` connections, which in turn can
+        to origins can consume all the way up to ts:cv:`proxy.config.net.connections_throttle` connections, which in turn can
         starve incoming requests from available connections.
 
 .. ts:cv:: CONFIG proxy.config.http.origin_max_connections INT 0
@@ -916,7 +945,7 @@ Negative Response Caching
 
    .. note::
 
-      ``Cache-Control`` directives from the server forbidding ache are ignored for the following HTTP response codes, regardless
+      ``Cache-Control`` directives from the server forbidding cache are ignored for the following HTTP response codes, regardless
       of the value specified for the :ts:cv:`proxy.config.http.negative_caching_enabled` variable.
 
       The following negative responses are cached by Traffic Server:::
@@ -1614,7 +1643,7 @@ Logging Configuration
 
 .. note::
 
-   When max_space_mb_for_orphan_logs is take as the maximum allowedlog space in the logging system, the same rule apply
+   When max_space_mb_for_orphan_logs is take as the maximum allowed log space in the logging system, the same rule apply
    to proxy.config.log.max_space_mb_for_logs also apply to proxy.config.log.max_space_mb_for_orphan_logs, ie: All files
    in the logging directory contribute to the space used, even if they are not log files. you may need to consider this
    when you enable full remote logging, and bump to the same size as proxy.config.log.max_space_mb_for_logs.
@@ -1825,7 +1854,7 @@ server, refer to `logs_xml.config <logs_xml.config>`_.
 .. ts:cv:: CONFIG proxy.config.log.rolling_interval_sec INT 86400
    :reloadable:
 
-   The log file rolling interval, in seconds. The minimum value is ``300`` (5 minutes). The maximum, and default, value is 86400 seconds (one day).
+   The log file rolling interval, in seconds. The minimum value is ``60`` (1 minute). The maximum, and default, value is 86400 seconds (one day).
 
    .. note:: If you start Traffic Server within a few minutes of the next rolling time, then rolling might not occur until the next rolling time.
 
@@ -1903,7 +1932,7 @@ Diagnostic Logging Configuration
    Each Traffic Server `diag` and `debug` level message is annotated
    with a subsytem tag. This configuration contains a regular
    expression that filters the messages based on the tag. Some
-   commonly used debug tags are::
+   commonly used debug tags are:
 
 ============  =====================================================
 Tag           Subsytem usage

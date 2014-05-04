@@ -48,7 +48,7 @@
 #if defined (__SUNPRO_CC) || (defined (__GNUC__) || ! defined(__cplusplus))
 #if !defined (bool)
 #if !defined(darwin) && !defined(freebsd) && !defined(solaris)
-// XXX: What other platforms are there?
+/* XXX: What other platforms are there? */
 #define bool int
 #endif
 #endif
@@ -62,7 +62,7 @@
 #endif
 
 #endif
-#endif  // not linux
+#endif  /* not linux */
 
 #if !defined (NULL)
 #define NULL 0
@@ -1007,13 +1007,6 @@ extern "C"
  */
   tsapi TSError TSRestart(bool cluster);
 
-/* TSHardRestart: stops and then starts Traffic Server
- * Input:  <none>
- * Output: TSError
- * Note: only for remote API clients
- */
-  tsapi TSError TSHardRestart();
-
 /* TSActionDo: based on TSActionNeedT, will take appropriate action
  * Input: action - action that needs to be taken
  * Output: TSError
@@ -1173,6 +1166,12 @@ extern "C"
  * Output: TSError
  */
   tsapi TSError TSRecordGetMlt(TSStringList rec_names, TSList rec_vals);
+
+/* TSRecordGetMatchMlt: gets a set of records
+ * Input:  rec_regex - regular expression to match against record names
+ * Output: TSError, TSList of TSRecordEle
+ */
+  tsapi TSError TSRecordGetMatchMlt(const char *rec_regex, TSList list);
 
 /* TSRecordSet*: sets a record w/ a known type
  * Input:  rec_name     - the name of the record (proxy.config.record_name)
@@ -1343,7 +1342,7 @@ extern "C"
  */
   TSError TSCfgContextMoveEleDown(TSCfgContext ctx, int index);
 
-/* TSCfgContextAppendEle: apppends the ele to the end of the TSCfgContext
+/* TSCfgContextAppendEle: appends the ele to the end of the TSCfgContext
  * Input:  ctx   - the TSCfgContext
  *         ele - the Ele (typecasted as an TSCfgEle) to append to ctx
  * Output: TSError

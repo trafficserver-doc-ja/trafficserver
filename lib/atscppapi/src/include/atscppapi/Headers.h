@@ -396,8 +396,7 @@ public:
 class Headers: noncopyable {
 public:
   /**
-   * Constructor for Headers, this shouldn't be used directly unless you're trying to mix the C++ and C apis.
-   * @warning This should only be used if you're mixing the C++ and C apis, it will be constructed automatically if using only the C++ api.
+   * Constructor for Headers. This creates a "detached" headers, i.e., not tied to any transaction.
    */
   Headers();
 
@@ -575,10 +574,16 @@ public:
   HeaderField operator[](const std::string &key);
 
   /**
-    * Get a string representing all the header fields.
+    * Get a human-readable/log-friendly string representing all the header fields.
     * @return a string representation of all the header fields
     */
   std::string str();
+
+  /**
+    * Get a string that can be put on the wire
+    * @return a string representation of all the header fields
+    */
+  std::string wireStr();
 
   friend std::ostream& operator<<(std::ostream &os, Headers &obj);
 

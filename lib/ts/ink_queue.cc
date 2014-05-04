@@ -49,7 +49,7 @@
 #include "ink_error.h"
 #include "ink_assert.h"
 #include "ink_queue_ext.h"
-
+#include "ink_align.h"
 
 inkcoreapi volatile int64_t fastalloc_mem_in_use = 0;
 inkcoreapi volatile int64_t fastalloc_mem_total = 0;
@@ -103,7 +103,8 @@ ink_freelist_init(InkFreeList **fl, const char *name, uint32_t type_size,
   ink_assert(!(alignment & (alignment - 1)));
   f->alignment = alignment;
   f->chunk_size = chunk_size;
-  f->type_size = type_size;
+  // Make sure we align *all* the objects in the allocation, not just the first one
+  f->type_size = INK_ALIGN(type_size, alignment);
   SET_FREELIST_POINTER_VERSION(f->head, FROM_PTR(0), 0);
 
   f->used = 0;
@@ -231,9 +232,9 @@ ink_freelist_new(InkFreeList * f)
   void *newp = NULL;
 
   if (f->alignment)
-    newp = ats_memalign(f->alignment, f->chunk_size * f->type_size);
+    newp = ats_memalign(f->alignment, f->type_size);
   else
-    newp = ats_malloc(f->chunk_size * f->type_size);
+    newp = ats_malloc(f->type_size);
   return newp;
 #endif
 }

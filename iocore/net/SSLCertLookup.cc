@@ -75,6 +75,8 @@ struct SSLContextStorage
 
   bool insert(SSL_CTX * ctx, const char * name);
   SSL_CTX * lookup(const char * name) const;
+  unsigned count() const { return this->references.count(); }
+  SSL_CTX * get(unsigned i) const { return this->references[i]; }
 
 private:
   struct SSLEntry
@@ -141,6 +143,18 @@ SSLCertLookup::insert(SSL_CTX * ctx, const IpEndpoint& address)
   return this->ssl_storage->insert(ctx, key.get());
 }
 
+unsigned
+SSLCertLookup::count() const
+{
+  return ssl_storage->count();
+}
+
+SSL_CTX *
+SSLCertLookup::get(unsigned i) const
+{
+  return ssl_storage->get(i);
+}
+
 struct ats_wildcard_matcher
 {
   ats_wildcard_matcher() {
@@ -172,16 +186,8 @@ reverse_dns_name(const char * hostname, char (&reversed)[TS_MAX_HOST_NAME_LEN+1]
     ssize_t len = strcspn(part, ".");
     ssize_t remain = ptr - reversed;
 
-    // We are going to put the '.' separator back for all components except the first.
-    if (*ptr == '\0') {
-      if (remain < len) {
-        return NULL;
-      }
-    } else {
-      if (remain < (len + 1)) {
-        return NULL;
-      }
-      *(--ptr) = '.';
+    if (remain < (len + 1)) {
+      return NULL;
     }
 
     ptr -= len;
@@ -192,6 +198,7 @@ reverse_dns_name(const char * hostname, char (&reversed)[TS_MAX_HOST_NAME_LEN+1]
     part += len;
     if (*part == '.') {
       ++part;
+      *(--ptr) = '.';
     }
   }
 
@@ -225,7 +232,7 @@ SSLContextStorage::insert(SSL_CTX * ctx, const char * name)
     char * reversed;
     xptr<SSLEntry> entry;
 
-    reversed = reverse_dns_name(name + 2, namebuf);
+    reversed = reverse_dns_name(name + 1, namebuf);
     if (!reversed) {
       Error("wildcard name '%s' is too long", name);
       return false;

@@ -354,8 +354,6 @@ int Cmd_ConfigStart(ClientData clientData, Tcl_Interp * interp, int argc, const 
 //
 int Cmd_ConfigStop(ClientData clientData, Tcl_Interp * interp, int argc, const char *argv[]);
 
-int Cmd_ConfigHardRestart(ClientData clientData, Tcl_Interp * interp, int argc, const char *argv[]);
-
 int Cmd_ConfigRestart(ClientData clientData, Tcl_Interp * interp, int argc, const char *argv[]);
 int CmdArgs_ConfigRestart();
 
@@ -458,26 +456,6 @@ int Cmd_ConfigSocks(ClientData clientData, Tcl_Interp * interp, int argc, const 
 // Register "config:socks" arguments with the Tcl interpreter.
 //
 int CmdArgs_ConfigSocks();
-
-////////////////////////////////////////////////////////////////
-// Cmd_ConfigClock
-//
-// This is the callback function for the "config:clock" command.
-//
-// Parameters:
-//    clientData -- information about parsed arguments
-//    interp -- the Tcl interpreter
-//    argc -- number of command arguments
-//    argv -- the command arguments
-//
-int Cmd_ConfigClock(ClientData clientData, Tcl_Interp * interp, int argc, const char *argv[]);
-
-////////////////////////////////////////////////////////////////
-// CmdArgs_ConfigClock
-//
-// Register "config:clock" arguments with the Tcl interpreter.
-//
-int CmdArgs_ConfigClock();
 
 ////////////////////////////////////////////////////////////////
 // Cmd_ConfigSecurity
@@ -769,12 +747,6 @@ int ConfigName(const char *proxy_name);
 // config ports sub-command
 int ConfigPortsSet(int arg_ref, void *valuePtr);
 int ConfigPortsGet(int arg_ref);
-
-// config Date sub-command
-int ConfigDate(char *datestr);
-
-// config Time sub-command
-int ConfigTime(char *timestr);
 
 // config Timezone sub-command
 int ConfigTimezone(int, int);

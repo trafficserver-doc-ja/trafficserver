@@ -262,19 +262,6 @@ Restart(bool cluster)
 }
 
 /*-------------------------------------------------------------------------
- * HardRestart
- *-------------------------------------------------------------------------
- * Cannot be executed locally since it requires a restart of Traffic Cop.
- * So just return TS_ERR_FAIL. Should only be called by remote API clients.
- */
-TSError
-HardRestart()
-{
-  return TS_ERR_FAIL;
-}
-
-
-/*-------------------------------------------------------------------------
  * Bouncer
  *-------------------------------------------------------------------------
  * Bounces traffic_server process(es).
@@ -383,6 +370,15 @@ MgmtRecordGet(const char *rec_name, TSRecordEle * rec_ele)
   return TS_ERR_OKAY;
 }
 
+// This is not implemented in the Core side of the API because we don't want
+// to buffer up all the matching records in memory. We stream the records
+// directory onto the management socket in handle_record_match(). This stub
+// is just here for link time dependencies.
+TSError
+MgmtRecordGetMatching(const char * /* regex */, TSList /* rec_vals */)
+{
+  return TS_ERR_FAIL;
+}
 
 /*-------------------------------------------------------------------------
  * reads the RecordsConfig info to determine which type of action is needed
@@ -409,9 +405,6 @@ determine_action_need(const char *rec_name)
 
   case RECU_RESTART_TM:          // requires TM/TS restart
     return TS_ACTION_RESTART;
-
-  case RECU_RESTART_TC:          // requires TC/TM/TS restart
-    return TS_ACTION_SHUTDOWN;
 
   default:                     // shouldn't get here actually
     return TS_ACTION_UNDEFINED;
