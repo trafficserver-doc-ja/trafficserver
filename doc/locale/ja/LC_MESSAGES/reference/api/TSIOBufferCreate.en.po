@@ -28,19 +28,19 @@ msgstr ""
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:22
 msgid "TSIOBufferCreate"
-msgstr ""
+msgstr "TSIOBufferCreate"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:25
 msgid "Synopsis"
-msgstr ""
+msgstr "概要"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:26
 msgid "`#include <ts/ts.h>`"
-msgstr ""
+msgstr "`#include <ts/ts.h>`"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:37
 msgid "Description"
-msgstr ""
+msgstr "解説"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:39
 msgid ""
@@ -53,6 +53,13 @@ msgid ""
 "copy any data; however applications should still strive to ensure data "
 "blocks are a reasonable size."
 msgstr ""
+":type:`TSIOBuffer` データ構造は TSVConn 抽象構造の構成要素です。同時に複数の"
+"バッファーに存在できるようにするため、 IO バッファーは参照カウントされる"
+"バッファーブロックのリストで構成されます。 Traffic Server はポインターの"
+"コピーと適切な参照カウントの調節と実際にデータをコピーしないことのみすれば"
+"良いため、 ``TSIOBufferCopy`` によりデータをある IO バッファーから別の IO "
+"バッファーにコピーするのが極めて効率的になりますが、しかしアプリケーションは"
+"データブロックが合理的なサイズに保証するよう努めるべきです。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:48
 msgid ""
@@ -63,16 +70,23 @@ msgid ""
 "`TSIOBufferWriter` data structure. The writer simply modifies the IO buffer "
 "directly."
 msgstr ""
+"IO バッファー抽象構造は一つの writer と複数の reader を提供します。 "
+"reader がお互いを知る必要を無くすため、 ``TSIOBufferReader`` データ構造を"
+"通して IO バッファーを操作します。 writer は一つのみしか許可されていない"
+"ため、``TSIOBufferWriter`` データ構造に相当するものはありません。 writer "
+"は単純に IO バッファーを直接修正します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:55
 msgid ":func:`TSIOBufferCreate` creates an empty :type:`TSIOBuffer`."
-msgstr ""
+msgstr ":func:`TSIOBufferCreate` は空の :type:`TSIOBuffer` を生成します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:57
 msgid ""
 ":func:`TSIOBufferSizedCreate` creates an empty :type:`TSIOBuffer` with an "
 "initial capacity of index bytes."
 msgstr ""
+":func:`TSIOBufferSizedCreate` は index バイトの初期容量を持つ空の "
+":type:`TSIOBuffer` を生成します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:60
 msgid ""
@@ -81,6 +95,9 @@ msgid ""
 "associated with the IO buffer but simply decrements the appropriate "
 "reference counts."
 msgstr ""
+":func:`TSIOBufferDestroy` は IO バッファー bufp を破棄します。複数の IO "
+"バッファーはデータを共有できるため、 IO バッファーに関連付けられる全てのデータ"
+"を解放する必要は無く、単純に適切な参照カウントを減少させます。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:64
 msgid ""
@@ -88,6 +105,8 @@ msgid ""
 "buffer bufp and returns the number of bytes successfully written into the "
 "IO buffer."
 msgstr ""
+":func:`TSIOBufferWrite` はバッファー buf から length バイト数を IO バッファー "
+"bufp に追加し、 IO バッファーへうまく書込まれたバイト数を返します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:68
 msgid ""
@@ -96,6 +115,10 @@ msgid ""
 "data into a buffer block and then call INKIOBufferProduce to make the new "
 "data visible to any readers."
 msgstr ""
+":func:`TSIOBufferProduce` は IO バッファー bufp のデータの nbytes を読込み"
+"可能にします。 IO バッファーへの書込みの共通のパターンは、バッファーブロックへ"
+"データをコピーし、任意の reader へ新しいデータを見えるようにするため、 "
+"INKIOBufferProduce を呼び出します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:73
 msgid ""
@@ -107,17 +130,26 @@ msgid ""
 "frequent callbacks to read small amounts of data. :func:"
 "`TSIOBufferWaterMarkGet` gets the current watermark for the IO buffer bufp."
 msgstr ""
+"TSIOBuffer の watermark はバッファーの読込み操作を初期化した任意の継続をコール"
+"バックする前に、バッファーに置かれる必要のあるデータの最小バイト数です。 "
+"writer が TSIOBuffer へデータを与えると、 watermark に到達するデータ量まで"
+"どの reader もコールバックされなくなります。少量のデータを読み込むための頻繁な"
+"コールバックを避けることになるため、 watermark の設定は性能を向上します。 "
+":func:`TSIOBufferWaterMarkGet` は IO バッファー bufp の現在の watermark を取得"
+"します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:82
 msgid ""
 ":func:`TSIOBufferWaterMarkSet` gets the current watermark for the IO buffer "
 "bufp to water_mark bytes."
 msgstr ""
+":func:`TSIOBufferWaterMarkSet` は IO バッファー bufp から water_mark バイト目"
+"への現在の watermark を取得します。"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:86
 msgid "See also"
-msgstr ""
+msgstr "参考"
 
 #: ../../reference/api/TSIOBufferCreate.en.rst:88
 msgid ":manpage:`TSAPI(3ts)`, :manpage:`TSIOBufferReaderAlloc(3ts)`"
-msgstr ""
+msgstr ":manpage:`TSAPI(3ts)`, :manpage:`TSIOBufferReaderAlloc(3ts)`"
