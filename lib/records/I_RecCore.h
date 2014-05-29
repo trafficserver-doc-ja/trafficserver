@@ -57,6 +57,10 @@ char * RecConfigReadSnapshotDir();
 // MUST release the result with ats_free().
 char * RecConfigReadLogDir();
 
+// Return a copy of the system's bin directory, taking proxy.config.bin_path into account. The caller MUST
+// release the result with ats_free().
+char * RecConfigReadBinDir();
+
 // Return a copy of a configuration file that is relative to sysconfdir. The relative path to the configuration
 // file is specified in the configuration variable named by "file_variable". If the configuration variable has no
 // value, NULL is returned. The caller MUST release the result with ats_free().
@@ -116,6 +120,7 @@ int RecLinkConfigFloat(const char *name, RecFloat * rec_float);
 int RecLinkConfigCounter(const char *name, RecCounter * rec_counter);
 int RecLinkConfigString(const char *name, RecString * rec_string);
 int RecLinkConfigByte(const char *name, RecByte * rec_byte);
+int RecLinkConfigBool(const char *name, RecBool * rec_byte);
 
 int RecRegisterConfigUpdateCb(const char *name, RecConfigUpdateCb update_cb, void *cookie);
 int RecRegisterRawStatUpdateFunc(const char *name, RecRawStatBlock * rsb, int id, RecStatUpdateFunc update_func, void *cookie);
@@ -145,6 +150,8 @@ int RecGetRecordString_Xmalloc(const char *name, RecString * rec_string, bool lo
 int RecGetRecordCounter(const char *name, RecCounter * rec_counter, bool lock = true);
 // Convenience to allow us to treat the RecInt as a single byte internally
 int RecGetRecordByte(const char *name, RecByte * rec_byte, bool lock = true);
+// Convenience to allow us to treat the RecInt as a bool internally
+int RecGetRecordBool(const char *name, RecBool * rec_byte, bool lock = true);
 
 //------------------------------------------------------------------------
 // Record Attributes Reading
@@ -241,6 +248,13 @@ void RecSignalManager(int, const char *);
 #define REC_EstablishStaticConfigByte(_var, _config_var_name) do { \
     RecLinkConfigByte(_config_var_name, &_var); \
     _var = (RecByte)REC_ConfigReadInteger(_config_var_name);    \
+  } while (0)
+
+// Allow to treat our "INT" configs as a bool type internally. Note
+// that the bool type is just a wrapper around RECD_INT.
+#define REC_EstablishStaticConfigBool(_var, _config_var_name) do { \
+    RecLinkConfigBool(_config_var_name, &_var); \
+    _var = 0 != REC_ConfigReadInteger(_config_var_name);    \
   } while (0)
 
 RecInt REC_ConfigReadInteger(const char *name);

@@ -175,14 +175,6 @@ System Variables
    installation prefix. The ``$TS_ROOT`` environment variable can
    be used alter the installation prefix at run time.
 
-.. ts:cv:: CONFIG proxy.config.alarm_email STRING
-   :reloadable:
-
-   The email address to which Traffic Server sends alarm messages.
-
-During a custom Traffic Server installation, you can specify the email address;
-otherwise, Traffic Server uses the Traffic Server user account name as the default value for this variable.
-
 .. ts:cv:: CONFIG proxy.config.syslog_facility STRING LOG_DAEMON
 
    The facility used to record system log files. Refer to :ref:`understanding-traffic-server-log-files`.
@@ -415,14 +407,34 @@ Process Manager
 Alarm Configuration
 ===================
 
-.. ts:cv:: CONFIG proxy.config.alarm.bin STRING example_alarm_bin.sh
+.. ts:cv:: CONFIG proxy.config.alarm_email STRING
+   :reloadable:
 
-   Name of the script file that can execute certain actions when an alarm is signaled. The default file is a sample script named
-   ``example_alarm_bin.sh`` located in the ``bin`` directory. You must edit the script to suit your needs.
+   The address to which the alarm script should send email.
+
+.. ts:cv:: CONFIG proxy.config.alarm.bin STRING example_alarm_bin.sh
+   :reloadable:
+
+   Name of the script file that can execute certain actions when
+   an alarm is signaled. The script is invoked with up to 4 arguments:
+
+       - the alarm message
+       - the value of :ts:cv:`proxy.config.product_name`
+       - the value of :ts:cv:`proxy.config.admin.user_id`
+       - the value of :ts:cv:`proxy.config.alarm_email`
 
 .. ts:cv:: CONFIG proxy.config.alarm.abs_path STRING NULL
+   :reloadable:
 
-   The full path to the script file that sends email to alert someone about Traffic Server problems.
+   The absolute path to the directory containing the alarm script.
+   If this is not set, the script will be located relative to
+   :ts:cv:`proxy.config.bin_path`.
+
+.. ts:cv:: CONFIG proxy.config.alarm.script_runtime INT 5
+   :reloadable:
+
+   The number of seconds that Traffic Server allows the alarm script
+   to run before aborting it.
 
 HTTP Engine
 ===========
@@ -439,22 +451,31 @@ Quick reference chart.
 Name        Note            Definition
 =========== =============== ========================================
 *number*    **Required**    The local port.
+blind                       Blind (``CONNECT``) port.
+compress    **N/I**         Compressed. Not implemented.
 ipv4        **Default**     Bind to IPv4 address family.
 ipv6                        Bind to IPv6 address family.
-tr-in                       Inbound transparent.
-tr-out                      Outbound transparent.
-tr-full                     Fully transparent (inbound and outbound)
-tr-pass                     Pass through enabled.
-ssl                         SSL terminated.
 ip-in       **Value**       Local inbound IP address.
 ip-out      **Value**       Local outbound IP address.
 ip-resolve  **Value**       IP address resolution style.
-blind                       Blind (``CONNECT``) port.
-compress    **N/I**         Compressed. Not implemented.
+proto       **Value**       List of supported session protocols.
+ssl                         SSL terminated.
+tr-full                     Fully transparent (inbound and outbound)
+tr-in                       Inbound transparent.
+tr-out                      Outbound transparent.
+tr-pass                     Pass through enabled.
 =========== =============== ========================================
 
 *number*
    Local IP port to bind. This is the port to which ATS clients will connect.
+
+blind
+   Accept only the ``CONNECT`` method on this port.
+
+   Not compatible with: ``tr-in``, ``ssl``.
+
+compress
+   Compress the connection. Retained only by inertia, should be considered "not implemented".
 
 ipv4
    Use IPv4. This is the default and is included primarily for completeness. This forced if the ``ip-in`` option is used with an IPv4 address.
@@ -462,20 +483,31 @@ ipv4
 ipv6
    Use IPv6. This is forced if the ``ip-in`` option is used with an IPv6 address.
 
-tr-in
-   Inbound transparent. The proxy port will accept connections to any IP address on the port. To have IPv6 inbound transparent you must use this and the ``ipv6`` option. This overrides :ts:cv:`proxy.local.incoming_ip_to_bind` for this port.
+ssl
+   Require SSL termination for inbound connections. SSL :ref:`must be configured <configuring-ssl-termination>` for this option to provide a functional server port.
 
-   Not compatible with: ``ip-in``, ``ssl``, ``blind``
+   Not compatible with: ``blind``.
 
-tr-out
-   Outbound transparent. If ATS connects to an origin server for a transaction on this port, it will use the client's address as its local address. This overrides :ts:cv:`proxy.local.outgoing_ip_to_bind` for this port.
-
-   Not compatible with: ``ip-out``, ``ip-resolve``
+proto
+   Specify the :ref:`session level protocols <session-protocol>` supported. These should be
+   separated by semi-colons. For TLS proxy ports the default value is
+   all available protocols. For non-TLS proxy ports the default is HTTP
+   only. SPDY can be enabled on non-TLS proxy ports but that must be done explicitly.
 
 tr-full
    Fully transparent. This is a convenience option and is identical to specifying both ``tr-in`` and ``tr-out``.
 
    Not compatible with: Any option not compatible with ``tr-in`` or ``tr-out``.
+
+tr-in
+   Inbound transparent. The proxy port will accept connections to any IP address on the port. To have IPv6 inbound transparent you must use this and the ``ipv6`` option. This overrides :ts:cv:`proxy.local.incoming_ip_to_bind` for this port.
+
+   Not compatible with: ``ip-in``, ``blind``
+
+tr-out
+   Outbound transparent. If ATS connects to an origin server for a transaction on this port, it will use the client's address as its local address. This overrides :ts:cv:`proxy.local.outgoing_ip_to_bind` for this port.
+
+   Not compatible with: ``ip-out``, ``ip-resolve``
 
 tr-pass
    Transparent pass through. This option is useful only for inbound transparent proxy ports. If the parsing of the expected HTTP header fails, then the transaction is switched to a blind tunnel instead of generating an error response to the client. It effectively enables :ts:cv:`proxy.config.http.use_client_target_addr` for the transaction as there is no other place to obtain the origin server address.
@@ -495,20 +527,7 @@ ip-out
 ip-resolve
    Set the :ts:cv:`host resolution style <proxy.config.hostdb.ip_resolve>` for transactions on this proxy port.
 
-   Not compatible with: ``tr-out``.
-
-ssl
-   Require SSL termination for inbound connections. SSL :ref:`must be configured <configuring-ssl-termination>` for this option to provide a functional server port.
-
-   Not compatible with: ``tr-in``, ``blind``.
-
-blind
-   Accept only ``CONNECT`` transactions on this port.
-
-   Not compatible with: ``tr-in``, ``ssl``.
-
-compress
-   Compress the connection. Retained only by inertia, should be considered "not implemented".
+   Not compatible with: ``tr-out`` - this option requires a value of ``client;none`` which is forced and should not be explicitly specified.
 
 .. topic:: Example
 
@@ -529,6 +548,12 @@ compress
    Listen on port 8080 for IPv6, fully transparent. Set up an SSL port on 443. These ports will use the IP address from :ts:cv:`proxy.local.incoming_ip_to_bind`.  Listen on IP address ``192.168.17.1``, port 80, IPv4, and connect to origin servers using the local address ``10.10.10.1`` for IPv4 and ``fc01:10:10:1::1`` for IPv6.::
 
       8080:ipv6:tr-full 443:ssl ip-in=192.168.17.1:80:ip-out=[fc01:10:10:1::1]:ip-out=10.10.10.1
+
+.. topic:: Example
+
+   Listen on port 9090 for TSL enabled SPDY or HTTP connections, accept no other session protocols.::
+
+      9090:proto=spdy;http:ssl
 
 .. ts:cv:: CONFIG proxy.config.http.connect_ports STRING 443 563
 
@@ -1130,13 +1155,7 @@ Cache Control
    client's ``If-Modified-Since`` header for the proxy request.
 
 .. ts:cv:: CONFIG proxy.config.http.cache.when_to_add_no_cache_to_msie_requests INT 0
-   :reloadable:
-
-   Specifies when to add ``no-cache`` directives to Microsoft Internet Explorer requests. You can specify the following:
-
-   -  ``0`` = ``no-cache`` is *not* added to MSIE requests
-   -  ``1`` = ``no-cache`` is added to IMS MSIE requests
-   -  ``2`` = ``no-cache`` is added to all MSIE requests
+   :deprecated:
 
 .. ts:cv:: CONFIG proxy.config.http.cache.required_headers INT 0
    :reloadable:
@@ -1155,6 +1174,14 @@ Cache Control
 .. ts:cv:: CONFIG proxy.config.http.cache.range.lookup INT 1
 
    When enabled (``1``), Traffic Server looks up range requests in the cache.
+
+.. ts:cv:: CONFIG proxy.config.http.cache.range.write INT 0
+
+   When enabled (``1``), Traffic Server will attempt to write (lock) the URL
+   to cache. This is rarely useful (at the moment), since it'll only be able
+   to write to cache if the origin has ignored the ``Range:` header. For a use
+   case where you know the origin will respond with a full (``200``) response,
+   you can turn this on to allow it to be cached.
 
 .. ts:cv:: CONFIG proxy.config.http.cache.ignore_accept_mismatch INT 2
    :reloadable:
@@ -2212,6 +2239,31 @@ ICP Configuration
 
    Specifies the timeout used for ICP queries.
 
+SPDY Configuration
+==================
+
+.. ts:cv:: CONFIG proxy.config.spdy.accept_no_activity_timeout INT 30
+   :reloadable:
+
+   How long a SPDY connection will be kept open after an accept without any streams created.
+
+.. ts:cv:: CONFIG proxy.config.spdy.no_activity_timeout_in INT 30
+   :reloadable:
+
+   How long a stream is kept open without activity.
+
+.. ts:cv:: CONFIG proxy.config.spdy.initial_window_size_in INT 65536
+   :reloadable:
+
+   The initial window size for inbound connections.
+
+.. ts:cv:: CONFIG proxy.config.spdy.max_concurrent_streams_in INT 100
+   :reloadable:
+
+   The maximum number of concurrent streams per inbound connection.
+
+   .. note:: Reloading this value affects only new SPDY connections, not existing connects.
+
 Scheduled Update Configuration
 ==============================
 
@@ -2265,7 +2317,7 @@ Plug-in Configuration
 Sockets
 =======
 
-.. ts:cv:: CONFIG proxy.config.net.defer_accept INT `1`
+.. ts:cv:: CONFIG proxy.config.net.defer_accept INT 1
 
    default: ``1`` meaning ``on`` all Platforms except Linux: ``45`` seconds
 
@@ -2347,12 +2399,14 @@ Sockets
        CONFIG proxy.config.cache.threads_per_disk INT 8
 
 
-Undocumented
-============
+.. ts:cv:: CONFIG proxy.config.task_threads INT 2
 
-These are referenced but not documented. Please contribute a definition.
+   Specifies the number of task threads to run. These threads are used for
+   various tasks that should be off-loaded from the normal network threads.
 
-
-.. ts:cv:: CONFIG proxy.config.task_threads INT 0
 
 .. ts:cv:: CONFIG proxy.config.http.enabled INT 1
+
+   Turn on or off support for HTTP proxying. This is rarely used, the one
+   exception being if you run Traffic Server with a protocol plugin, and would
+   like for it to not support HTTP requests at all.

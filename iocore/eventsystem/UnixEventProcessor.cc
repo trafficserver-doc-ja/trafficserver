@@ -43,7 +43,7 @@ EventProcessor::spawn_event_threads(int n_threads, const char* et_name, size_t s
   new_thread_group_id = (EventType) n_thread_groups;
 
   for (i = 0; i < n_threads; i++) {
-    EThread *t = NEW(new EThread(REGULAR, n_ethreads + i));
+    EThread *t = new EThread(REGULAR, n_ethreads + i);
     all_ethreads[n_ethreads + i] = t;
     eventthread[new_thread_group_id][i] = t;
     t->set_event_type(new_thread_group_id);
@@ -83,7 +83,7 @@ EventProcessor::start(int n_event_threads, size_t stacksize)
   int first_thread = 1;
 
   for (i = 0; i < n_event_threads; i++) {
-    EThread *t = NEW(new EThread(REGULAR, i));
+    EThread *t = new EThread(REGULAR, i);
     if (first_thread && !i) {
       ink_thread_setspecific(Thread::thread_data_key, t);
       global_mutex = t->mutex;
@@ -101,8 +101,8 @@ EventProcessor::start(int n_event_threads, size_t stacksize)
   REC_ReadConfigInteger(affinity, "proxy.config.exec_thread.affinity");
   hwloc_obj_t obj;
   hwloc_obj_type_t obj_type;
-  int obj_count = 0, cpu_mask_len = 0;
-  char *obj_name, *cpu_mask;
+  int obj_count = 0;
+  char *obj_name;
 
   switch(affinity) {
     case 4:           // assign threads to logical processing units
@@ -131,8 +131,8 @@ EventProcessor::start(int n_event_threads, size_t stacksize)
       obj_name = (char *) "Machine";
   }
 
-    obj_count = hwloc_get_nbobjs_by_type(ink_get_topology(), obj_type);
-    Debug("iocore_thread", "Affinity: %d %ss: %d PU: %d", affinity, obj_name, obj_count, ink_number_of_processors());
+  obj_count = hwloc_get_nbobjs_by_type(ink_get_topology(), obj_type);
+  Debug("iocore_thread", "Affinity: %d %ss: %d PU: %d", affinity, obj_name, obj_count, ink_number_of_processors());
 
 #endif
   for (i = first_thread; i < n_ethreads; i++) {
@@ -140,13 +140,21 @@ EventProcessor::start(int n_event_threads, size_t stacksize)
     ink_thread tid = all_ethreads[i]->start(thr_name, stacksize);
     (void)tid;
 #if TS_USE_HWLOC
-    obj = hwloc_get_obj_by_type(ink_get_topology(), obj_type, i % obj_count);
-    cpu_mask_len = hwloc_bitmap_snprintf(NULL, 0, obj->cpuset) + 1;
-    cpu_mask = (char *) alloca(cpu_mask_len);
-    hwloc_bitmap_snprintf(cpu_mask, cpu_mask_len, obj->cpuset);
-    Debug("iocore_thread","EThread: %d %s: %d CPU Mask: %s\n", i, obj_name, obj->logical_index, cpu_mask);
-    hwloc_set_thread_cpubind(ink_get_topology(), tid, obj->cpuset, HWLOC_CPUBIND_STRICT);
-#endif
+    if (obj_count > 0) {
+      obj = hwloc_get_obj_by_type(ink_get_topology(), obj_type, i % obj_count);
+#if HWLOC_API_VERSION >= 0x00010100
+      int cpu_mask_len = hwloc_bitmap_snprintf(NULL, 0, obj->cpuset) + 1;
+      char *cpu_mask = (char *) alloca(cpu_mask_len);
+      hwloc_bitmap_snprintf(cpu_mask, cpu_mask_len, obj->cpuset);
+      Debug("iocore_thread","EThread: %d %s: %d CPU Mask: %s\n", i, obj_name, obj->logical_index, cpu_mask);
+#else
+      Debug("iocore_thread","EThread: %d %s: %d\n", i, obj_name, obj->logical_index);
+#endif // HWLOC_API_VERSION
+      hwloc_set_thread_cpubind(ink_get_topology(), tid, obj->cpuset, HWLOC_CPUBIND_STRICT);
+    } else {
+      Warning("hwloc returned an unexpected value -- CPU affinity disabled");
+    }
+#endif // TS_USE_HWLOC
   }
 
   Debug("iocore_thread", "Created event thread group id %d with %d threads", ET_CALL, n_event_threads);
@@ -165,7 +173,7 @@ EventProcessor::spawn_thread(Continuation *cont, const char* thr_name, size_t st
   Event *e = eventAllocator.alloc();
 
   e->init(cont, 0, 0);
-  all_dthreads[n_dthreads] = NEW(new EThread(DEDICATED, e, sem));
+  all_dthreads[n_dthreads] = new EThread(DEDICATED, e, sem);
   e->ethread = all_dthreads[n_dthreads];
   e->mutex = e->continuation->mutex = all_dthreads[n_dthreads]->mutex;
   n_dthreads++;

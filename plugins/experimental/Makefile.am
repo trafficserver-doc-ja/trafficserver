@@ -22,6 +22,7 @@ SUBDIRS = \
  balancer \
  buffer_upload \
  channel_stats \
+ collapsed_connection \
  custom_redirect \
  escalate \
  esi \
@@ -29,10 +30,10 @@ SUBDIRS = \
  healthchecks \
  hipes \
  metalink \
+ regex_revalidate \
  remap_stats \
- rfc5861 \
  s3_auth \
- spdy \
+ stale_while_revalidate \
  ts_lua \
  url_sig \
  xdebug

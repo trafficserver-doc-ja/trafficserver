@@ -22,26 +22,50 @@
  */
 
 #include "SpdySessionAccept.h"
+#include "Error.h"
+
 #if TS_HAS_SPDY
-#include "SpdySM.h"
+#include "SpdyClientSession.h"
 #endif
 
-SpdySessionAccept::SpdySessionAccept(Continuation *ep)
-    : SessionAccept(new_ProxyMutex()), endpoint(ep)
+SpdySessionAccept::SpdySessionAccept(spdy::SessionVersion vers)
+    : SessionAccept(new_ProxyMutex()), version(vers)
 {
 #if TS_HAS_SPDY
-  spdy_config_load();
+  ink_release_assert(spdy::SESSION_VERSION_2 <= vers && vers <= spdy::SESSION_VERSION_3_1);
 #endif
   SET_HANDLER(&SpdySessionAccept::mainEvent);
 }
 
 int
-SpdySessionAccept::mainEvent(int /* event */, void *netvc)
+SpdySessionAccept::mainEvent(int event, void * edata)
+{
+  if (event == NET_EVENT_ACCEPT) {
+    NetVConnection * netvc =static_cast<NetVConnection *>(edata);
+
+#if TS_HAS_SPDY
+    spdy_sm_create(netvc, this->version, NULL, NULL);
+#else
+    Error("accepted a SPDY session, but SPDY support is not available");
+    netvc->do_io_close();
+#endif
+
+    return EVENT_CONT;
+  }
+
+  MachineFatal("SPDY accept received fatal error: errno = %d", -((int)(intptr_t)edata));
+  return EVENT_CONT;
+}
+
+void
+SpdySessionAccept::accept(NetVConnection * netvc, MIOBuffer * iobuf, IOBufferReader * reader)
 {
 #if TS_HAS_SPDY
-  spdy_sm_create((TSCont)netvc);
+  spdy_sm_create(netvc, this->version, iobuf, reader);
 #else
-  (void)(netvc);
+  (void)netvc;
+  (void)iobuf;
+  (void)reader;
+  ink_release_assert(0);
 #endif
-  return 0;
 }

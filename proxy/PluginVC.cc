@@ -127,7 +127,8 @@ PluginVC::main_handler(int event, void *data)
     read_mutex_held = MUTEX_TAKE_TRY_LOCK(read_side_mutex, my_ethread);
 
     if (!read_mutex_held) {
-      call_event->schedule_in(PVC_LOCK_RETRY_TIME);
+      if (call_event != inactive_event)
+        call_event->schedule_in(PVC_LOCK_RETRY_TIME);
       return 0;
     }
 
@@ -135,7 +136,8 @@ PluginVC::main_handler(int event, void *data)
       // It's possible some swapped the mutex on us before
       //  we were able to grab it
       Mutex_unlock(read_side_mutex, my_ethread);
-      call_event->schedule_in(PVC_LOCK_RETRY_TIME);
+      if (call_event != inactive_event)
+        call_event->schedule_in(PVC_LOCK_RETRY_TIME);
       return 0;
     }
   }
@@ -147,7 +149,8 @@ PluginVC::main_handler(int event, void *data)
       if (read_mutex_held) {
         Mutex_unlock(read_side_mutex, my_ethread);
       }
-      call_event->schedule_in(PVC_LOCK_RETRY_TIME);
+      if (call_event != inactive_event)
+        call_event->schedule_in(PVC_LOCK_RETRY_TIME);
       return 0;
     }
 
@@ -158,7 +161,8 @@ PluginVC::main_handler(int event, void *data)
       if (read_mutex_held) {
         Mutex_unlock(read_side_mutex, my_ethread);
       }
-      call_event->schedule_in(PVC_LOCK_RETRY_TIME);
+      if (call_event != inactive_event)
+        call_event->schedule_in(PVC_LOCK_RETRY_TIME);
       return 0;
     }
   }
@@ -980,7 +984,7 @@ PluginVCCore::~PluginVCCore()
 PluginVCCore *
 PluginVCCore::alloc()
 {
-  PluginVCCore *pvc = NEW(new PluginVCCore);
+  PluginVCCore *pvc = new PluginVCCore;
   pvc->init();
   return pvc;
 }
@@ -1047,7 +1051,6 @@ void
 PluginVCCore::set_accept_cont(Continuation * c)
 {
   connect_to = c;
-
   // FIX ME - must return action
 }
 
@@ -1198,6 +1201,17 @@ PluginVCCore::set_transparent(bool passive_side, bool active_side)
   active_vc.set_is_transparent(active_side);
 }
 
+void
+PluginVCCore::set_plugin_id(int64_t id)
+{
+  passive_vc.plugin_id = active_vc.plugin_id = id;
+}
+
+void
+PluginVCCore::set_plugin_tag(char const* tag)
+{
+  passive_vc.plugin_tag = active_vc.plugin_tag = tag;
+}
 
 /*************************************************************
  *
@@ -1267,8 +1281,8 @@ PVCTestDriver::run_next_test()
 
   Debug("pvc_test", "Starting test %s", netvc_tests_def[a_index].test_name);
 
-  NetVCTest *p = NEW(new NetVCTest);
-  NetVCTest *a = NEW(new NetVCTest);
+  NetVCTest *p = new NetVCTest;
+  NetVCTest *a = new NetVCTest;
   PluginVCCore *core = PluginVCCore::alloc();
   core->set_accept_cont(p);
 
@@ -1292,7 +1306,7 @@ PVCTestDriver::main_handler(int /* event ATS_UNUSED */, void * /* data ATS_UNUSE
 
 EXCLUSIVE_REGRESSION_TEST(PVC) (RegressionTest * t, int /* atype ATS_UNUSED */, int *pstatus)
 {
-  PVCTestDriver *driver = NEW(new PVCTestDriver);
+  PVCTestDriver *driver = new PVCTestDriver;
   driver->start_tests(t, pstatus);
 }
 #endif

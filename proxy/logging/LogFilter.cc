@@ -28,7 +28,6 @@
  ***************************************************************************/
 #include "libts.h"
 
-#include "Resource.h"
 #include "Error.h"
 #include "LogUtils.h"
 #include "LogFilter.h"
@@ -44,7 +43,7 @@
 #include "SimpleTokenizer.h"
 
 const char *LogFilter::OPERATOR_NAME[] = { "MATCH", "CASE_INSENSITIVE_MATCH","CONTAIN", "CASE_INSENSITIVE_CONTAIN" };
-const char *LogFilter::ACTION_NAME[] = { "REJECT", "ACCEPT" };
+const char *LogFilter::ACTION_NAME[] = { "REJECT", "ACCEPT", "WIPE_FIELD_VALUE" };
 
 /*-------------------------------------------------------------------------
   LogFilter::LogFilter
@@ -56,7 +55,7 @@ const char *LogFilter::ACTION_NAME[] = { "REJECT", "ACCEPT" };
 LogFilter::LogFilter(const char *name, LogField * field, LogFilter::Action action, LogFilter::Operator oper)
   : m_name(ats_strdup(name)), m_field(NULL) , m_action(action), m_operator(oper), m_type(INT_FILTER), m_num_values(0)
 {
-  m_field = NEW(new LogField(*field));
+  m_field = new LogField(*field);
   ink_assert(m_field);
 }
 
@@ -79,9 +78,9 @@ LogFilterString::_setValues(size_t n, char **value)
   m_type = STRING_FILTER;
   m_num_values = n;
   if (n) {
-    m_value = NEW(new char *[n]);
-    m_value_uppercase = NEW(new char *[n]);
-    m_length = NEW(new size_t[n]);
+    m_value = new char *[n];
+    m_value_uppercase = new char *[n];
+    m_length = new size_t[n];
     ink_assert(m_value && m_value_uppercase && m_length);
     for (size_t i = 0; i < n; ++i) {
       m_value[i] = ats_strdup(value[i]);
@@ -108,7 +107,7 @@ LogFilterString::LogFilterString(const char *name, LogField * field,
   SimpleTokenizer tok(values, ',');
   size_t n = tok.getNumTokensRemaining();
   if (n) {
-    val_array = NEW(new char *[n]);
+    val_array = new char *[n];
     char *t;
     while (t = tok.getNext(), t != NULL) {
       val_array[i++] = t;
@@ -180,6 +179,85 @@ LogFilterString::operator==(LogFilterString & rhs)
   }
   return false;
 }
+
+/*-------------------------------------------------------------------------
+  LogFilterString::wipe_this_entry
+
+  For strings, we need to marshal the given string into a buffer so that we
+  can compare it with the filter value.  Most strings are snall, so we'll
+  only allocate space dynamically if the marshal_len is very large (eg,
+  URL).
+
+  The m_substr field tells us whether we can match based on substrings, or
+  whether we should compare the entire string.
+  -------------------------------------------------------------------------*/
+
+bool
+LogFilterString::wipe_this_entry(LogAccess * lad)
+{
+  if (m_num_values == 0 || m_field == NULL || lad == NULL || m_action != WIPE_FIELD_VALUE) {
+    return false;
+  }
+
+  static const unsigned BUFSIZE = 1024;
+  char small_buf[BUFSIZE];
+  char small_buf_upper[BUFSIZE];
+  char *big_buf = NULL;
+  char *big_buf_upper = NULL;
+  char *buf = small_buf;
+  char *buf_upper = small_buf_upper;
+  size_t marsh_len = m_field->marshal_len(lad);      // includes null termination
+
+  if (marsh_len > BUFSIZE) {
+    big_buf = (char *)ats_malloc((unsigned int) marsh_len);
+    buf = big_buf;
+  }
+
+  m_field->marshal(lad, buf);
+
+  bool cond_satisfied = false;
+  switch (m_operator) {
+  case MATCH:
+    // marsh_len is an upper bound on the length of the marshalled string
+    // because marsh_len counts padding and the eos. So for a MATCH
+    // operator, we use the DATA_LENGTH_LARGER length condition rather
+    // than DATA_LENGTH_EQUAL, which we would use if we had the actual
+    // length of the string. It is probably not worth computing the
+    // actual length, so we just use the fact that a MATCH is not possible
+    // when marsh_len <= (length of the filter string)
+    //
+    cond_satisfied = _checkConditionAndWipe(&strcmp, &buf, marsh_len, m_value, DATA_LENGTH_LARGER);
+    break;
+  case CASE_INSENSITIVE_MATCH:
+    cond_satisfied = _checkConditionAndWipe(&strcasecmp, &buf, marsh_len, m_value, DATA_LENGTH_LARGER);
+    break;
+  case CONTAIN:
+    cond_satisfied = _checkConditionAndWipe(&_isSubstring, &buf, marsh_len, m_value, DATA_LENGTH_LARGER);
+    break;
+  case CASE_INSENSITIVE_CONTAIN:
+    {
+      if (big_buf) {
+        big_buf_upper = (char *)ats_malloc((unsigned int) marsh_len);
+        buf_upper = big_buf_upper;
+      }
+      for (size_t i = 0; i < marsh_len; i++) {
+        buf_upper[i] = ParseRules::ink_toupper(buf[i]);
+      }
+      cond_satisfied = _checkConditionAndWipe(&_isSubstring, &buf_upper, marsh_len, m_value_uppercase, DATA_LENGTH_LARGER);
+      strcpy(buf, buf_upper);
+      break;
+    }
+  default:
+    ink_assert(!"INVALID FILTER OPERATOR");
+  }
+
+  ats_free(big_buf);
+  ats_free(big_buf_upper);
+
+  m_field->updateField(lad, buf, strlen(buf));
+  return cond_satisfied;
+}
+
 
 /*-------------------------------------------------------------------------
   LogFilterString::toss_this_entry
@@ -310,7 +388,7 @@ LogFilterInt::_setValues(size_t n, int64_t *value)
   m_type = INT_FILTER;
   m_num_values = n;
   if (n) {
-    m_value = NEW(new int64_t[n]);
+    m_value = new int64_t[n];
     memcpy(m_value, value, n * sizeof(int64_t));
   }
 }
@@ -367,7 +445,7 @@ LogFilterInt::LogFilterInt(const char *name, LogField * field,
   size_t n = tok.getNumTokensRemaining();
 
   if (n) {
-    val_array = NEW(new int64_t[n]);
+    val_array = new int64_t[n];
     char *t;
     while (t = tok.getNext(), t != NULL) {
       int64_t ival;
@@ -435,6 +513,44 @@ bool LogFilterInt::operator==(LogFilterInt & rhs)
     return true;
   }
   return false;
+}
+
+/*-------------------------------------------------------------------------
+  LogFilterInt::wipe_this_entry
+  -------------------------------------------------------------------------*/
+
+bool
+LogFilterInt::wipe_this_entry(LogAccess * lad)
+{
+  if (m_num_values == 0 || m_field == NULL || lad == NULL || m_action != WIPE_FIELD_VALUE) {
+    return false;
+  }
+
+  bool cond_satisfied = false;
+  int64_t value;
+
+  m_field->marshal(lad, (char *) &value);
+  // This used to do an ntohl() on value, but that breaks various filters.
+  // Long term we should move IPs to their own log type.
+
+  // we don't use m_operator because we consider all operators to be
+  // equivalent to "MATCH" for an integer field
+  //
+
+  // most common case is single value, speed it up a little bit by unrolling
+  //
+  if (m_num_values == 1) {
+    cond_satisfied = (value == *m_value);
+  } else {
+    for (size_t i = 0; i < m_num_values; ++i) {
+      if (value == m_value[i]) {
+        cond_satisfied = true;
+        break;
+      }
+    }
+  }
+
+  return cond_satisfied;
 }
 
 /*-------------------------------------------------------------------------
@@ -606,16 +722,32 @@ LogFilterList::add(LogFilter * filter, bool copy)
   ink_assert(filter != NULL);
   if (copy) {
     if (filter->type() == LogFilter::INT_FILTER) {
-      LogFilterInt *f = NEW(new LogFilterInt(*((LogFilterInt *) filter)));
+      LogFilterInt *f = new LogFilterInt(*((LogFilterInt *) filter));
       m_filter_list.enqueue(f);
     } else {
-      LogFilterString *f = NEW(new LogFilterString(*((LogFilterString *) filter)));
+      LogFilterString *f = new LogFilterString(*((LogFilterString *) filter));
       m_filter_list.enqueue(f);
     }
   } else {
     m_filter_list.enqueue(filter);
   }
 }
+
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+bool
+LogFilterList::wipe_this_entry(LogAccess * lad)
+{
+  bool wipeFlag = false;
+    for (LogFilter * f = first(); f; f = next(f)) {
+      if (f->wipe_this_entry(lad)) {
+        wipeFlag = true;
+      }
+    }
+    return wipeFlag;
+}
+
 
 /*-------------------------------------------------------------------------
   -------------------------------------------------------------------------*/

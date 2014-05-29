@@ -36,6 +36,7 @@
 #include "HttpSM.h"
 #include "HttpDebugNames.h"
 #include "HttpServerSession.h"
+#include "Plugin.h"
 
 #define DebugSsn(tag, ...) DebugSpecific(debug_on, tag, __VA_ARGS__)
 #define STATE_ENTER(state_name, event, vio) { \
@@ -110,13 +111,6 @@ HttpClientSession::destroy()
   THREAD_FREE(this, httpClientSessionAllocator, this_thread());
 }
 
-HttpClientSession *
-HttpClientSession::allocate()
-{
-  ink_assert(0);
-  return NULL;
-}
-
 void
 HttpClientSession::ssn_hook_append(TSHttpHookID id, INKContInternal * cont)
 {
@@ -144,6 +138,7 @@ void
 HttpClientSession::new_transaction()
 {
   ink_assert(current_reader == NULL);
+  PluginIdentity* pi = dynamic_cast<PluginIdentity*>(client_vc);
 
   read_state = HCS_ACTIVE_READER;
   current_reader = HttpSM::allocate();
@@ -151,8 +146,13 @@ HttpClientSession::new_transaction()
   transact_count++;
   DebugSsn("http_cs", "[%" PRId64 "] Starting transaction %d using sm [%" PRId64 "]", con_id, transact_count, current_reader->sm_id);
 
-  current_reader->proto_stack = client_vc->proto_stack;
   current_reader->attach_client_session(this, sm_reader);
+  if (pi) {
+    // it's a plugin VC of some sort with identify information.
+    // copy it to the SM.
+    current_reader->plugin_tag = pi->getPluginTag();
+    current_reader->plugin_id = pi->getPluginId();
+  }
 }
 
 inline void
@@ -173,7 +173,7 @@ HttpClientSession::do_api_callout(TSHttpHookID id)
 }
 
 void
-HttpClientSession::new_connection(NetVConnection * new_vc, bool backdoor)
+HttpClientSession::new_connection(NetVConnection * new_vc, bool backdoor, MIOBuffer * iobuf, IOBufferReader * reader)
 {
 
   ink_assert(new_vc != NULL);
@@ -191,6 +191,10 @@ HttpClientSession::new_connection(NetVConnection * new_vc, bool backdoor)
   HTTP_INCREMENT_DYN_STAT(http_current_client_connections_stat);
   conn_decrease = true;
   HTTP_INCREMENT_DYN_STAT(http_total_client_connections_stat);
+  if (static_cast<HttpProxyPort::TransportType>(new_vc->attributes) == HttpProxyPort::TRANSPORT_SSL) {
+    HTTP_INCREMENT_DYN_STAT(https_total_client_connections_stat);
+  }
+
   /* inbound requests stat should be incremented here, not after the
    * header has been read */
   HTTP_INCREMENT_DYN_STAT(http_total_incoming_connections_stat);
@@ -223,8 +227,8 @@ HttpClientSession::new_connection(NetVConnection * new_vc, bool backdoor)
 
   DebugSsn("http_cs", "[%" PRId64 "] session born, netvc %p", con_id, new_vc);
 
-  read_buffer = new_MIOBuffer(HTTP_HEADER_BUFFER_SIZE_INDEX);
-  sm_reader = read_buffer->alloc_reader();
+  read_buffer = iobuf ? iobuf : new_MIOBuffer(HTTP_HEADER_BUFFER_SIZE_INDEX);
+  sm_reader = reader ? reader : read_buffer->alloc_reader();
 
   // INKqa11186: Use a local pointer to the mutex as
   // when we return from do_api_callout, the ClientSession may

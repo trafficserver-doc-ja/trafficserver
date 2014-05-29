@@ -19,6 +19,7 @@
 AM_CPPFLAGS = \
   $(iocore_include_dirs) \
   -I$(top_srcdir)/lib \
+  -I$(top_builddir)/lib \
   -I$(top_srcdir)/lib/records \
   -I$(top_srcdir)/lib/ts \
   -I$(top_srcdir)/proxy \
@@ -37,11 +38,11 @@ libspdy_a_SOURCES = \
   SpdySessionAccept.cc
 
 if BUILD_SPDY
-  libspdy_a_SOURCES += \
-  SpdyCallbacks.h \
-  SpdyCommon.h \
-  SpdySM.h \
+libspdy_a_SOURCES += \
   SpdyCallbacks.cc \
+  SpdyCallbacks.h \
+  SpdyClientSession.cc \
+  SpdyClientSession.h \
   SpdyCommon.cc \
-  SpdySM.cc
+  SpdyCommon.h
 endif

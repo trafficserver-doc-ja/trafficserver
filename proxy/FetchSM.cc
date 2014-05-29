@@ -36,6 +36,8 @@ static const char *http_method[] = {
   "HEAD",
   "PURGE",
   "PUT",
+  "OPTIONS",
+  "TRACE",
   "LAST",
 };
 
@@ -59,23 +61,22 @@ FetchSM::cleanUp()
   client_response_hdr.destroy();
   ats_free(client_response);
   cont_mutex.clear();
-
-  PluginVC *vc = (PluginVC *) http_vc;
-
-  vc->do_io_close();
+  http_vc->do_io_close();
   FetchSMAllocator.free(this);
 }
 
 void
 FetchSM::httpConnect()
 {
+  PluginIdentity* pi = dynamic_cast<PluginIdentity*>(contp);
+  char const* tag = pi ? pi->getPluginTag() : "fetchSM";
+  int64_t id = pi ? pi->getPluginId() : 0;
+
   Debug(DEBUG_TAG, "[%s] calling httpconnect write", __FUNCTION__);
-  http_vc = TSHttpConnectWithProtoStack(&_addr.sa, proto_stack);
+  http_vc = reinterpret_cast<PluginVC*>(TSHttpConnectWithPluginId(&_addr.sa, tag, id));
 
-  PluginVC *vc = (PluginVC *) http_vc;
-
-  read_vio = vc->do_io_read(this, INT64_MAX, resp_buffer);
-  write_vio = vc->do_io_write(this, getReqLen() + req_content_length, req_reader);
+  read_vio = http_vc->do_io_read(this, INT64_MAX, resp_buffer);
+  write_vio = http_vc->do_io_write(this, getReqLen() + req_content_length, req_reader);
 }
 
 char* FetchSM::resp_get(int *length) {
@@ -522,7 +523,11 @@ FetchSM::ext_lanuch()
 void
 FetchSM::ext_write_data(const void *data, size_t len)
 {
-  if (header_done && (fetch_flags & TS_FETCH_FLAGS_NEWLOCK)) {
+  bool writeReady = (header_done ||
+		    (req_method == TS_FETCH_METHOD_POST) ||
+		    (req_method == TS_FETCH_METHOD_PUT));
+
+  if (writeReady && (fetch_flags & TS_FETCH_FLAGS_NEWLOCK)) {
     MUTEX_TAKE_LOCK(mutex, this_ethread());
   }
 
@@ -532,10 +537,13 @@ FetchSM::ext_write_data(const void *data, size_t len)
   // Before header_done, FetchSM may not
   // be initialized.
   //
-  if (header_done)
+  if (writeReady) {
+    Debug(DEBUG_TAG, "[%s] re-enabling write_vio, header_done %u, req_method %u", __FUNCTION__, header_done, req_method);
     write_vio->reenable();
+    fetch_handler(TS_EVENT_VCONN_WRITE_READY, write_vio);
+  }
 
-  if (header_done && (fetch_flags & TS_FETCH_FLAGS_NEWLOCK)) {
+  if (writeReady && (fetch_flags & TS_FETCH_FLAGS_NEWLOCK)) {
     MUTEX_UNTAKE_LOCK(mutex, this_ethread());
   }
 }
@@ -619,18 +627,6 @@ void*
 FetchSM::ext_get_user_data()
 {
   return user_data;
-}
-
-void
-FetchSM::ext_set_proto_stack(TSClientProtoStack proto_stack)
-{
-  this->proto_stack = proto_stack;
-}
-
-TSClientProtoStack
-FetchSM::ext_get_proto_stack()
-{
-  return proto_stack;
 }
 
 TSMBuffer

@@ -56,20 +56,28 @@ using namespace std;
 #define atomic_dec(a)   atomic_fetch_and_sub(a, 1)
 
 struct SpdyConfig {
-  bool verbose;
-  bool enable_tls;
-  bool keep_host_port;
-  int serv_port;
-  int max_concurrent_streams;
-  int initial_window_size;
+  int32_t max_concurrent_streams;
+  int32_t initial_window_size;
   spdylay_session_callbacks callbacks;
 };
 
 struct Config {
   SpdyConfig spdy;
-  int nr_accept_threads;
-  int accept_no_activity_timeout;
-  int no_activity_timeout_in;
+  int32_t accept_no_activity_timeout;
+  int32_t no_activity_timeout_in;
+
+  // Statistics
+  /// This is the stat slot index for each statistic.
+  enum StatIndex {
+    STAT_CURRENT_CLIENT_SESSION_COUNT, ///< Current # of active SPDY sessions.
+    STAT_CURRENT_CLIENT_STREAM_COUNT, ///< Current # of active SPDY streams.
+    STAT_TOTAL_CLIENT_STREAM_COUNT, ///< Total number of streams created.
+    STAT_TOTAL_TRANSACTIONS_TIME,  //< Total stream time
+    STAT_TOTAL_CLIENT_CONNECTION_COUNT, //< Total connections running spdy
+
+    N_STATS ///< Terminal counter, NOT A STAT INDEX.
+  };
+  RecRawStatBlock* rsb; ///< Container for statistics.
 };
 
 // Spdy Name/Value pairs
@@ -93,4 +101,22 @@ string http_date(time_t t);
 int spdy_config_load();
 
 extern Config SPDY_CFG;
+
+// Stat helper functions
+
+inline void
+SpdyStatIncrCount(Config::StatIndex idx, Continuation* contp) {
+  RecIncrRawStatCount(SPDY_CFG.rsb, contp->mutex->thread_holding, idx, 1);
+}
+
+inline void
+SpdyStatDecrCount(Config::StatIndex idx, Continuation* contp) {
+  RecIncrRawStatCount(SPDY_CFG.rsb, contp->mutex->thread_holding, idx, -1);
+}
+
+inline void
+SpdyStatIncr(Config::StatIndex idx, Continuation* contp, const int64_t incr) {
+  RecIncrRawStat(SPDY_CFG.rsb, contp->mutex->thread_holding, idx, incr);
+}
+
 #endif

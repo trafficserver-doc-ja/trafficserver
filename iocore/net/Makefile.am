@@ -19,6 +19,7 @@
 AM_CPPFLAGS = \
   $(iocore_include_dirs) \
   -I$(top_srcdir)/lib \
+  -I$(top_builddir)/lib \
   -I$(top_srcdir)/lib/records \
   -I$(top_srcdir)/lib/ts \
   -I$(top_srcdir)/proxy \
@@ -62,8 +63,6 @@ libinknet_a_SOURCES = \
   P_Net.h \
   P_NetAccept.h \
   P_NetVConnection.h \
-  P_ProtocolNetAccept.h \
-  P_ProtocolProbeSessionAccept.h \
   P_Socks.h \
   P_SSLCertLookup.h \
   P_SSLConfig.h \
@@ -85,8 +84,6 @@ libinknet_a_SOURCES = \
   P_UnixNetVConnection.h \
   P_UnixPollDescriptor.h \
   P_UnixUDPConnection.h \
-  ProtocolNetAccept.cc \
-  ProtocolProbeSessionAccept.cc \
   Socks.cc \
   SSLCertLookup.cc \
   SSLConfig.cc \

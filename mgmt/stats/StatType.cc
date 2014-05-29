@@ -34,6 +34,7 @@
 #include "StatType.h"
 #include "MgmtUtils.h"
 #include "ink_hrtime.h"
+#include "WebOverview.h"
 
 bool StatError = false;         // global error flag
 bool StatDebug = false;         // global debug flag
@@ -74,7 +75,7 @@ StatExprToken::copy(const StatExprToken & source)
   m_token_value_max = source.m_token_value_max;
 
   if (source.m_token_value_delta) {
-    m_token_value_delta = NEW(new StatDataSamples());
+    m_token_value_delta = new StatDataSamples();
     m_token_value_delta->previous_time = source.m_token_value_delta->previous_time;
     m_token_value_delta->current_time = source.m_token_value_delta->current_time;
     m_token_value_delta->previous_value = source.m_token_value_delta->previous_value;
@@ -476,7 +477,7 @@ StatObject::assignDst(const char *str, bool m_node_var, bool m_sum_var)
     Debug(MODULE_INIT, "DESTINTATION: %s\n", str);
   }
 
-  StatExprToken *statToken = NEW(new StatExprToken());
+  StatExprToken *statToken = new StatExprToken();
 
   statToken->assignTokenName(str);
   statToken->m_node_var = m_node_var;
@@ -532,11 +533,11 @@ StatObject::assignExpr(char *str)
   const char *token = exprTok.iterFirst(&exprTok_state);
 
   ink_assert(m_expression == NULL);
-  m_expression = NEW(new StatExprList());
+  m_expression = new StatExprList();
 
   while (token) {
 
-    statToken = NEW(new StatExprToken());
+    statToken = new StatExprToken();
 
     if (isOperator(token[0])) {
 
@@ -555,7 +556,7 @@ StatObject::assignExpr(char *str)
       if (token[0] == '#') {
 
         token += 1;             // skip '#'
-        statToken->m_token_value_delta = NEW(new StatDataSamples());
+        statToken->m_token_value_delta = new StatDataSamples();
         statToken->m_token_value_delta->previous_time = (ink_hrtime) 0;
         statToken->m_token_value_delta->current_time = (ink_hrtime) 0;
         statToken->m_token_value_delta->data_type = RECD_NULL;
@@ -596,7 +597,7 @@ StatObject::infix2postfix()
   StatExprList stack;
   StatExprToken *tempToken = NULL;
   StatExprToken *curToken = NULL;
-  m_postfix = NEW(new StatExprList());
+  m_postfix = new StatExprList();
 
   while (m_expression->top()) {
     curToken = m_expression->dequeue();
@@ -706,7 +707,7 @@ RecData StatObject::NodeStatEval(RecDataT *result_type, bool cluster)
     /* standard postfix evaluation */
     for (StatExprToken * token = m_postfix->first(); token; token = m_postfix->next(token)) {
       /* carbon-copy the token. */
-      curToken = NEW(new StatExprToken());
+      curToken = new StatExprToken();
       curToken->copy(*token);
 
       if (!isOperator(curToken->m_arith_symbol)) {
@@ -858,7 +859,7 @@ StatExprToken *StatObject::StatBinaryEval(StatExprToken * left, char op,
                                           StatExprToken * right, bool cluster)
 {
   RecData l, r;
-  StatExprToken *result = NEW(new StatExprToken());
+  StatExprToken *result = new StatExprToken();
   result->m_token_type = RECD_INT;
 
   if (left->m_token_type == RECD_NULL

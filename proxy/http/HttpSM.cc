@@ -91,6 +91,9 @@ static int scat_count = 0;
 static const int sub_header_size = sizeof("Content-type: ") - 1 + 2 + sizeof("Content-range: bytes ") - 1 + 4;
 static const int boundary_size = 2 + sizeof("RANGE_SEPARATOR") - 1 + 2;
 
+static const char *str_100_continue_response = "HTTP/1.1 100 Continue\r\n\r\n";
+static const int len_100_continue_response = strlen(str_100_continue_response);
+
 /**
  * Takes two milestones and returns the difference.
  * @param start The start time
@@ -300,7 +303,7 @@ static int next_sm_id = 0;
 
 
 HttpSM::HttpSM()
-  : Continuation(NULL), proto_stack(1u << TS_PROTO_HTTP), sm_id(-1), magic(HTTP_SM_MAGIC_DEAD),
+  : Continuation(NULL), sm_id(-1), magic(HTTP_SM_MAGIC_DEAD),
     //YTS Team, yamsat Plugin
     enable_redirection(false), redirect_url(NULL), redirect_url_len(0), redirection_tries(0),
     transfered_bytes(0), post_failed(false), debug_on(false),
@@ -322,6 +325,7 @@ HttpSM::HttpSM()
     client_response_hdr_bytes(0), client_response_body_bytes(0),
     cache_response_hdr_bytes(0), cache_response_body_bytes(0),
     pushed_response_hdr_bytes(0), pushed_response_body_bytes(0),
+    plugin_tag(0), plugin_id(0),
     hooks_set(0), cur_hook_id(TS_HTTP_LAST_HOOK), cur_hook(NULL),
     cur_hooks(0), callout_state(HTTP_API_NO_CALLOUT), terminate_sm(false), kill_this_async_done(false)
 {
@@ -1886,6 +1890,21 @@ HttpSM::state_send_server_request_header(int event, void *data)
       if (post_transform_info.vc) {
         setup_transform_to_server_transfer();
       } else {
+        if (t_state.http_config_param->send_100_continue_response) {
+          int len = 0;
+          const char *expect = t_state.hdr_info.client_request.value_get(MIME_FIELD_EXPECT, MIME_LEN_EXPECT, &len);
+          // When receive an "Expect: 100-continue" request from client, ATS sends a "100 Continue" response to client
+          // imediately, before receive the real response from original server.
+          if ((len == HTTP_LEN_100_CONTINUE) && (strncasecmp(expect, HTTP_VALUE_100_CONTINUE, HTTP_LEN_100_CONTINUE) == 0)) {
+            int64_t alloc_index = buffer_size_to_index(len_100_continue_response);
+            ua_entry->write_buffer = new_MIOBuffer(alloc_index);
+            IOBufferReader *buf_start = ua_entry->write_buffer->alloc_reader();
+
+            DebugSM("http_seq", "send 100 Continue response to client");
+            int64_t nbytes = ua_entry->write_buffer->write(str_100_continue_response, len_100_continue_response);
+            ua_session->do_io_write(ua_session->get_netvc(), nbytes, buf_start);
+          }
+        }
         do_setup_post_tunnel(HTTP_SERVER_VC);
       }
     } else {
@@ -2943,11 +2962,10 @@ HttpSM::is_bg_fill_necessary(HttpTunnelConsumer * c)
 {
   ink_assert(c->vc_type == HT_HTTP_CLIENT);
 
-  // There must be another consumer for it to worthwhile to
-  //  set up a background fill
-  if (((c->producer->num_consumers > 1 && c->producer->vc_type == HT_HTTP_SERVER) ||
-       (c->producer->num_consumers > 1 && c->producer->vc_type == HT_TRANSFORM)) &&
-      c->producer->alive == true) {
+  if (c->producer->alive && // something there to read
+      server_entry && server_entry->vc && // from an origin server
+      c->producer->num_consumers > 1  // with someone else reading it
+    ) {
 
     // If threshold is 0.0 or negative then do background
     //   fill regardless of the content length.  Since this
@@ -3266,6 +3284,14 @@ HttpSM::tunnel_handler_post_ua(int event, HttpTunnelProducer * p)
 
   case VC_EVENT_READ_COMPLETE:
   case HTTP_TUNNEL_EVENT_PRECOMPLETE:
+    // We have completed reading POST data from client here.
+    // It's time to free MIOBuffer of 100 Continue's response now,
+    // althought this is a little late.
+    if (t_state.http_config_param->send_100_continue_response) {
+      free_MIOBuffer(ua_entry->write_buffer);
+      ua_entry->write_buffer = NULL;
+    }
+
     // Completed successfully
     if (t_state.txn_conf->keep_alive_post_out == 0) {
       // don't share the session if keep-alive for post is not on
@@ -4027,7 +4053,7 @@ HttpSM::parse_range_and_compare(MIMEField *field, int64_t content_length)
   if (n_values <= 0 || ptr_len_ncmp(value, value_len, "bytes=", 6))
     return;
 
-  ranges = NEW(new RangeRecord[n_values]);
+  ranges = new RangeRecord[n_values];
   value += 6; // skip leading 'bytes='
   value_len -= 6;
 
@@ -4940,16 +4966,18 @@ HttpSM::handle_post_failure()
   // have the full post and it's deallocating the post buffers here
   enable_redirection = false;
   tunnel.deallocate_redirect_postdata_buffers();
-  tunnel.reset();
 
   // Don't even think about doing keep-alive after this debacle
   t_state.client_info.keep_alive = HTTP_NO_KEEPALIVE;
   t_state.current.server->keep_alive = HTTP_NO_KEEPALIVE;
 
   if (server_buffer_reader->read_avail() > 0) {
+    tunnel.reset();
     // There's data from the server so try to read the header
     setup_server_read_response_header();
   } else {
+    tunnel.deallocate_buffers();
+    tunnel.reset();
     // Server died
     vc_table.cleanup_entry(server_entry);
     server_entry = NULL;
@@ -5529,12 +5557,13 @@ HttpSM::setup_server_send_request()
 
   // Send the request header
   server_entry->vc_handler = &HttpSM::state_send_server_request_header;
-  server_entry->write_buffer = new_MIOBuffer(buffer_size_to_index(HTTP_HEADER_BUFFER_SIZE));
+  server_entry->write_buffer = new_MIOBuffer(HTTP_HEADER_BUFFER_SIZE_INDEX);
 
   if (t_state.api_server_request_body_set) {
     msg_len = t_state.internal_msg_buffer_size;
     t_state.hdr_info.server_request.value_set_int64(MIME_FIELD_CONTENT_LENGTH, MIME_LEN_CONTENT_LENGTH, msg_len);
   }
+  DUMP_HEADER("http_hdrs", &(t_state.hdr_info.server_request), t_state.state_machine_id, "Proxy's Request after hooks");
   // We need a reader so bytes don't fall off the end of
   //  the buffer
   IOBufferReader *buf_start = server_entry->write_buffer->alloc_reader();
@@ -5635,7 +5664,7 @@ HttpSM::setup_cache_read_transfer()
   ink_assert(cache_sm.cache_read_vc != NULL);
 
   doc_size = t_state.cache_info.object_read->object_size_get();
-  alloc_index = buffer_size_to_index(doc_size + HTTP_HEADER_BUFFER_SIZE);
+  alloc_index = buffer_size_to_index(doc_size + index_to_buffer_size(HTTP_HEADER_BUFFER_SIZE_INDEX));
 
 #ifndef USE_NEW_EMPTY_MIOBUFFER
   MIOBuffer *buf = new_MIOBuffer(alloc_index);
@@ -5733,9 +5762,7 @@ HttpSM::setup_cache_write_transfer(HttpCacheSM * c_sm,
 void
 HttpSM::setup_100_continue_transfer()
 {
-  int64_t buf_size = HTTP_HEADER_BUFFER_SIZE;
-
-  MIOBuffer *buf = new_MIOBuffer(buffer_size_to_index(buf_size));
+  MIOBuffer *buf = new_MIOBuffer(HTTP_HEADER_BUFFER_SIZE_INDEX);
   IOBufferReader *buf_start = buf->alloc_reader();
 
   // First write the client response header into the buffer
@@ -5835,7 +5862,7 @@ HttpSM::setup_internal_transfer(HttpSMHandler handler_arg)
 
   t_state.source = HttpTransact::SOURCE_INTERNAL;
 
-  int64_t buf_size = HTTP_HEADER_BUFFER_SIZE + (is_msg_buf_present ? t_state.internal_msg_buffer_size : 0);
+  int64_t buf_size = index_to_buffer_size(HTTP_HEADER_BUFFER_SIZE_INDEX) + (is_msg_buf_present ? t_state.internal_msg_buffer_size : 0);
 
   MIOBuffer *buf = new_MIOBuffer(buffer_size_to_index(buf_size));
   IOBufferReader *buf_start = buf->alloc_reader();
@@ -5905,7 +5932,7 @@ HttpSM::find_http_resp_buffer_size(int64_t content_length)
 #ifdef WRITE_AND_TRANSFER
     buf_size = HTTP_HEADER_BUFFER_SIZE + content_length - index_to_buffer_size(HTTP_SERVER_RESP_HDR_BUFFER_INDEX);
 #else
-    buf_size = HTTP_HEADER_BUFFER_SIZE + content_length;
+    buf_size = index_to_buffer_size(HTTP_HEADER_BUFFER_SIZE_INDEX) + content_length;
 #endif
     alloc_index = buffer_size_to_index(buf_size);
   }
@@ -6608,8 +6635,10 @@ HttpSM::update_stats()
     if (t_state.hdr_info.client_response.valid()) {
       status = t_state.hdr_info.client_response.status_get();
     }
-
+    char client_ip[INET6_ADDRSTRLEN];
+    ats_ip_ntop(&t_state.client_info.addr, client_ip, sizeof(client_ip));
     Error("[%" PRId64 "] Slow Request: "
+          "client_ip: %s:%u "
           "url: %s "
           "status: %d "
           "unique id: %s "
@@ -6630,6 +6659,8 @@ HttpSM::update_stats()
           "ua_close: %.3f "
           "sm_finish: %.3f",
           sm_id,
+          client_ip,
+          ats_ip_port_host_order(&t_state.client_info.addr),
           url_string,
           status,
           unique_id_string,

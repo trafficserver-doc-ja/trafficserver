@@ -215,7 +215,6 @@ TS_ARG_ENABLE_VAR([has], [tests])
 AC_SUBST(has_tests)
 AM_CONDITIONAL([BUILD_TESTS], [test 0 -ne $has_tests])
 
-AC_SUBST([ink_with_modules_def],["-DREC_BUILD_MGMT"])
 AC_SUBST([ink_with_modules_local],["-DLOCAL_MANAGER"])
 AC_SUBST([ink_with_modules_process],["-DPROCESS_MANAGER"])
 
@@ -682,13 +681,13 @@ AC_ISC_POSIX
 
 AM_PATH_PYTHON([2.4], [
   dnl action-if-found
-  TS_MAN1_MANPAGES=`$PYTHON $srcdir/doc/conf.py --man-pages --section=1 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
-  TS_MAN3_MANPAGES=`$PYTHON $srcdir/doc/conf.py --man-pages --section=3 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
-  TS_MAN5_MANPAGES=`$PYTHON $srcdir/doc/conf.py --man-pages --section=5 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
-  TS_MAN8_MANPAGES=`$PYTHON $srcdir/doc/conf.py --man-pages --section=8 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
+  TS_MAN1_MANPAGES=`cd $srcdir/doc && $PYTHON manpages.py --section=1 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
+  TS_MAN3_MANPAGES=`cd $srcdir/doc && $PYTHON manpages.py --section=3 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
+  TS_MAN5_MANPAGES=`cd $srcdir/doc && $PYTHON manpages.py --section=5 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
+  TS_MAN8_MANPAGES=`cd $srcdir/doc && $PYTHON manpages.py --section=8 | $AWK '{print "$(BUILDDIR)/man/" $0 }' | tr '\n' ' '`
 
   # If we have python, check if the Sphinx version looks OK.
-  AS_IF(["$PYTHON" "$srcdir/doc/conf.py" --check-version], [
+  AS_IF(["$PYTHON" "$srcdir/doc/checkvers.py" --check-version], [
     sphinx_version_check=yes
   ])
 
@@ -790,9 +789,9 @@ AX_PROG_PERL_MODULES([ExtUtils::MakeMaker], AM_CONDITIONAL([BUILD_PERL_LIB], [tr
                                             AM_CONDITIONAL([BUILD_PERL_LIB], [false])
 )
 
-# Check for GNU-style -On and for Solaris Studio style -xOn.
+# Check for GNU-style -On optimization flags
 AC_MSG_CHECKING([checking whether to auto-set compiler optimization flags])
-has_optimizer_flags=`echo "$CFLAGS $CXXFLAGS" | ${AWK} '$0 !~ /-x?O.?/{print "no"}'`
+has_optimizer_flags=`echo "$CFLAGS $CXXFLAGS" | ${AWK} '$0 !~ /-O.?/{print "no"}'`
 AS_IF([test "x${has_optimizer_flags}" = "xno"],
 	[
 		optimizing_flags='-O3'
@@ -898,19 +897,6 @@ case $host_os_def in
     ;; # freebsd|kfreebsd)
 
   solaris)
-    AS_IF([test "x$ax_cv_c_compiler_vendor" = "xsun"], [
-      # XXX: Solaris Studio support is going away: https://issues.apache.org/jira/browse/TS-1486
-      common_opt="-mt -D__WORDSIZE=64" # FIXME: arch should be detected
-      debug_opt="-g $common_opt"
-      release_opt="-g $common_opt $optimizing_flags"
-      cxx_opt="-library=stlport4"
-      cxx_dbg="+w2"
-      cxx_rel="-erroff"
-
-      AC_DEFINE([_POSIX_PTHREAD_SEMANTICS], 1, [posix thread semantics])
-      AS_IF([test "x$solaris_use_stlport4" != "xyes"], [postdeps_CXX="-library=Crun"])
-    ])
-
     AS_IF([test "x$ax_cv_c_compiler_vendor" = "xgnu"], [
       common_opt="-pipe -Wall"
       debug_opt="-ggdb3 $common_opt"
@@ -988,9 +974,6 @@ if test "x${GCC}" = "xyes"; then
       i?86* | k[5-8]* | pentium* | athlon)
         cpu_architecture="-march=i586"
       ;;
-      *sparc*)
-        cpu_architecture="-mv8"
-      ;;
     esac
   else
     case "$host_cpu" in
@@ -998,13 +981,8 @@ if test "x${GCC}" = "xyes"; then
         # XXX: Any need for 64-bit arch flags?
         # cpu_architecture="-march=native"
       ;;
-      *sparc*)
-        cpu_architecture="-march=ultrasparc"
-      ;;
     esac
   fi
-  # TODO: Add support for other compilers
-  #
 fi
 
 # Overrride detected architecture with the user suplied one
@@ -1822,6 +1800,9 @@ AS_IF([test "x$enable_experimental_plugins" = xyes],
 AM_CONDITIONAL([BUILD_REMAP_STATS_PLUGIN],
   [ test "x$enable_experimental_plugins" = "xyes" -a "x$ac_cv_header_search_h" = "xyes" -a "x$ac_cv_type_struct_hsearch_data" = "xyes" -a "x$ac_cv_func_hcreate_r" = "xyes" -a "x$ac_cv_func_hsearch_r" = "xyes" ])
 
+AM_CONDITIONAL([BUILD_COLLAPSED_CONNECTION_PLUGIN],
+  [ test "x$enable_experimental_plugins" = "xyes" -a "x${enable_collapsed_connection_plugin}" != "xno" ])
+
 #
 # use modular IOCORE
 #
@@ -1865,7 +1846,6 @@ AC_CONFIG_FILES([
   cmd/Makefile
   cmd/traffic_cop/Makefile
   cmd/traffic_line/Makefile
-  cmd/traffic_shell/Makefile
   cmd/traffic_top/Makefile
   doc/Doxyfile
   doc/Makefile
@@ -1933,6 +1913,7 @@ AC_CONFIG_FILES([
   plugins/experimental/balancer/Makefile
   plugins/experimental/buffer_upload/Makefile
   plugins/experimental/channel_stats/Makefile
+  plugins/experimental/collapsed_connection/Makefile
   plugins/experimental/custom_redirect/Makefile
   plugins/experimental/escalate/Makefile
   plugins/experimental/esi/Makefile
@@ -1941,9 +1922,9 @@ AC_CONFIG_FILES([
   plugins/experimental/hipes/Makefile
   plugins/experimental/metalink/Makefile
   plugins/experimental/remap_stats/Makefile
-  plugins/experimental/rfc5861/Makefile
+  plugins/experimental/regex_revalidate/Makefile
   plugins/experimental/s3_auth/Makefile
-  plugins/experimental/spdy/Makefile
+  plugins/experimental/stale_while_revalidate/Makefile
   plugins/experimental/ts_lua/Makefile
   plugins/experimental/url_sig/Makefile
   plugins/experimental/xdebug/Makefile

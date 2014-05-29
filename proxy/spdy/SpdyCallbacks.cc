@@ -22,7 +22,7 @@
  */
 
 #include "SpdyCallbacks.h"
-#include "SpdySM.h"
+#include "SpdyClientSession.h"
 #include <arpa/inet.h>
 
 void
@@ -50,7 +50,7 @@ spdy_callbacks_init(spdylay_session_callbacks *callbacks)
 }
 
 void
-spdy_prepare_status_response(SpdySM *sm, int stream_id, const char *status)
+spdy_prepare_status_response(SpdyClientSession *sm, int stream_id, const char *status)
 {
   SpdyRequest *req = sm->req_map[stream_id];
   string date_str = http_date(time(0));
@@ -85,7 +85,7 @@ spdy_show_data_frame(const char *head_str, spdylay_session * /*session*/, uint8_
   if (!is_debug_tag_set("spdy"))
     return;
 
-  SpdySM *sm = (SpdySM *)user_data;
+  SpdyClientSession *sm = (SpdyClientSession *)user_data;
 
   Debug("spdy", "%s DATA frame (sm_id:%" PRIu64 ", stream_id:%d, flag:%d, length:%d)",
         head_str, sm->sm_id, stream_id, flags, length);
@@ -98,7 +98,7 @@ spdy_show_ctl_frame(const char *head_str, spdylay_session * /*session*/, spdylay
   if (!is_debug_tag_set("spdy"))
     return;
 
-  SpdySM *sm = (SpdySM *)user_data;
+  SpdyClientSession *sm = (SpdyClientSession *)user_data;
   switch (type) {
   case SPDYLAY_SYN_STREAM: {
     spdylay_syn_stream *f = (spdylay_syn_stream *)frame;
@@ -170,10 +170,10 @@ spdy_fetcher_launch(SpdyRequest *req, TSFetchMethod method)
   string url;
   int fetch_flags;
   const sockaddr *client_addr;
-  SpdySM *sm = req->spdy_sm;
+  SpdyClientSession *sm = req->spdy_sm;
 
   url = req->scheme + "://" + req->host + req->path;
-  client_addr = TSNetVConnRemoteAddrGet(sm->net_vc);
+  client_addr = TSNetVConnRemoteAddrGet(reinterpret_cast<TSVConn>(sm->vc));
 
   req->url = url;
   Debug("spdy", "++++Request[%" PRIu64 ":%d] %s", sm->sm_id, req->stream_id, req->url.c_str());
@@ -182,16 +182,10 @@ spdy_fetcher_launch(SpdyRequest *req, TSFetchMethod method)
   // HTTP content should be dechunked before packed into SPDY.
   //
   fetch_flags = TS_FETCH_FLAGS_DECHUNK;
-  req->fetch_sm = TSFetchCreate(sm->contp, method,
+  req->fetch_sm = TSFetchCreate((TSCont)sm, method,
                                 url.c_str(), req->version.c_str(),
                                 client_addr, fetch_flags);
   TSFetchUserDataSet(req->fetch_sm, req);
-
-  //
-  // Set client protocol stack in FetchSM that needed by logging module
-  //
-  NetVConnection *netvc = (NetVConnection *)sm->net_vc;
-  TSFetchClientProtoStackSet(req->fetch_sm, netvc->proto_stack);
 
   //
   // Set header list
@@ -214,7 +208,7 @@ ssize_t
 spdy_send_callback(spdylay_session * /*session*/, const uint8_t *data, size_t length,
                    int /*flags*/, void *user_data)
 {
-  SpdySM  *sm = (SpdySM*)user_data;
+  SpdyClientSession  *sm = (SpdyClientSession*)user_data;
 
   sm->total_size += length;
   TSIOBufferWrite(sm->resp_buffer, data, length);
@@ -232,7 +226,7 @@ spdy_recv_callback(spdylay_session * /*session*/, uint8_t *buf, size_t length,
   TSIOBufferBlock blk, next_blk;
   int64_t already, blk_len, need, wavail;
 
-  SpdySM  *sm = (SpdySM*)user_data;
+  SpdyClientSession  *sm = (SpdyClientSession*)user_data;
 
   already = 0;
   blk = TSIOBufferReaderStart(sm->req_reader);
@@ -256,7 +250,12 @@ spdy_recv_callback(spdylay_session * /*session*/, uint8_t *buf, size_t length,
   }
 
   TSIOBufferReaderConsume(sm->req_reader, already);
-  TSVIOReenable(sm->read_vio);
+
+  // This is a bit of a hack. If we are reading out of the buffer the protocol probe acceptor gave us, then we have not
+  // kicked off our own I/O yet. After consuming this data we will come back and do that.
+  if (sm->read_vio) {
+    TSVIOReenable(sm->read_vio);
+  }
 
   if (!already)
     return SPDYLAY_ERR_WOULDBLOCK;
@@ -265,7 +264,7 @@ spdy_recv_callback(spdylay_session * /*session*/, uint8_t *buf, size_t length,
 }
 
 static void
-spdy_process_syn_stream_frame(SpdySM *sm, SpdyRequest *req)
+spdy_process_syn_stream_frame(SpdyClientSession *sm, SpdyRequest *req)
 {
   // validate request headers
   for(size_t i = 0; i < req->headers.size(); ++i) {
@@ -304,6 +303,10 @@ spdy_process_syn_stream_frame(SpdySM *sm, SpdyRequest *req)
     spdy_fetcher_launch(req, TS_FETCH_METHOD_CONNECT);
   else if (req->method == "DELETE")
     spdy_fetcher_launch(req, TS_FETCH_METHOD_DELETE);
+  else if (req->method == "OPTIONS")
+    spdy_fetcher_launch(req, TS_FETCH_METHOD_OPTIONS);
+  else if (req->method == "TRACE")
+    spdy_fetcher_launch(req, TS_FETCH_METHOD_TRACE);
   else if (req->method == "LAST")
     spdy_fetcher_launch(req, TS_FETCH_METHOD_LAST);
   else
@@ -317,7 +320,7 @@ spdy_on_ctrl_recv_callback(spdylay_session *session, spdylay_frame_type type,
 {
   int         stream_id;
   SpdyRequest *req;
-  SpdySM      *sm = (SpdySM*)user_data;
+  SpdyClientSession      *sm = (SpdyClientSession*)user_data;
 
   spdy_show_ctl_frame("++++RECV", session, type, frame, user_data);
 
@@ -364,7 +367,7 @@ spdy_on_data_chunk_recv_callback(spdylay_session * /*session*/, uint8_t /*flags*
                                  int32_t stream_id, const uint8_t *data,
                                  size_t len, void *user_data)
 {
-  SpdySM *sm = (SpdySM *)user_data;
+  SpdyClientSession *sm = (SpdyClientSession *)user_data;
   SpdyRequest *req = sm->req_map[stream_id];
 
   //
@@ -383,7 +386,7 @@ void
 spdy_on_data_recv_callback(spdylay_session *session, uint8_t flags,
                            int32_t stream_id, int32_t length, void *user_data)
 {
-  SpdySM *sm = (SpdySM *)user_data;
+  SpdyClientSession *sm = (SpdyClientSession *)user_data;
   SpdyRequest *req = sm->req_map[stream_id];
 
   spdy_show_data_frame("++++RECV", session, flags, stream_id, length, user_data);
@@ -454,7 +457,7 @@ void
 spdy_on_data_send_callback(spdylay_session *session, uint8_t flags,
                            int32_t stream_id, int32_t length, void *user_data)
 {
-  SpdySM *sm = (SpdySM *)user_data;
+  SpdyClientSession *sm = (SpdyClientSession *)user_data;
 
   spdy_show_data_frame("----SEND", session, flags, stream_id, length, user_data);
 

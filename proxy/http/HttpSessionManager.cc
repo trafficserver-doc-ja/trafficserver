@@ -43,7 +43,7 @@
 void
 initialize_thread_for_http_sessions(EThread *thread, int /* thread_index ATS_UNUSED */)
 {
-  thread->l1_hash = NEW(new SessionBucket[HSM_LEVEL1_BUCKETS]);
+  thread->l1_hash = new SessionBucket[HSM_LEVEL1_BUCKETS];
   for (int i = 0; i < HSM_LEVEL1_BUCKETS; ++i)
     thread->l1_hash[i].mutex = new_ProxyMutex();
   //thread->l1_hash[i].mutex = thread->mutex;
@@ -180,7 +180,7 @@ HttpSessionManager::match(HttpServerSession* s, sockaddr const* addr, INK_MD5 co
 {
   return
     (TS_SERVER_SESSION_SHARING_MATCH_HOST == sm->t_state.txn_conf->server_session_sharing_match || 
-          (ats_ip_addr_eq(&s->server_ip.sa, addr) && ats_ip_port_cast(addr) == ats_ip_port_cast(addr)))
+          (ats_ip_addr_eq(&s->server_ip.sa, addr) && ats_ip_port_cast(&s->server_ip.sa) == ats_ip_port_cast(addr)))
     && (TS_SERVER_SESSION_SHARING_MATCH_IP == sm->t_state.txn_conf->server_session_sharing_match ||
         s->hostname_hash == hostname_hash)
     ;

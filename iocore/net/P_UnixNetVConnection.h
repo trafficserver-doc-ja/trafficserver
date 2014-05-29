@@ -41,13 +41,6 @@ class UnixNetVConnection;
 class NetHandler;
 struct PollDescriptor;
 
-enum SpdyProbeState
-{
-  SPDY_PROBE_STATE_NONE,
-  SPDY_PROBE_STATE_BEGIN,
-  SPDY_PROBE_STATE_END
-};
-
 TS_INLINE void
 NetVCOptions::reset()
 {
@@ -240,13 +233,11 @@ public:
   ink_hrtime submit_time;
   OOB_callback *oob_ptr;
   bool from_accept_thread;
-  SpdyProbeState probe_state;
-  const char *selected_next_protocol;
 
   int startEvent(int event, Event *e);
   int acceptEvent(int event, Event *e);
   int mainEvent(int event, Event *e);
-  virtual int connectUp(EThread *t);
+  virtual int connectUp(EThread *t, int fd);
   virtual void free(EThread *t);
 
   virtual ink_hrtime get_inactivity_timeout();
