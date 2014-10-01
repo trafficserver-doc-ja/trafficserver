@@ -64,6 +64,7 @@ struct SSLConfigParams : public ConfigInfo
   char *  serverCACertPath;
   char *  configFilePath;
   char *  cipherSuite;
+  char *  client_cipherSuite;
   int     clientCertLevel;
   int     verify_depth;
   int     ssl_session_cache; // SSL_SESSION_CACHE_MODE
@@ -77,9 +78,15 @@ struct SSLConfigParams : public ConfigInfo
   int     clientVerify;
   int     client_verify_depth;
   long    ssl_ctx_options;
+  long    ssl_client_ctx_protocols;
 
   static int ssl_maxrecord;
   static bool ssl_allow_client_renegotiation;
+
+  static bool ssl_ocsp_enabled;
+  static int  ssl_ocsp_cache_timeout;
+  static int  ssl_ocsp_request_timeout;
+  static int  ssl_ocsp_update_period;
 
   static init_ssl_ctx_func init_ssl_ctx_cb;
 

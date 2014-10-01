@@ -46,7 +46,7 @@
    sides, in additional this VC's lock.  Additionally, issues like
    watermarks are very hard to deal with.  Since we try to
    to move data by IOBufferData references the efficiency penalty shouldn't
-   be too bad and if it is a big pentaly, a brave soul can reimplement
+   be too bad and if it is a big penalty, a brave soul can reimplement
    to move the data directly without the intermediate buffer.
 
    Locking is difficult issue for this multi-headed beast.  In each
@@ -54,7 +54,7 @@
    the lock from the state machine using the PluginVC.  The read side
    lock & the write side lock must be the same.  The regular net processor has
    this constraint as well.  In order to handle scheduling of retry events cleanly,
-   we have two event poitners, one for each lock.  sm_lock_retry_event can only
+   we have two event pointers, one for each lock.  sm_lock_retry_event can only
    be changed while holding the using state machine's lock and
    core_lock_retry_event can only be manipulated while holding the PluginVC's
    lock.  On entry to PluginVC::main_handler, we obtain all the locks
@@ -64,7 +64,7 @@
    exclusively in the later parts of the handler and we will
    be free from do_io or reenable calls on the PluginVC.
 
-   The assumption is made (conistant with IO Core spec) that any close,
+   The assumption is made (consistent with IO Core spec) that any close,
    shutdown, reenable, or do_io_{read,write) operation is done by the callee
    while holding the lock for that side of the operation.
 
@@ -84,17 +84,15 @@
 #define EVENT_PTR_CLOSED (void*) 0x2
 
 #define PVC_TYPE    ((vc_type == PLUGIN_VC_ACTIVE) ? "Active" : "Passive")
-#define PVC_ID      (core_obj? core_obj->id : (unsigned)-1)
 
-PluginVC::PluginVC():
-NetVConnection(),
-magic(PLUGIN_VC_MAGIC_ALIVE), vc_type(PLUGIN_VC_UNKNOWN), core_obj(NULL),
-other_side(NULL), read_state(), write_state(),
-need_read_process(false), need_write_process(false),
-closed(false), sm_lock_retry_event(NULL), core_lock_retry_event(NULL),
-deletable(false), reentrancy_count(0), active_timeout(0), active_event(NULL),
-inactive_timeout(0), inactive_timeout_at(0), inactive_event(NULL)
+PluginVC::PluginVC(PluginVCCore *core_obj)
+  : NetVConnection(),magic(PLUGIN_VC_MAGIC_ALIVE), vc_type(PLUGIN_VC_UNKNOWN), core_obj(core_obj),
+    other_side(NULL), read_state(), write_state(), need_read_process(false), need_write_process(false),
+    closed(false), sm_lock_retry_event(NULL), core_lock_retry_event(NULL),
+    deletable(false), reentrancy_count(0), active_timeout(0), active_event(NULL),
+    inactive_timeout(0), inactive_timeout_at(0), inactive_event(NULL), plugin_tag(NULL), plugin_id(0)
 {
+  ink_assert(core_obj != NULL);
   SET_HANDLER(&PluginVC::main_handler);
 }
 
@@ -107,7 +105,7 @@ int
 PluginVC::main_handler(int event, void *data)
 {
 
-  Debug("pvc_event", "[%u] %s: Received event %d", PVC_ID, PVC_TYPE, event);
+  Debug("pvc_event", "[%u] %s: Received event %d", core_obj->id, PVC_TYPE, event);
 
   ink_release_assert(event == EVENT_INTERVAL || event == EVENT_IMMEDIATE);
   ink_release_assert(magic == PLUGIN_VC_MAGIC_ALIVE);
@@ -252,7 +250,7 @@ PluginVC::do_io_read(Continuation * c, int64_t nbytes, MIOBuffer * buf)
   read_state.vio.vc_server = (VConnection *) this;
   read_state.vio.op = VIO::READ;
 
-  Debug("pvc", "[%u] %s: do_io_read for %" PRId64" bytes", PVC_ID, PVC_TYPE, nbytes);
+  Debug("pvc", "[%u] %s: do_io_read for %" PRId64" bytes", core_obj->id, PVC_TYPE, nbytes);
 
   // Since reentrant callbacks are not allowed on from do_io
   //   functions schedule ourselves get on a different stack
@@ -285,7 +283,7 @@ PluginVC::do_io_write(Continuation * c, int64_t nbytes, IOBufferReader * abuffer
   write_state.vio.vc_server = (VConnection *) this;
   write_state.vio.op = VIO::WRITE;
 
-  Debug("pvc", "[%u] %s: do_io_write for %" PRId64" bytes", PVC_ID, PVC_TYPE, nbytes);
+  Debug("pvc", "[%u] %s: do_io_write for %" PRId64" bytes", core_obj->id, PVC_TYPE, nbytes);
 
   // Since reentrant callbacks are not allowed on from do_io
   //   functions schedule ourselves get on a different stack
@@ -303,7 +301,7 @@ PluginVC::reenable(VIO * vio)
   ink_assert(magic == PLUGIN_VC_MAGIC_ALIVE);
   ink_assert(vio->mutex->thread_holding == this_ethread());
 
-  Debug("pvc", "[%u] %s: reenable %s", PVC_ID, PVC_TYPE, (vio->op == VIO::WRITE) ? "Write" : "Read");
+  Debug("pvc", "[%u] %s: reenable %s", core_obj->id, PVC_TYPE, (vio->op == VIO::WRITE) ? "Write" : "Read");
 
   if (vio->op == VIO::WRITE) {
     ink_assert(vio == &write_state.vio);
@@ -324,7 +322,7 @@ PluginVC::reenable_re(VIO * vio)
   ink_assert(magic == PLUGIN_VC_MAGIC_ALIVE);
   ink_assert(vio->mutex->thread_holding == this_ethread());
 
-  Debug("pvc", "[%u] %s: reenable_re %s", PVC_ID, PVC_TYPE, (vio->op == VIO::WRITE) ? "Write" : "Read");
+  Debug("pvc", "[%u] %s: reenable_re %s", core_obj->id, PVC_TYPE, (vio->op == VIO::WRITE) ? "Write" : "Read");
 
   MUTEX_TRY_LOCK(lock, this->mutex, this_ethread());
   if (!lock) {
@@ -365,7 +363,7 @@ PluginVC::do_io_close(int /* flag ATS_UNUSED */)
   ink_assert(closed == false);
   ink_assert(magic == PLUGIN_VC_MAGIC_ALIVE);
 
-  Debug("pvc", "[%u] %s: do_io_close", PVC_ID, PVC_TYPE);
+  Debug("pvc", "[%u] %s: do_io_close", core_obj->id, PVC_TYPE);
 
   if (reentrancy_count > 0) {
     // Do nothing since dealloacting ourselves
@@ -494,14 +492,14 @@ PluginVC::process_write_side(bool other_side_call)
   ink_assert(my_ethread != NULL);
   MUTEX_TRY_LOCK(lock, write_state.vio.mutex, my_ethread);
   if (!lock) {
-    Debug("pvc_event", "[%u] %s: process_write_side lock miss, retrying", PVC_ID, PVC_TYPE);
+    Debug("pvc_event", "[%u] %s: process_write_side lock miss, retrying", core_obj->id, PVC_TYPE);
 
     need_write_process = true;
     setup_event_cb(PVC_LOCK_RETRY_TIME, &core_lock_retry_event);
     return;
   }
 
-  Debug("pvc", "[%u] %s: process_write_side", PVC_ID, PVC_TYPE);
+  Debug("pvc", "[%u] %s: process_write_side", core_obj->id, PVC_TYPE);
   need_write_process = false;
 
 
@@ -515,7 +513,7 @@ PluginVC::process_write_side(bool other_side_call)
   int64_t bytes_avail = reader->read_avail();
   int64_t act_on = MIN(bytes_avail, ntodo);
 
-  Debug("pvc", "[%u] %s: process_write_side; act_on %" PRId64"", PVC_ID, PVC_TYPE, act_on);
+  Debug("pvc", "[%u] %s: process_write_side; act_on %" PRId64"", core_obj->id, PVC_TYPE, act_on);
 
   if (other_side->closed || other_side->read_state.shutdown) {
     write_state.vio._cont->handleEvent(VC_EVENT_ERROR, &write_state.vio);
@@ -535,7 +533,7 @@ PluginVC::process_write_side(bool other_side_call)
   //
   int64_t buf_space = PVC_DEFAULT_MAX_BYTES - core_buffer->max_read_avail();
   if (buf_space <= 0) {
-    Debug("pvc", "[%u] %s: process_write_side no buffer space", PVC_ID, PVC_TYPE);
+    Debug("pvc", "[%u] %s: process_write_side no buffer space", core_obj->id, PVC_TYPE);
     return;
   }
   act_on = MIN(act_on, buf_space);
@@ -545,13 +543,13 @@ PluginVC::process_write_side(bool other_side_call)
     // Couldn't actually get the buffer space.  This only
     //   happens on small transfers with the above
     //   PVC_DEFAULT_MAX_BYTES factor doesn't apply
-    Debug("pvc", "[%u] %s: process_write_side out of buffer space", PVC_ID, PVC_TYPE);
+    Debug("pvc", "[%u] %s: process_write_side out of buffer space", core_obj->id, PVC_TYPE);
     return;
   }
 
   write_state.vio.ndone += added;
 
-  Debug("pvc", "[%u] %s: process_write_side; added %" PRId64"", PVC_ID, PVC_TYPE, added);
+  Debug("pvc", "[%u] %s: process_write_side; added %" PRId64"", core_obj->id, PVC_TYPE, added);
 
   if (write_state.vio.ntodo() == 0) {
     write_state.vio._cont->handleEvent(VC_EVENT_WRITE_COMPLETE, &write_state.vio);
@@ -611,14 +609,14 @@ PluginVC::process_read_side(bool other_side_call)
   ink_assert(my_ethread != NULL);
   MUTEX_TRY_LOCK(lock, read_state.vio.mutex, my_ethread);
   if (!lock) {
-    Debug("pvc_event", "[%u] %s: process_read_side lock miss, retrying", PVC_ID, PVC_TYPE);
+    Debug("pvc_event", "[%u] %s: process_read_side lock miss, retrying", core_obj->id, PVC_TYPE);
 
     need_read_process = true;
     setup_event_cb(PVC_LOCK_RETRY_TIME, &core_lock_retry_event);
     return;
   }
 
-  Debug("pvc", "[%u] %s: process_read_side", PVC_ID, PVC_TYPE);
+  Debug("pvc", "[%u] %s: process_read_side", core_obj->id, PVC_TYPE);
   need_read_process = false;
 
   // Check the state of our read buffer as well as ntodo
@@ -630,7 +628,7 @@ PluginVC::process_read_side(bool other_side_call)
   int64_t bytes_avail = core_reader->read_avail();
   int64_t act_on = MIN(bytes_avail, ntodo);
 
-  Debug("pvc", "[%u] %s: process_read_side; act_on %" PRId64"", PVC_ID, PVC_TYPE, act_on);
+  Debug("pvc", "[%u] %s: process_read_side; act_on %" PRId64"", core_obj->id, PVC_TYPE, act_on);
 
   if (act_on <= 0) {
     if (other_side->closed || other_side->write_state.shutdown) {
@@ -647,7 +645,7 @@ PluginVC::process_read_side(bool other_side_call)
   water_mark = MAX(water_mark, PVC_DEFAULT_MAX_BYTES);
   int64_t buf_space = water_mark - output_buffer->max_read_avail();
   if (buf_space <= 0) {
-    Debug("pvc", "[%u] %s: process_read_side no buffer space", PVC_ID, PVC_TYPE);
+    Debug("pvc", "[%u] %s: process_read_side no buffer space", core_obj->id, PVC_TYPE);
     return;
   }
   act_on = MIN(act_on, buf_space);
@@ -657,13 +655,13 @@ PluginVC::process_read_side(bool other_side_call)
     // Couldn't actually get the buffer space.  This only
     //   happens on small transfers with the above
     //   PVC_DEFAULT_MAX_BYTES factor doesn't apply
-    Debug("pvc", "[%u] %s: process_read_side out of buffer space", PVC_ID, PVC_TYPE);
+    Debug("pvc", "[%u] %s: process_read_side out of buffer space", core_obj->id, PVC_TYPE);
     return;
   }
 
   read_state.vio.ndone += added;
 
-  Debug("pvc", "[%u] %s: process_read_side; added %" PRId64"", PVC_ID, PVC_TYPE, added);
+  Debug("pvc", "[%u] %s: process_read_side; added %" PRId64"", core_obj->id, PVC_TYPE, added);
 
   if (read_state.vio.ntodo() == 0) {
     read_state.vio._cont->handleEvent(VC_EVENT_READ_COMPLETE, &read_state.vio);
@@ -697,7 +695,7 @@ PluginVC::process_close()
 
   ink_assert(magic == PLUGIN_VC_MAGIC_ALIVE);
 
-  Debug("pvc", "[%u] %s: process_close", PVC_ID, PVC_TYPE);
+  Debug("pvc", "[%u] %s: process_close", core_obj->id, PVC_TYPE);
 
   if (!deletable) {
     deletable = true;

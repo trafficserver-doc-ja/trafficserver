@@ -25,24 +25,53 @@
 #include "I_Machine.h"
 #include "ProtocolProbeSessionAccept.h"
 #include "Error.h"
+#include "http2/HTTP2.h"
+
+static bool
+proto_is_spdy(IOBufferReader * reader)
+{
+  // SPDY clients have to start by sending a control frame (the high bit is set). Let's assume
+  // that no other protocol could possibly ever set this bit!
+  return ((uint8_t)(*reader)[0]) == 0x80u;
+}
+
+static bool
+proto_is_http2(IOBufferReader * reader)
+{
+  char buf[HTTP2_CONNECTION_PREFACE_LEN];
+  char * end;
+  ptrdiff_t nbytes;
+
+  end = reader->memcpy(buf, sizeof(buf), 0 /* offset */);
+  nbytes = end - buf;
+
+  // Client must send at least 4 bytes to get a reasonable match.
+  if (nbytes < 4) {
+    return false;
+  }
+
+  ink_assert(nbytes <= (int64_t)HTTP2_CONNECTION_PREFACE_LEN);
+  return memcmp(HTTP2_CONNECTION_PREFACE, buf, nbytes) == 0;
+}
 
 struct ProtocolProbeTrampoline : public Continuation, public ProtocolProbeSessionAcceptEnums
 {
   static const size_t minimum_read_size = 1;
   static const unsigned buffer_size_index = CLIENT_CONNECTION_FIRST_READ_BUFFER_SIZE_INDEX;
+  IOBufferReader *  reader;
 
   explicit
   ProtocolProbeTrampoline(const ProtocolProbeSessionAccept * probe, ProxyMutex * mutex)
     : Continuation(mutex), probeParent(probe)
   {
     this->iobuf = new_MIOBuffer(buffer_size_index);
+    reader = iobuf->alloc_reader(); // reader must be allocated only on a new MIOBuffer.
     SET_HANDLER(&ProtocolProbeTrampoline::ioCompletionEvent);
   }
 
   int ioCompletionEvent(int event, void * edata)
   {
     VIO *             vio;
-    IOBufferReader *  reader;
     NetVConnection *  netvc;
     ProtoGroupKey  key = N_PROTO_GROUPS; // use this as an invalid value.
 
@@ -64,7 +93,6 @@ struct ProtocolProbeTrampoline : public Continuation, public ProtocolProbeSessio
       return EVENT_ERROR;
     }
 
-    reader = iobuf->alloc_reader();
     ink_assert(netvc != NULL);
 
     if (!reader->is_read_avail_more_than(minimum_read_size - 1)) {
@@ -75,8 +103,10 @@ struct ProtocolProbeTrampoline : public Continuation, public ProtocolProbeSessio
 
     // SPDY clients have to start by sending a control frame (the high bit is set). Let's assume
     // that no other protocol could possibly ever set this bit!
-    if ((uint8_t)(*reader->start()) == 0x80u) {
+    if (proto_is_spdy(reader)) {
       key = PROTO_SPDY;
+    } else if (proto_is_http2(reader)) {
+      key = PROTO_HTTP2;
     } else {
       key = PROTO_HTTP;
     }

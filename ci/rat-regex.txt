@@ -25,7 +25,7 @@ stamp-h1
 .gitmodules
 .indent.pro
 .vimrc
-Doxyfile.*
+Doxyfile
 CHANGES
 LAYOUT
 README.*$
@@ -47,3 +47,8 @@ port\.h
 luajit
 diags.log
 pm_to_blib
+MurmurHash3.cc
+MurmurHash3.h
+^ck$
+HashFNV.cc
+HashSip.cc

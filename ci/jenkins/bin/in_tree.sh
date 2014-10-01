@@ -16,14 +16,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-source /home/jenkins/bin/environment.sh
+# This does intentionally not run the regressions, it's primarily a "build" test
 
-if test "${JOB_NAME#*type=in_tree}" != "${JOB_NAME}"; then
-    cd "${WORKSPACE}/src_in-tree"
+# Test if we should enable CPPAPI (only 5.0 and later for now)
+enable_cppapi="--enable-cppapi"
+test "${JOB_NAME#*-4.2.x}" != "${JOB_NAME}" && enable_cppapi=""
 
-    # Just use the configure from the snapshot.sh
-    ${ATS_MAKE} -j4
-    ${ATS_MAKE} check
+cd "${WORKSPACE}/src"
 
-    ${ATS_MAKE} clean
-fi
+autoreconf -fi
+./configure \
+    --enable-ccache \
+    --enable-werror \
+    --enable-experimental-plugins \
+    ${enable_cppapi} \
+    --enable-example-plugins \
+    --enable-test-tools \
+    CORES=2
+
+${ATS_MAKE} -j5 V=1
+${ATS_MAKE} check VERBOSE=Y
+${ATS_MAKE} clean

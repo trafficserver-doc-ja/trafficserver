@@ -31,9 +31,10 @@
 #include "I_Machine.h"
 
 bool
-HttpTransactHeaders::is_method_cacheable(int method)
+HttpTransactHeaders::is_method_cacheable(const HttpConfigParams *http_config_param, const int method)
 {
-  return (method == HTTP_WKSIDX_GET || method == HTTP_WKSIDX_HEAD);
+  return (method == HTTP_WKSIDX_GET || method == HTTP_WKSIDX_HEAD ||
+          (http_config_param->cache_post_method == 1 && method == HTTP_WKSIDX_POST));
 }
 
 
@@ -651,76 +652,10 @@ HttpTransactHeaders::generate_and_set_squid_codes(HTTPHdr *header,
         hit_miss_code, log_code, hier_code);
   squid_codes->log_code = log_code;
   squid_codes->hier_code = hier_code;
-
-  if (hit_miss_code != SQUID_MISS_NONE) {
-    squid_codes->hit_miss_code = hit_miss_code;
-  } else {
-    if (squid_codes->hit_miss_code == SQUID_MISS_NONE) {
-      squid_codes->hit_miss_code = hit_miss_code;
-    } else {
-      hit_miss_code = squid_codes->hit_miss_code;
-    }
-  }
+  squid_codes->hit_miss_code = hit_miss_code;
 }
 
-
-void
-HttpTransactHeaders::handle_conditional_headers(HttpTransact::CacheLookupInfo *cache_info, HTTPHdr *header)
-{
-  if (cache_info->action == HttpTransact::CACHE_DO_UPDATE) {
-    HTTPHdr *c_response = cache_info->object_read->response_get();
-
-    // wouldn't be updating cache for range requests (would be writing)
-    uint64_t mask = (MIME_PRESENCE_RANGE | MIME_PRESENCE_IF_RANGE);
-    ink_release_assert(header->presence(mask) == mask);
-
-    /*
-     * Conditional Headers
-     *  We use the if-modified-since and if-none-match headers in conjunction
-     * whenever an etag and last-modified time were supplied in the original
-     * response.
-     *
-     *  If no last-modified time was sent we use the date value
-     *
-     *  It is safe to use both the etag revalidation and last-modified
-     * revalidation together since 1.1 servers will user the etags correctly
-     * and 1.0 servers will ignore them, using instead the weaker validator.
-     */
-
-    /*
-     *  Here we override whatever modified since time might have been
-     * sent with the client. If there comes a time when the client(s) are
-     * not using a given cache primarily then we may want to create a
-     * special optimized path for this case.
-     */
-    if (c_response->presence(MIME_PRESENCE_LAST_MODIFIED)) {
-      header->set_if_modified_since(c_response->get_last_modified());
-    }
-
-    /*
-     * ETags
-     *  If-None-Match has the semantics of If-Modified-Since for opaque
-     * etag token.
-     */
-
-    MIMEField *old_field;
-    old_field = c_response->field_find(MIME_FIELD_ETAG, MIME_LEN_ETAG);
-    if (old_field) {
-      MIMEField *new_field;
-
-      new_field = header->field_find(MIME_FIELD_ETAG, MIME_LEN_ETAG);
-      if (new_field == NULL) {
-        new_field = header->field_create(MIME_FIELD_ETAG, MIME_LEN_ETAG);
-        header->field_attach(new_field);
-      }
-
-      int len;
-      const char *str = old_field->value_get(&len);
-      header->field_value_set(new_field, str, len);
-    }
-  }
-}
-
+#include "HttpDebugNames.h"
 
 void
 HttpTransactHeaders::insert_warning_header(HttpConfigParams *http_config_param, HTTPHdr *header, HTTPWarningCode code,
@@ -1031,20 +966,20 @@ HttpTransactHeaders::remove_host_name_from_url(HTTPHdr *outgoing_request)
 
 
 void
-HttpTransactHeaders::add_global_user_agent_header_to_request(HttpConfigParams *http_config_param, HTTPHdr *header)
+HttpTransactHeaders::add_global_user_agent_header_to_request(OverridableHttpConfigParams *http_txn_conf, HTTPHdr *header)
 {
-  if (http_config_param->global_user_agent_header) {
+  if (http_txn_conf->global_user_agent_header) {
     MIMEField *ua_field;
 
-    Debug("http_trans", "Adding User-Agent: %s", http_config_param->global_user_agent_header);
+    Debug("http_trans", "Adding User-Agent: %s", http_txn_conf->global_user_agent_header);
     if ((ua_field = header->field_find(MIME_FIELD_USER_AGENT, MIME_LEN_USER_AGENT)) == NULL) {
       if (likely((ua_field = header->field_create(MIME_FIELD_USER_AGENT, MIME_LEN_USER_AGENT)) != NULL))
         header->field_attach(ua_field);
     }
     // This will remove any old string (free it), and set our User-Agent.
     if (likely(ua_field))
-      header->field_value_set(ua_field, http_config_param->global_user_agent_header,
-                              http_config_param->global_user_agent_header_size);
+      header->field_value_set(ua_field, http_txn_conf->global_user_agent_header,
+                              http_txn_conf->global_user_agent_header_size);
   }
 }
 

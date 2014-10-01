@@ -31,7 +31,6 @@
 #define enable_read(_vc) (_vc)->read.enabled = 1
 #define enable_write(_vc) (_vc)->write.enabled = 1
 
-typedef struct iovec IOVec;
 #ifndef UIO_MAXIOV
 #define NET_MAX_IOV 16          // UIO_MAXIOV shall be at least 16 1003.1g (5.4.1.1)
 #else
@@ -267,7 +266,7 @@ read_from_net(NetHandler *nh, UnixNetVConnection *vc, EThread *thread)
       }
       NET_DEBUG_COUNT_DYN_STAT(net_calls_to_read_stat, 1);
       total_read += rattempted;
-    } while (r == rattempted && total_read < toread);
+    } while (rattempted && r == rattempted && total_read < toread);
 
     // if we have already moved some bytes successfully, summarize in r
     if (total_read != rattempted) {
@@ -385,7 +384,9 @@ write_to_net_io(NetHandler *nh, UnixNetVConnection *vc, EThread *thread)
       nh->read_ready_list.remove(vc);
       vc->write.triggered = 0;
       nh->write_ready_list.remove(vc);
-      if (!(ret == SSL_HANDSHAKE_WANT_READ || ret == SSL_HANDSHAKE_WANT_ACCEPT))
+      if (ret == SSL_HANDSHAKE_WANT_READ || ret == SSL_HANDSHAKE_WANT_ACCEPT)
+        read_reschedule(nh, vc);
+      else
         write_reschedule(nh, vc);
     } else if (ret == EVENT_DONE) {
       vc->write.triggered = 1;
@@ -475,6 +476,8 @@ write_to_net_io(NetHandler *nh, UnixNetVConnection *vc, EThread *thread)
     write_signal_error(nh, vc, (int)-r);
     return;
   } else {
+    int wbe_event = vc->write_buffer_empty_event; // save so we can clear if needed.
+
     NET_SUM_DYN_STAT(net_write_bytes_stat, r);
 
     // Remove data from the buffer and signal continuation.
@@ -483,12 +486,21 @@ write_to_net_io(NetHandler *nh, UnixNetVConnection *vc, EThread *thread)
     ink_assert(buf.reader()->read_avail() >= 0);
     s->vio.ndone += r;
 
+    // If the empty write buffer trap is set, clear it.
+    if (!(buf.reader()->is_read_avail_more_than(0)))
+      vc->write_buffer_empty_event = 0;
+
     net_activity(vc, thread);
     // If there are no more bytes to write, signal write complete,
     ink_assert(ntodo >= 0);
     if (s->vio.ntodo() <= 0) {
       write_signal_done(VC_EVENT_WRITE_COMPLETE, nh, vc);
       return;
+    } else if (signalled && (wbe_event != vc->write_buffer_empty_event)) {
+      // @a signalled means we won't send an event, and the event values differing means we
+      // had a write buffer trap and cleared it, so we need to send it now.
+      if (write_signal_and_update(wbe_event, vc) != EVENT_CONT)
+        return;
     } else if (!signalled) {
       if (write_signal_and_update(VC_EVENT_WRITE_READY, vc) != EVENT_CONT) {
         return;
@@ -1176,6 +1188,7 @@ UnixNetVConnection::free(EThread *t)
   action_.mutex.clear();
   got_remote_addr = 0;
   got_local_addr = 0;
+  attributes = 0;
   read.vio.mutex.clear();
   write.vio.mutex.clear();
   flags = 0;

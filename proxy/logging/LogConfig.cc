@@ -1616,7 +1616,7 @@ static char xml_config_buffer[] = "<LogFilter> \
 void
 LogConfig::read_xml_log_config(int from_memory)
 {
-  xptr<char> config_path;
+  ats_scoped_str config_path;
 
   if (!from_memory) {
     if (xml_config_file == NULL) {
@@ -1649,6 +1649,7 @@ LogConfig::read_xml_log_config(int from_memory)
 
     if (pipe(filedes) != 0) {
       Note("xml parsing: Error in Opening a pipe");
+      ats_free(ptr);
       return;
     }
 
@@ -1927,8 +1928,9 @@ LogConfig::read_xml_log_config(int from_memory)
         break;
 
       case LogField::IP:
-        Warning("Internal error: IP filters not yet supported cannot create filter %s.", filter_name);
-        continue;
+
+        filter = new LogFilterIP(filter_name, logfield, act, oper, val_str);
+        break;
 
       default:
 
@@ -2223,7 +2225,7 @@ LogConfig::read_xml_log_config(int from_memory)
 char **
 LogConfig::read_log_hosts_file(size_t * num_hosts)
 {
-  xptr<char> config_path(Layout::get()->relative_to(Layout::get()->sysconfdir, hosts_config_file));
+  ats_scoped_str config_path(Layout::get()->relative_to(Layout::get()->sysconfdir, hosts_config_file));
   char line[LOG_MAX_FORMAT_LINE];
   char **hosts = NULL;
 

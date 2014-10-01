@@ -15,6 +15,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Implement the classes for the various types of hash keys we support.
@@ -22,8 +23,14 @@
 #ifndef __LULU_H__
 #define __LULU_H__ 1
 
+#include <string>
+
 #include "ink_defs.h"
 #include "ink_platform.h"
+
+std::string getIP(sockaddr const* s_sockaddr);
+char* getIP(sockaddr const* s_sockaddr, char res[INET6_ADDRSTRLEN]);
+
 
 // Memory barriers
 #if defined(__i386__)
@@ -46,6 +53,14 @@
 #define mb()  __asm__ __volatile__ ( "sync" : : : "memory")
 #define rmb() __asm__ __volatile__ ( "sync" : : : "memory")
 #define wmb() __asm__ __volatile__ ( "" : : : "memory")
+#elif defined(__powerpc64__)
+#define mb()   __asm__ __volatile__ ("sync" : : : "memory")
+#define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
+#define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
+#elif defined(__aarch64__)
+#define mb()  __asm__ __volatile__ ( "dsb sy" : : : "memory")
+#define rmb() __asm__ __volatile__ ( "dsb ld" : : : "memory")
+#define wmb() __asm__ __volatile__ ( "dsb st" : : : "memory")
 #else
 #error "Define barriers"
 #endif

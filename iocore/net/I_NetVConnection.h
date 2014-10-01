@@ -159,6 +159,10 @@ struct NetVCOptions {
 
   EventType etype;
 
+  /** Server name to use for SNI data on an outbound connection.
+   */
+  ats_scoped_str sni_servername;
+
   /// Reset all values to defaults.
   void reset();
 
@@ -169,11 +173,44 @@ struct NetVCOptions {
     reset();
   }
 
+  ~NetVCOptions() {
+  }
+
+  /** Set the SNI server name.
+      A local copy is made of @a name.
+  */
+  self& set_sni_servername(const char * name, size_t len) {
+    IpEndpoint ip;
+
+    // Literal IPv4 and IPv6 addresses are not permitted in "HostName".(rfc6066#section-3)
+    if (ats_ip_pton(ts::ConstBuffer(name, len), &ip) != 0) {
+      sni_servername = ats_strndup(name, len);
+    } else {
+      sni_servername = NULL;
+    }
+    return *this;
+  }
+
+  self& operator=(self const& that) {
+    if (&that != this) {
+      sni_servername = NULL; // release any current name.
+      memcpy(this, &that, sizeof(self));
+      if (that.sni_servername) {
+	sni_servername.release(); // otherwise we'll free the source string.
+        this->sni_servername = ats_strdup(that.sni_servername);
+      }
+    }
+    return *this;
+  }
+
   /// @name Debugging
   //@{
   /// Convert @a s to its string equivalent.
   static char const* toString(addr_bind_style s);
   //@}
+
+private:
+  NetVCOptions(const NetVCOptions&);
 };
 
 /**
@@ -397,6 +434,17 @@ public:
   /** @return current inactivity_timeout value in nanosecs */
   virtual ink_hrtime get_inactivity_timeout() = 0;
 
+  /** Force an @a event if a write operation empties the write buffer.
+
+      This event will be sent to the VIO, the same place as other IO events.
+      Use an @a event value of 0 to cancel the trap.
+
+      The event is sent only the next time the write buffer is emptied, not
+      every future time. The event is sent only if otherwise no event would
+      be generated.
+   */
+  virtual void trapWriteBufferEmpty(int event = VC_EVENT_WRITE_READY);
+
   /** Returns local sockaddr storage. */
   sockaddr const* get_local_addr();
 
@@ -498,6 +546,8 @@ protected:
   bool is_internal_request;
   /// Set if this connection is transparent.
   bool is_transparent;
+  /// Set if the next write IO that empties the write buffer should generate an event.
+  int write_buffer_empty_event;
 };
 
 inline
@@ -508,10 +558,17 @@ NetVConnection::NetVConnection():
   got_local_addr(0),
   got_remote_addr(0),
   is_internal_request(false),
-  is_transparent(false)
+  is_transparent(false),
+  write_buffer_empty_event(0)
 {
   ink_zero(local_addr);
   ink_zero(remote_addr);
+}
+
+inline void
+NetVConnection::trapWriteBufferEmpty(int event)
+{
+  write_buffer_empty_event = event;
 }
 
 #endif

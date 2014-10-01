@@ -215,7 +215,6 @@ ChunkedHandler::transfer_bytes()
 
   while (bytes_left > 0) {
     block_read_avail = chunked_reader->block_read_avail();
-    moved = 0;
 
     to_move = MIN(bytes_left, block_read_avail);
     if (to_move <= 0)
@@ -796,7 +795,6 @@ HttpTunnel::producer_run(HttpTunnelProducer * p)
 
   IOBufferReader *chunked_buffer_start = NULL, *dechunked_buffer_start = NULL;
   if (p->do_chunking || p->do_dechunking || p->do_chunked_passthru) {
-    producer_n = (consumer_n = INT64_MAX);
     p->chunked_handler.init(p->buffer_start, p);
 
     // Copy the header into the chunked/dechunked buffers.
@@ -893,6 +891,21 @@ HttpTunnel::producer_run(HttpTunnelProducer * p)
       c->write_vio = NULL;
       consumer_handler(VC_EVENT_WRITE_COMPLETE, c);
     } else {
+      // In the client half close case, all the data that will be sent
+      // from the client is already in the buffer.  Go ahead and set
+      // the amount to read since we know it.  We will forward the FIN
+      // to the server on VC_EVENT_WRITE_COMPLETE.
+      if (p->vc_type == HT_HTTP_CLIENT) {
+        HttpClientSession* ua_vc = static_cast<HttpClientSession*>(p->vc);
+        if (ua_vc->get_half_close_flag() || producer_n == 0) {
+          // Force the half close to make sure we send the FIN immediately after we finish writing.
+          ua_vc->set_half_close_flag();
+          c_write = c->buffer_reader->read_avail();
+          if (producer_n != 0) {
+            p->alive = false;
+          }
+        }
+      }
       c->write_vio = c->vc->do_io_write(this, c_write, c->buffer_reader);
       ink_assert(c_write > 0);
     }
@@ -955,6 +968,7 @@ HttpTunnel::producer_run(HttpTunnelProducer * p)
     }
   }
 
+
   if (p->alive) {
     ink_assert(producer_n >= 0);
 
@@ -980,6 +994,7 @@ HttpTunnel::producer_run(HttpTunnelProducer * p)
   // that it doesn't act like a buffer guard
   p->read_buffer->dealloc_reader(p->buffer_start);
   p->buffer_start = NULL;
+
 }
 
 int
@@ -1107,7 +1122,6 @@ bool HttpTunnel::producer_handler(int event, HttpTunnelProducer * p)
       (event == VC_EVENT_READ_READY || event == VC_EVENT_READ_COMPLETE) && (p->vc_type == HT_HTTP_CLIENT)) {
     Debug("http_redirect", "[HttpTunnel::producer_handler] [%s %s]", p->name, HttpDebugNames::get_event_name(event));
 
-    c = p->consumer_list.head;
     if ((postbuf->postdata_copy_buffer_start->read_avail() + postbuf->ua_buffer_reader->read_avail())
         > HttpConfig::m_master.post_copy_size) {
       Debug("http_redirect",
@@ -1244,6 +1258,15 @@ HttpTunnel::consumer_reenable(HttpTunnelConsumer* c)
           srcp->read_vio->reenable();
           // Kick source producer to get flow ... well, flowing.
           this->producer_handler(VC_EVENT_READ_READY, srcp);
+        } else {
+          // We can stall for small thresholds on network sinks because this event happens
+          // before the actual socket write. So we trap for the buffer becoming empty to
+          // make sure we get an event to unthrottle after the write.
+          if (HT_HTTP_CLIENT == c->vc_type) {
+            NetVConnection* netvc = dynamic_cast<NetVConnection*>(c->write_vio->vc_server);
+            if (netvc) // really, this should always be true.
+              netvc->trapWriteBufferEmpty();
+          }
         }
       }
       p->read_vio->reenable();

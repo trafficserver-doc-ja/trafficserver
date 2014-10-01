@@ -164,13 +164,6 @@ static volatile int delay_listen_for_cache_p = 0;
 
 AppVersionInfo appVersionInfo;  // Build info for this application
 
-const Version version = {
-  {CACHE_DB_MAJOR_VERSION, CACHE_DB_MINOR_VERSION},     // cacheDB
-  {CACHE_DIR_MAJOR_VERSION, CACHE_DIR_MINOR_VERSION},   // cacheDir
-  {CLUSTER_MAJOR_VERSION, CLUSTER_MINOR_VERSION},       // current clustering
-  {MIN_CLUSTER_MAJOR_VERSION, MIN_CLUSTER_MINOR_VERSION},       // min clustering
-};
-
 static const ArgumentDescription argument_descriptions[] = {
   {"net_threads", 'n', "Number of Net Threads", "I", &num_of_net_threads, "PROXY_NET_THREADS", NULL},
   {"cluster_threads", 'Z', "Number of Cluster Threads", "I", &num_of_cluster_threads, "PROXY_CLUSTER_THREADS", NULL},
@@ -248,8 +241,8 @@ init_system()
 static void
 check_lockfile()
 {
-  xptr<char> rundir(RecConfigReadRuntimeDir());
-  xptr<char> lockfile;
+  ats_scoped_str rundir(RecConfigReadRuntimeDir());
+  ats_scoped_str lockfile;
   pid_t holding_pid;
   int err;
 
@@ -278,7 +271,7 @@ check_lockfile()
 static void
 check_config_directories(void)
 {
-  xptr<char> rundir(RecConfigReadRuntimeDir());
+  ats_scoped_str rundir(RecConfigReadRuntimeDir());
 
   if (access(Layout::get()->sysconfdir, R_OK) == -1) {
     fprintf(stderr,"unable to access() config dir '%s': %d, %s\n",
@@ -396,6 +389,18 @@ CB_After_Cache_Init()
   int start;
 
   start = ink_atomic_swap(&delay_listen_for_cache_p, -1);
+
+  // Check for cache BC after the cache is initialized and before listen, if possible.
+  if (cacheProcessor.min_stripe_version.ink_major < CACHE_DB_MAJOR_VERSION) {
+    // Versions before 23 need the MMH hash.
+    if (cacheProcessor.min_stripe_version.ink_major < 23) {
+      Debug("cache_bc", "Pre 4.0 stripe (cache version %d.%d) found, forcing MMH hash for cache URLs"
+        , cacheProcessor.min_stripe_version.ink_major, cacheProcessor.min_stripe_version.ink_minor
+        );
+      URLHashContext::Setting = URLHashContext::MMH;
+    }
+  }
+
   if (1 == start) {
     Debug("http_listen", "Delayed listen enable, cache initialization finished");
     start_HttpProxyServer();
@@ -478,27 +483,16 @@ cmd_check_internal(char * /* cmd ATS_UNUSED */, bool fix = false)
   const char *n = fix ? "REPAIR" : "CHECK";
 
   printf("%s\n\n", n);
-  int res = 0;
 
   hostdb_current_interval = (ink_get_based_hrtime() / HRTIME_MINUTE);
 
-//#ifndef INK_NO_ACC
-//  acc.clear_cache();
-//#endif
-
-  const char *err = NULL;
-  theStore.delete_all();
-  if ((err = theStore.read_config())) {
-    printf("%s, %s failed\n", err, n);
-    return CMD_FAILED;
-  }
   printf("Host Database\n");
   HostDBCache hd;
   if (hd.start(fix) < 0) {
     printf("\tunable to open Host Database, %s failed\n", n);
     return CMD_OK;
   }
-  res = hd.check("hostdb.config", fix) < 0 || res;
+  hd.check("hostdb.config", fix);
   hd.reset();
 
   if (cacheProcessor.start() < 0) {
@@ -535,21 +529,12 @@ cmd_clear(char *cmd)
   bool c_cache = !strcmp(cmd, "clear_cache");
 
   if (c_all || c_hdb) {
-    xptr<char> rundir(RecConfigReadRuntimeDir());
-    xptr<char> config(Layout::relative_to(rundir, "hostdb.config"));
+    ats_scoped_str rundir(RecConfigReadRuntimeDir());
+    ats_scoped_str config(Layout::relative_to(rundir, "hostdb.config"));
 
     Note("Clearing HostDB Configuration");
     if (unlink(config) < 0)
       Note("unable to unlink %s", (const char *)config);
-  }
-
-  if (c_all || c_cache) {
-    const char *err = NULL;
-    theStore.delete_all();
-    if ((err = theStore.read_config())) {
-      printf("%s, CLEAR failed\n", err);
-      return CMD_FAILED;
-    }
   }
 
   if (c_hdb || c_all) {
@@ -792,53 +777,54 @@ init_core_size()
 static void
 adjust_sys_settings(void)
 {
-#if defined(linux)
   struct rlimit lim;
-  int mmap_max = -1;
   int fds_throttle = -1;
-  float file_max_pct = 0.9;
-  FILE *fd;
+  rlim_t maxfiles;
 
   // TODO: I think we might be able to get rid of this?
+#if defined(ATS_MMAP_MAX)
+  int mmap_max = -1;
+
   REC_ReadConfigInteger(mmap_max, "proxy.config.system.mmap_max");
   if (mmap_max >= 0)
     ats_mallopt(ATS_MMAP_MAX, mmap_max);
+#endif
 
-  if ((fd = fopen("/proc/sys/fs/file-max","r"))) {
-    ATS_UNUSED_RETURN(fscanf(fd, "%lu", &lim.rlim_max));
-    fclose(fd);
+  maxfiles = ink_get_max_files();
+  if (maxfiles != RLIM_INFINITY) {
+    float file_max_pct = 0.9;
+
     REC_ReadConfigFloat(file_max_pct, "proxy.config.system.file_max_pct");
-    lim.rlim_cur = lim.rlim_max = static_cast<rlim_t>(lim.rlim_max * file_max_pct);
-    if (!setrlimit(RLIMIT_NOFILE, &lim) && !getrlimit(RLIMIT_NOFILE, &lim)) {
+    if (file_max_pct > 1.0) {
+      file_max_pct = 1.0;
+    }
+
+    lim.rlim_cur = lim.rlim_max = static_cast<rlim_t>(maxfiles * file_max_pct);
+    if (setrlimit(RLIMIT_NOFILE, &lim) == 0 && getrlimit(RLIMIT_NOFILE, &lim) == 0) {
       fds_limit = (int) lim.rlim_cur;
       syslog(LOG_NOTICE, "NOTE: RLIMIT_NOFILE(%d):cur(%d),max(%d)",RLIMIT_NOFILE, (int)lim.rlim_cur, (int)lim.rlim_max);
-    } else {
-      syslog(LOG_NOTICE, "NOTE: Unable to set RLIMIT_NOFILE(%d):cur(%d),max(%d)", RLIMIT_NOFILE, (int)lim.rlim_cur, (int)lim.rlim_max);
     }
-  } else {
-    syslog(LOG_NOTICE, "NOTE: Unable to open /proc/sys/fs/file-max");
   }
 
   REC_ReadConfigInteger(fds_throttle, "proxy.config.net.connections_throttle");
 
-  if (!getrlimit(RLIMIT_NOFILE, &lim)) {
+  if (getrlimit(RLIMIT_NOFILE, &lim) == 0) {
     if (fds_throttle > (int) (lim.rlim_cur + THROTTLE_FD_HEADROOM)) {
       lim.rlim_cur = (lim.rlim_max = (rlim_t) fds_throttle);
-      if (!setrlimit(RLIMIT_NOFILE, &lim) && !getrlimit(RLIMIT_NOFILE, &lim)) {
+      if (setrlimit(RLIMIT_NOFILE, &lim) == 0 && getrlimit(RLIMIT_NOFILE, &lim) == 0) {
         fds_limit = (int) lim.rlim_cur;
         syslog(LOG_NOTICE, "NOTE: RLIMIT_NOFILE(%d):cur(%d),max(%d)",RLIMIT_NOFILE, (int)lim.rlim_cur, (int)lim.rlim_max);
       }
     }
   }
 
-  ink_max_out_rlimit(RLIMIT_STACK,true,true);
-  ink_max_out_rlimit(RLIMIT_DATA,true,true);
+  ink_max_out_rlimit(RLIMIT_STACK, true, true);
+  ink_max_out_rlimit(RLIMIT_DATA, true, true);
   ink_max_out_rlimit(RLIMIT_FSIZE, true, false);
-#ifdef RLIMIT_RSS
-  ink_max_out_rlimit(RLIMIT_RSS,true,true);
-#endif
 
-#endif  // linux check
+#ifdef RLIMIT_RSS
+  ink_max_out_rlimit(RLIMIT_RSS, true, true);
+#endif
 }
 
 struct ShowStats: public Continuation
@@ -976,9 +962,6 @@ ShowStats():Continuation(NULL),
 };
 
 
-// TODO: How come this is never used ??
-static int syslog_facility = LOG_DAEMON;
-
 // static void syslog_log_configure()
 //
 //   Reads the syslog configuration variable
@@ -989,21 +972,24 @@ static int syslog_facility = LOG_DAEMON;
 static void
 syslog_log_configure()
 {
-  char *facility_str = NULL;
-  int facility;
+  bool found = false;
+  char sys_var[] = "proxy.config.syslog_facility";
+  char *facility_str = REC_readString(sys_var, &found);
 
-  REC_ReadConfigStringAlloc(facility_str, "proxy.config.syslog_facility");
+  if (found) {
+    int facility = facility_string_to_int(facility_str);
 
-  if (facility_str == NULL || (facility = facility_string_to_int(facility_str)) < 0) {
-    syslog(LOG_WARNING, "Bad or missing syslog facility.  " "Defaulting to LOG_DAEMON");
+    ats_free(facility_str);
+    if (facility < 0) {
+      syslog(LOG_WARNING, "Bad syslog facility in records.config. Keeping syslog at LOG_DAEMON");
+    } else {
+      Debug("server", "Setting syslog facility to %d\n", facility);
+      closelog();
+      openlog("traffic_server", LOG_PID | LOG_NDELAY | LOG_NOWAIT, facility);
+    }
   } else {
-    syslog_facility = facility;
-    closelog();
-    openlog("traffic_server", LOG_PID | LOG_NDELAY | LOG_NOWAIT, facility);
+    syslog(LOG_WARNING, "Missing syslog facility config %s. Keeping syslog at LOG_DAEMON", sys_var);
   }
-  // TODO: Not really, what's up with this?
-  Debug("server", "Setting syslog facility to %d\n", syslog_facility);
-  ats_free(facility_str);
 }
 
 static void
@@ -1101,7 +1087,7 @@ chdir_root()
 static int
 getNumSSLThreads(void)
 {
-  int num_of_ssl_threads = 0;
+  int num_of_ssl_threads = -1;
 
   // Set number of ssl threads equal to num of processors if
   // SSL is enabled so it will scale properly. If SSL is not
@@ -1112,8 +1098,10 @@ getNumSSLThreads(void)
 
     REC_ReadConfigInteger(config_num_ssl_threads, "proxy.config.ssl.number.threads");
 
-    if (config_num_ssl_threads != 0) {
+    if (config_num_ssl_threads > 0) {
       num_of_ssl_threads = config_num_ssl_threads;
+    } else if (config_num_ssl_threads == -1) {
+      return -1; // This will disable ET_SSL threads entirely
     } else {
       float autoconfig_scale = 1.5;
 
@@ -1156,12 +1144,12 @@ adjust_num_of_net_threads(int nthreads)
     REC_ReadConfigFloat(autoconfig_scale, "proxy.config.exec_thread.autoconfig.scale");
     num_of_threads_tmp = (int) ((float) num_of_threads_tmp * autoconfig_scale);
 
-    if (num_of_threads_tmp) {
-      nthreads = num_of_threads_tmp;
-    }
-
     if (unlikely(num_of_threads_tmp > MAX_EVENT_THREADS)) {
       num_of_threads_tmp = MAX_EVENT_THREADS;
+    }
+
+    if (num_of_threads_tmp) {
+      nthreads = num_of_threads_tmp;
     }
   }
 
@@ -1338,7 +1326,7 @@ main(int /* argc ATS_UNUSED */, char **argv)
   if (!num_task_threads)
     REC_ReadConfigInteger(num_task_threads, "proxy.config.task_threads");
 
-  xptr<char> user(MAX_LOGIN + 1);
+  ats_scoped_str user(MAX_LOGIN + 1);
 
   *user = '\0';
   admin_user_p = ((REC_ERR_OKAY == REC_ReadConfigString(user, "proxy.config.admin.user_id", MAX_LOGIN)) &&
@@ -1433,10 +1421,6 @@ main(int /* argc ATS_UNUSED */, char **argv)
   // Sanity checks
   check_fd_limit();
   command_flag = command_flag || *command_string;
-
-  // Set up store
-  if (!command_flag && initialize_store())
-    ProcessFatal("unable to initialize storage, (Re)Configuration required\n");
 
   // Alter the frequecies at which the update threads will trigger
 #define SET_INTERVAL(scope, name, var) do { \

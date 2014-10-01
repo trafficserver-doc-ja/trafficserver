@@ -104,21 +104,19 @@ LogFormat::setup(const char *name, const char *format_str, unsigned interval_sec
 
 int32_t LogFormat::id_from_name(const char *name)
 {
-  int32_t
-    id = 0;
+  int32_t id = 0;
   if (name) {
-    INK_MD5
-      name_md5;
-    name_md5.encodeBuffer(name, (int)::strlen(name));
+    CryptoHash hash;
+    MD5Context().hash_immediate(hash, name, static_cast<int>(strlen(name)));
 #if defined(linux)
     /* Mask most signficant bit so that return value of this function
      * is not sign extended to be a negative number.
      * This problem is only known to occur on Linux which
      * is a 32-bit OS.
      */
-    id = (int32_t) name_md5.fold() & 0x7fffffff;
+    id = (int32_t) hash.fold() & 0x7fffffff;
 #else
-    id = (int32_t) name_md5.fold();
+    id = (int32_t) hash.fold();
 #endif
   }
   return id;
@@ -434,7 +432,7 @@ LogFormat::parse_symbol_string(const char *symbol_string, LogFieldList *field_li
   char *sym_str;
   int field_count = 0;
   LogField *f;
-  char *symbol, *name, *sym;
+  char *symbol, *name, *sym, *saveptr;
   LogField::Container container;
   LogField::Aggregate aggregate;
 
@@ -446,10 +444,10 @@ LogFormat::parse_symbol_string(const char *symbol_string, LogFieldList *field_li
   *contains_aggregates = false; // we'll change if it does
 
   //
-  // strtok will mangle the input string; we'll make a copy for that.
+  // strtok_r will mangle the input string; we'll make a copy for that.
   //
   sym_str = ats_strdup(symbol_string);
-  symbol = strtok(sym_str, ",");
+  symbol = strtok_r(sym_str, ",", &saveptr);
 
   while (symbol != NULL) {
     //
@@ -548,7 +546,7 @@ LogFormat::parse_symbol_string(const char *symbol_string, LogFieldList *field_li
     //
     // Get the next symbol
     //
-    symbol = strtok(NULL, ",");
+    symbol = strtok_r(NULL, ",", &saveptr);
   }
 
   ats_free(sym_str);

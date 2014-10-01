@@ -572,7 +572,7 @@ public:
     RANGE_NOT_HANDLED,
     RANGE_NOT_TRANSFORM_REQUESTED
   };
-  
+
   enum CacheAuth_t
   {
     CACHE_AUTH_NONE = 0,
@@ -699,7 +699,7 @@ public:
     TransferEncoding_t transfer_encoding;
 
     IpEndpoint addr;    // replaces 'ip' field
-    
+
     // port to connect to, except for client
     // connection where it is port on proxy
     // that client connected to.
@@ -768,7 +768,7 @@ public:
 	on the CTA (USE_CLIENT) up to the max retry value.  In essence
 	we try to treat the CTA as if it were another RR value in the
 	HostDB record.
-     */ 
+     */
     enum {
       OS_ADDR_TRY_DEFAULT, ///< Initial state, use what config says.
       OS_ADDR_TRY_HOSTDB, ///< Try HostDB data.
@@ -784,11 +784,15 @@ public:
     bool srv_lookup_success;
     short srv_port;
     HostDBApplicationInfo srv_app;
+    /*** Set to true by default.  If use_client_target_address is set
+     * to 1, this value will be set to false if the client address is
+     * not in the DNS pool */
+    bool lookup_validated;
 
     _DNSLookupInfo()
     : attempts(0), os_addr_style(OS_ADDR_TRY_DEFAULT),
         lookup_success(false), lookup_name(NULL), looking_up(UNDEFINED_LOOKUP),
-        srv_lookup_success(false), srv_port(0)
+        srv_lookup_success(false), srv_port(0), lookup_validated(true)
     {
       srv_hostname[0] = '\0';
       srv_app.allotment.application1 = 0;
@@ -1000,20 +1004,21 @@ public:
 
     bool already_downgraded;
     URL pristine_url;  // pristine url is the url before remap
-    
+
     bool api_skip_all_remapping;
-    
+
     // Http Range: related variables
     RangeSetup_t range_setup;
     int64_t num_range_fields;
     int64_t range_output_cl;
     RangeRecord *ranges;
-    
+
     OverridableHttpConfigParams *txn_conf;
     OverridableHttpConfigParams my_txn_conf; // Storage for plugins, to avoid malloc
 
     bool transparent_passthrough;
-    
+    bool range_in_cache;
+
     // Methods
     void
     init()
@@ -1108,7 +1113,8 @@ public:
         range_output_cl(0),
         ranges(NULL),
         txn_conf(NULL),
-        transparent_passthrough(false)
+        transparent_passthrough(false),
+        range_in_cache(false)
     {
       int i;
       char *via_ptr = via_string;
@@ -1223,7 +1229,6 @@ public:
       }
       internal_msg_buffer_size = 0;
     }
-
   }; // End of State struct.
 
   static void HandleBlindTunnel(State* s);

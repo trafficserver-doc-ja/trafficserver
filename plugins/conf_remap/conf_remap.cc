@@ -78,7 +78,7 @@ str_to_datatype(const char* str)
 bool
 RemapConfigs::parse_inline(const char *arg)
 {
-  const char * sep;
+  const char* sep;
   std::string key;
   std::string value;
 
@@ -104,8 +104,13 @@ RemapConfigs::parse_inline(const char *arg)
       _items[_current]._data.rec_int = strtoll(value.c_str(), NULL, 10);
       break;
     case TS_RECORDDATATYPE_STRING:
-      _items[_current]._data.rec_string = TSstrdup(value.c_str());
-      _items[_current]._data_len = value.size();
+      if (strcmp(value.c_str(), "NULL") == 0) {
+        _items[_current]._data.rec_string = NULL;
+        _items[_current]._data_len = 0;
+      } else {
+        _items[_current]._data.rec_string = TSstrdup(value.c_str());
+        _items[_current]._data_len = value.size();
+      }
       break;
     default:
       TSError("%s: configuration variable '%s' is of an unsupported type", PLUGIN_NAME, key.c_str());
@@ -217,8 +222,13 @@ RemapConfigs::parse_file(const char* filename)
       _items[_current]._data.rec_int = strtoll(tok, NULL, 10);
       break;
     case TS_RECORDDATATYPE_STRING:
-      _items[_current]._data.rec_string = TSstrdup(tok);
-      _items[_current]._data_len = strlen(tok);
+      if (strcmp(tok, "NULL") == 0) {
+        _items[_current]._data.rec_string = NULL;
+        _items[_current]._data_len = 0;
+      } else {
+        _items[_current]._data.rec_string = TSstrdup(tok);
+        _items[_current]._data_len = strlen(tok);
+      }
       break;
     default:
       TSError("%s: file %s, line %d: type not support (unheard of)", PLUGIN_NAME, path.c_str(), line_num);
@@ -259,12 +269,12 @@ TSRemapInit(TSRemapInterface* api_info, char *errbuf, int errbuf_size)
 TSReturnCode
 TSRemapNewInstance(int argc, char* argv[], void** ih, char* /* errbuf ATS_UNUSED */, int /* errbuf_size ATS_UNUSED */)
 {
-  RemapConfigs* conf = new(RemapConfigs);
-
   if (argc < 3) {
     TSError("Unable to create remap instance, need configuration file");
     return TS_ERROR;
   }
+  
+  RemapConfigs* conf = new(RemapConfigs);
 
   for (int i = 2; i < argc; ++i) {
     if (strchr(argv[i], '=') != NULL) {
@@ -306,7 +316,7 @@ TSRemapDeleteInstance(void* ih)
 // Main entry point when used as a remap plugin.
 //
 TSRemapStatus
-TSRemapDoRemap(void* ih, TSHttpTxn rh, TSRemapRequestInfo * /* rri ATS_UNUSED */)
+TSRemapDoRemap(void* ih, TSHttpTxn rh, TSRemapRequestInfo* /* rri ATS_UNUSED */)
 {
   if (NULL != ih) {
     RemapConfigs* conf = static_cast<RemapConfigs*>(ih);

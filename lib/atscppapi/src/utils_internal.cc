@@ -53,6 +53,10 @@ int handleTransactionEvents(TSCont cont, TSEvent event, void *edata) {
   switch (event) {
   case TS_EVENT_HTTP_POST_REMAP:
     transaction.getClientRequest().getUrl().reset();
+    // This is here to force a refresh of the cached client request url
+    TSMBuffer hdr_buf;
+    TSMLoc hdr_loc;
+    TSHttpTxnClientReqGet(static_cast<TSHttpTxn>(transaction.getAtsHandle()), &hdr_buf, &hdr_loc);
     break;
   case TS_EVENT_HTTP_SEND_REQUEST_HDR:
     utils::internal::initTransactionServerRequest(transaction);

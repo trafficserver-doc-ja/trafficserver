@@ -25,19 +25,17 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ink_config.h"
+#include "ts/ts.h"
+#include "ts/remap.h"
+#include "ink_defs.h"
+#include <string>
+#include <vector>
 
 #ifdef HAVE_PCRE_PCRE_H
 #include <pcre/pcre.h>
 #else
 #include <pcre.h>
 #endif
-
-#include "ts/ts.h"
-#include "ts/remap.h"
-#include "ink_defs.h"
-#include <string>
-#include <vector>
 
 #define TOKENCOUNT 10
 #define OVECOUNT 30
@@ -138,8 +136,8 @@ regex_compile(regex_info ** buf, char *pattern, char *replacement)
   int reerroffset;              /* Offset where any pcre error occured */
 
   int tokcount;
-  int *tokens;
-  int *tokenoffset;
+  int *tokens = NULL;
+  int *tokenoffset = NULL;
 
   int status = 1;               /* Status (return value) of the function */
   regex_info *info = (regex_info *) TSmalloc(sizeof(regex_info));
@@ -192,14 +190,11 @@ regex_compile(regex_info ** buf, char *pattern, char *replacement)
     *buf = info;
   } else {
     /* Something went wrong, clean up */
-    if (info->tokens)
-      TSfree(info->tokens);
-    if (info->tokenoffset)
-      TSfree(info->tokenoffset);
+    TSfree(tokens);
+    TSfree(tokenoffset);
     if (info->re)
       pcre_free(info->re);
-    if (info)
-      TSfree(info);
+    TSfree(info);
   }
   return status;
 }
@@ -403,7 +398,6 @@ TSRemapDeleteInstance(void *ih)
 
   TSDebug(PLUGIN_NAME, "Deleting remap instance");
 
-  TSfree(prl);
   delete prl;
 }
 

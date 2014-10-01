@@ -20,6 +20,7 @@
  */
 
 #include "ink_defs.h"
+#include "ink_platform.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -27,13 +28,17 @@
 #include <string.h>
 #include <stdbool.h>
 #include <getopt.h>
-#include <alloca.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <pcre.h>
 #include <ts/ts.h>
+
+#ifdef HAVE_PCRE_PCRE_H
+#  include <pcre/pcre.h>
+#else
+#  include <pcre.h>
+#endif
 
 #define LOG_PREFIX        "regex_revalidate"
 #define CONFIG_TMOUT      60000
@@ -555,8 +560,8 @@ TSPluginInit (int argc, const char *argv[])
     }
 
     info.plugin_name = LOG_PREFIX;
-    info.vendor_name = "Comcast";
-    info.support_email = "sorber@apache.org";
+    info.vendor_name = "Apache Software Foundation";
+    info.support_email = "dev@trafficserver.apache.org";
 
     if (TSPluginRegister(TS_SDK_VERSION_3_0 , &info) != TS_SUCCESS)
     {

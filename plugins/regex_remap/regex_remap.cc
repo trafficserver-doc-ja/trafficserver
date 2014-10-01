@@ -22,18 +22,11 @@
 */
 #include "ts/ts.h"
 #include "ts/remap.h"
-#include "ink_config.h"
 
 #include <sys/types.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
-
-#ifdef HAVE_PCRE_PCRE_H
-#include <pcre/pcre.h>
-#else
-#include <pcre.h>
-#endif
 
 #include <ctype.h>
 #include <unistd.h>
@@ -47,6 +40,12 @@
 #include "ink_platform.h"
 #include "ink_atomic.h"
 #include "ink_time.h"
+
+#ifdef HAVE_PCRE_PCRE_H
+#include <pcre/pcre.h>
+#else
+#include <pcre.h>
+#endif
 
 static const char* PLUGIN_NAME = "regex_remap";
 
@@ -118,7 +117,7 @@ class RemapRegex
  public:
   RemapRegex() :
     _num_subs(-1), _rex(NULL), _extra(NULL), _options(0), _order(-1),
-    _simple(false), _lowercase_substitutions(false),
+    _lowercase_substitutions(false),
     _active_timeout(-1), _no_activity_timeout(-1), _connect_timeout(-1), _dns_timeout(-1),
     _first_override(NULL)
   {
@@ -182,8 +181,6 @@ class RemapRegex
   inline const char* substitution() const { return _subst;  }
   inline int substitutions_used() const { return _num_subs; }
 
-  inline bool is_simple() const { return _simple; }
-
   inline TSHttpStatus status_option() const { return _status; }
   inline int active_timeout_option() const  { return _active_timeout; }
   inline int no_activity_timeout_option() const  { return _no_activity_timeout; }
@@ -217,7 +214,6 @@ class RemapRegex
   RemapRegex* _next;
   int _order;
   TSHttpStatus _status;
-  bool _simple;
   bool _lowercase_substitutions;
   int _active_timeout;
   int _no_activity_timeout;
@@ -233,10 +229,6 @@ RemapRegex::initialize(const std::string& reg, const std::string& sub, const std
   _status = static_cast<TSHttpStatus>(0);
 
   if (!reg.empty()) {
-    if (reg == ".") {
-      TSDebug(PLUGIN_NAME, "Rule is simple, and fast!");
-      _simple = true;
-    }
     _rex_string = TSstrdup(reg.c_str());
   } else
     _rex_string = NULL;
@@ -316,8 +308,8 @@ RemapRegex::initialize(const std::string& reg, const std::string& sub, const std
           break;
         default:
           TSError("%s: configuration variable '%s' is of an unsupported type", PLUGIN_NAME, opt_name.c_str());
+          delete cur;
           return false;
-          break;
         }
         if (cur) {
           TSDebug(PLUGIN_NAME, "Overridable config %s=%s", opt_name.c_str(), opt_val.c_str());
@@ -930,7 +922,7 @@ TSRemapDoRemap(void* ih, TSHttpTxn txnp, TSRemapRequestInfo *rri)
   // Apply the regular expressions, in order. First one wins.
   while (re) {
     // Since we check substitutions on parse time, we don't need to reset ovector
-    if (re->is_simple() || (re->match(match_buf, match_len, ovector) != -1)) {
+    if (re->match(match_buf, match_len, ovector) != -1) {
       int new_len = re->get_lengths(ovector, lengths, rri, &req_url);
 
       // Set timeouts

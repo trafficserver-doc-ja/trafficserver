@@ -376,6 +376,7 @@ print_cache_ele(TSCacheEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   char *pd_str, *time_str;
@@ -446,6 +447,7 @@ print_hosting_ele(TSHostingEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   switch (ele->pd_type) {
@@ -477,6 +479,7 @@ print_icp_ele(TSIcpEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   int peer_type;
@@ -508,6 +511,7 @@ print_ip_allow_ele(TSIpAllowEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   print_ip_addr_ele(ele->src_ip_addr);
@@ -518,6 +522,7 @@ print_parent_ele(TSParentProxyEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   printf("parent rule type: %d\n", ele->cfg_ele.type);
@@ -533,6 +538,7 @@ print_volume_ele(TSVolumeEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   printf("volume #: %d\n", ele->volume_num);
@@ -556,6 +562,7 @@ print_plugin_ele(TSPluginEle * ele)
 {
   if (!ele) {
     printf("can't print plugin ele\n");
+    return;
   }
 
   printf("name: %s\t\t", ele->name);
@@ -572,6 +579,7 @@ print_remap_ele(TSRemapEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   char buf[MAX_BUF_SIZE];
@@ -751,6 +759,7 @@ print_storage_ele(TSStorageEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   if (ele->pathname)
@@ -762,6 +771,7 @@ print_update_ele(TSUpdateEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   printf("url: %s\n", ele->url);
@@ -775,6 +785,7 @@ print_vaddrs_ele(TSVirtIpAddrEle * ele)
 {
   if (!ele) {
     printf("can't print ele\n");
+    return;
   }
 
   printf("ip=%s, intr=%s, sub_intr=%d\n", ele->ip_addr, ele->intr, ele->sub_intr);
@@ -880,8 +891,9 @@ start_TS(char *tsArgs)
 {
   TSMgmtError ret;
   TSCacheClearT clear = TS_CACHE_CLEAR_OFF;
+  char *args;
 
-  char *args = strtok(tsArgs, ":");
+  strtok(tsArgs, ":");
   args = strtok(NULL, ":");
   if (args) {
     if (strcmp(args, "all\n") == 0)
@@ -1083,6 +1095,7 @@ test_records()
   else
     printf("[TSRecordGetString] proxy.config.proxy_name=%s\n", rec_value);
   TSfree(rec_value);
+  rec_value = NULL;
 
   // test RecordSet
   err = TSRecordSetString("proxy.config.proxy_name", (TSString) new_str, &action);
@@ -1513,8 +1526,9 @@ test_cfg_context_get(char *args)
 {
   TSCfgContext ctx;
   TSFileNameT file;
+  char *filename;
 
-  char *filename = strtok(args, ":");
+  strtok(args, ":");
   filename = strtok(NULL, ":");
   fprintf(stderr, "modify file: %s\n", filename);
   char *name = TSstrdup(filename);
@@ -1583,8 +1597,9 @@ test_cfg_context_move(char *args)
   TSFileNameT file;
   int i;
   TSMgmtError err;
+  char *filename;
 
-  char *filename = strtok(args, ":");
+  strtok(args, ":");
   filename = strtok(NULL, ":");
   fprintf(stderr, "modify file: %s\n", filename);
   char *name =TSstrdup(filename);
@@ -2075,7 +2090,9 @@ print_snapshots()
 void
 add_snapshot(char *args)
 {
-  char *snap_name = strtok(args, ":");
+  char *snap_name;
+
+  strtok(args, ":");
   snap_name = strtok(NULL, ":");
   fprintf(stderr, "add snapshot: %s\n", snap_name);
   char *name = TSstrdup(snap_name);
@@ -2089,7 +2106,9 @@ add_snapshot(char *args)
 void
 remove_snapshot(char *args)
 {
-  char *snap_name = strtok(args, ":");
+  char *snap_name;
+
+  strtok(args, ":");
   snap_name = strtok(NULL, ":");
   fprintf(stderr, "remove snapshot: %s\n", snap_name);
   char *name = TSstrdup(snap_name);
@@ -2103,7 +2122,9 @@ remove_snapshot(char *args)
 void
 restore_snapshot(char *args)
 {
-  char *snap_name = strtok(args, ":");
+  char *snap_name;
+
+  strtok(args, ":");
   snap_name = strtok(NULL, ":");
   fprintf(stderr, "resotre snapshot: %s\n", snap_name);
   char *name = TSstrdup(snap_name);

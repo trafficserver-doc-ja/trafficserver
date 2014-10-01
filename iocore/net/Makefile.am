@@ -26,7 +26,9 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/proxy/hdrs \
   -I$(top_srcdir)/proxy/shared \
   -I$(top_srcdir)/mgmt \
-  -I$(top_srcdir)/mgmt/utils
+  -I$(top_srcdir)/mgmt/utils \
+  -I$(top_srcdir)/proxy/api/ts \
+  -I$(top_srcdir)/proxy/http
 
 TESTS = $(check_PROGRAMS)
 
@@ -53,7 +55,6 @@ libinknet_a_SOURCES = \
   I_UDPPacket.h \
   Inline.cc \
   I_SessionAccept.h \
-  SessionAccept.cc \
   Net.cc \
   NetVConnection.cc \
   P_CompletionUtil.h \
@@ -72,6 +73,7 @@ libinknet_a_SOURCES = \
   P_SSLNextProtocolAccept.h \
   P_SSLNextProtocolSet.h \
   P_SSLUtils.h \
+  P_OCSPStapling.h \
   P_Socks.h \
   P_UDPConnection.h \
   P_UDPIOEvent.h \
@@ -93,6 +95,7 @@ libinknet_a_SOURCES = \
   SSLNextProtocolAccept.cc \
   SSLNextProtocolSet.cc \
   SSLUtils.cc \
+  OCSPStapling.cc \
   Socks.cc \
   UDPIOEvent.cc \
   UnixConnection.cc \

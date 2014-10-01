@@ -428,21 +428,7 @@ int
 ink_aio_read(AIOCallback *op, int fromAPI)
 {
   op->aiocb.aio_lio_opcode = LIO_READ;
-
-#if (AIO_MODE == AIO_MODE_AIO)
-  ink_assert(this_ethread() == op->thread);
-  op->thread->aio_ops.enqueue(op);
-  if (aio_read(&op->aiocb) < 0) {
-    Warning("failed aio_read: %s\n", strerror(errno));
-    op->thread->aio_ops.remove(op);
-    return -1;
-  }
-#elif (AIO_MODE == AIO_MODE_SYNC)
-  cache_op((AIOCallbackInternal *) op);
-  op->action.continuation->handleEvent(AIO_EVENT_DONE, op);
-#elif (AIO_MODE == AIO_MODE_THREAD)
   aio_queue_req((AIOCallbackInternal *) op, fromAPI);
-#endif
 
   return 1;
 }
@@ -451,21 +437,7 @@ int
 ink_aio_write(AIOCallback *op, int fromAPI)
 {
   op->aiocb.aio_lio_opcode = LIO_WRITE;
-
-#if (AIO_MODE == AIO_MODE_AIO)
-  ink_assert(this_ethread() == op->thread);
-  op->thread->aio_ops.enqueue(op);
-  if (aio_write(&op->aiocb) < 0) {
-    Warning("failed aio_write: %s\n", strerror(errno));
-    op->thread->aio_ops.remove(op);
-    return -1;
-  }
-#elif (AIO_MODE == AIO_MODE_SYNC)
-  cache_op((AIOCallbackInternal *) op);
-  op->action.continuation->handleEvent(AIO_EVENT_DONE, op);
-#elif (AIO_MODE == AIO_MODE_THREAD)
   aio_queue_req((AIOCallbackInternal *) op, fromAPI);
-#endif
 
   return 1;
 }
@@ -564,29 +536,34 @@ Lagain:
     complete_list.enqueue(op);
     //op->handleEvent(event, e);
   }
-  if (ret == MAX_AIO_EVENTS)
+
+  if (ret == MAX_AIO_EVENTS) {
     goto Lagain;
-  if (ret < 0)
-    perror("io_getevents");
+  }
+
+  if (ret < 0) {
+    Debug("aio", "io_getevents failed: %s (%d)", strerror(-ret), -ret);
+  }
 
   ink_aiocb_t *cbs[MAX_AIO_EVENTS];
   int num = 0;
+
   for (; num < MAX_AIO_EVENTS && ((op = ready_list.dequeue()) != NULL); ++num) {
     cbs[num] = &op->aiocb;
     ink_assert(op->action.continuation);
   }
+
   if (num > 0) {
     int ret;
     do {
       ret = io_submit(ctx, num, cbs);
-    } while (ret < 0 && errno == EAGAIN);
+    } while (ret < 0 && ret == -EAGAIN);
 
     if (ret != num) {
-      if (ret < 0)
-        perror("io_submit error");
-      else {
-        fprintf(stderr, "could not sumbit IOs");
-        ink_assert(0);
+      if (ret < 0) {
+        Debug("aio", "io_submit failed: %s (%d)", strerror(-ret), -ret);
+      } else {
+        Fatal("could not sumbit IOs, io_submit(%p, %d, %p) returned %d", ctx, num, cbs, ret);
       }
     }
   }

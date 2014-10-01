@@ -138,7 +138,7 @@ HttpServerSession::do_io_close(int alerrno)
             ats_ip_ntop(&server_ip.sa, addrbuf, sizeof(addrbuf)), 
             connection_count->getCount(server_ip));
     } else {
-      Error("[%" PRId64 "] number of connections should be greater then zero: %u",
+      Error("[%" PRId64 "] number of connections should be greater than zero: %u",
             con_id, connection_count->getCount(server_ip));
     }
   }
@@ -162,6 +162,7 @@ HttpServerSession::reenable(VIO *vio)
 void
 HttpServerSession::release()
 {
+  Debug("http_ss", "Releasing session, private_session=%d, sharing_match=%d", private_session, sharing_match);
   // Set our state to KA for stat issues
   state = HSS_KA_SHARED;
 

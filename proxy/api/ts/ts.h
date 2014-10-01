@@ -1109,6 +1109,7 @@ extern "C"
 
   tsapi const char* TSHttpHdrMethodGet(TSMBuffer bufp, TSMLoc offset, int* length);
   tsapi TSReturnCode TSHttpHdrMethodSet(TSMBuffer bufp, TSMLoc offset, const char* value, int length);
+  tsapi const char* TSHttpHdrHostGet(TSMBuffer bufp, TSMLoc offset, int* length);
   tsapi TSReturnCode TSHttpHdrUrlGet(TSMBuffer bufp, TSMLoc offset, TSMLoc* locp);
   tsapi TSReturnCode TSHttpHdrUrlSet(TSMBuffer bufp, TSMLoc offset, TSMLoc url);
 
@@ -1221,6 +1222,21 @@ extern "C"
   tsapi void TSHttpSsnHookAdd(TSHttpSsn ssnp, TSHttpHookID id, TSCont contp);
   tsapi void TSHttpSsnReenable(TSHttpSsn ssnp, TSEvent event);
   tsapi int TSHttpSsnTransactionCount(TSHttpSsn ssnp);
+
+  /* --------------------------------------------------------------------------
+     SSL connections */
+  /// Re-enable an SSL connection from a hook.
+  /// This must be called exactly once before the SSL connection will resume.
+  tsapi void TSVConnReenable(TSVConn sslvcp);
+  /// Set the connection to go into blind tunnel mode
+  tsapi TSReturnCode TSVConnTunnel(TSVConn sslp);
+  // Return the SSL object associated with the connection
+  tsapi TSSslConnection TSVConnSSLConnectionGet(TSVConn sslp);
+  // Fetch a SSL context from the global lookup table
+  tsapi TSSslContext TSSslContextFindByName(const char *name);
+  tsapi TSSslContext TSSslContextFindByAddr(struct sockaddr const*);
+  // Returns 1 if the sslp argument refers to a SSL connection
+  tsapi int TSVConnIsSsl(TSVConn sslp);
 
   /* --------------------------------------------------------------------------
      HTTP transactions */
@@ -1623,6 +1639,7 @@ extern "C"
 
   /* Check if HTTP State machine is internal or not */
   tsapi TSReturnCode TSHttpIsInternalRequest(TSHttpTxn txnp);
+  tsapi TSReturnCode TSHttpIsInternalSession(TSHttpSsn ssnp);
 
   /* --------------------------------------------------------------------------
      HTTP alternate selection */
@@ -2123,6 +2140,13 @@ extern "C"
 
    */
   tsapi void TSTextLogObjectRollingOffsetHrSet(TSTextLogObject the_object, int rolling_offset_hr);
+
+  /**
+      Set the rolling size. rolling_size_mb specifies the size in MB when log rolling
+      should take place.
+
+   */
+  tsapi void TSTextLogObjectRollingSizeMbSet(TSTextLogObject the_object, int rolling_size_mb);
 
   /**
       Async disk IO read

@@ -497,7 +497,7 @@ public:
   // hooks_set records whether there are any hooks relevant
   //  to this transaction.  Used to avoid costly calls
   //  do_api_callout_internal()
-  int hooks_set;
+  bool hooks_set;
 
 protected:
   TSHttpHookID cur_hook_id;
@@ -520,6 +520,7 @@ protected:
   //   when the flag is set
   bool terminate_sm;
   bool kill_this_async_done;
+  bool parse_range_done;
   virtual int kill_this_async_hook(int event, void *data);
   void kill_this();
   void update_stats();

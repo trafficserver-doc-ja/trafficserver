@@ -77,7 +77,7 @@ public:
   bool has_submitted_data;
   bool need_resume_data;
   int fetch_data_len;
-  int delta_window_size;
+  unsigned delta_window_size;
   bool fetch_body_completed;
   vector<pair<string, string> > headers;
 
@@ -90,6 +90,8 @@ public:
 
   MD5_CTX recv_md5;
 };
+
+extern ClassAllocator<SpdyRequest> spdyRequestAllocator;
 
 class SpdyClientSession : public Continuation, public PluginIdentity
 {
@@ -130,13 +132,27 @@ public:
   virtual char const* getPluginTag() const;
   virtual int64_t getPluginId() const;
 
+  SpdyRequest *
+  find_request(int streamId) {
+    map<int32_t, SpdyRequest*>::iterator iter = this->req_map.find(streamId);
+    return ((iter == this->req_map.end()) ? NULL : iter->second);
+  }
+
+  void
+  cleanup_request(int streamId) {
+    SpdyRequest* req = this->find_request(streamId);
+    if (req) {
+      req->clear();
+      spdyRequestAllocator.free(req);
+      this->req_map.erase(streamId);
+    }
+  }
+
 private:
   int state_session_start(int event, void * edata);
   int state_session_readwrite(int event, void * edata);
 };
 
-void spdy_sm_create(NetVConnection * netvc, spdy::SessionVersion vers, MIOBuffer * iobuf, IOBufferReader * reader);
-
-extern ClassAllocator<SpdyRequest> spdyRequestAllocator;
+void spdy_cs_create(NetVConnection * netvc, spdy::SessionVersion vers, MIOBuffer * iobuf, IOBufferReader * reader);
 
 #endif

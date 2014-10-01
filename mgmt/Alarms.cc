@@ -24,15 +24,10 @@
 
 #include "libts.h"
 #include "LocalManager.h"
+#include "ClusterCom.h"
 #include "MgmtUtils.h"
 #include "Alarms.h"
 #include "Diags.h"
-
-#if defined(MGMT_API)
-#include "TSControlMain.h"
-#include "Message.h"
-#include "Defs.h"
-#endif
 
 #include "P_RecCore.h"
 
@@ -204,7 +199,6 @@ Alarms::signalAlarm(alarm_t a, const char *desc, const char *ip)
     break;
   case MGMT_ALARM_PROXY_PROCESS_BORN:
     mgmt_log(stderr, "[Alarms::signalAlarm] Server Process born\n");
-    priority = 2;
     return;
   case MGMT_ALARM_ADD_ALARM:
     priority = 2;
@@ -314,36 +308,6 @@ Alarms::signalAlarm(alarm_t a, const char *desc, const char *ip)
   ink_strlcpy(atmp->description, desc, atmp_desc_size);
   ink_mutex_release(&mutex);
 
-#if defined(MGMT_API)
-  if (mgmt_alarm_event_q) {
-    // ADDED CODE here is where we Add to the queue of alarms one more
-    EventNoticeForm *new_alarm = (EventNoticeForm *)ats_malloc(sizeof(EventNoticeForm));
-
-    // allocated space copy over values
-    // remember AlarmID start from 0 exactly 1 off but everything else
-    // matches
-    new_alarm->alarm_t = (AlarmID) (atmp->type - 1);
-    new_alarm->priority = atmp->priority;
-    new_alarm->linger = atmp->linger;
-    new_alarm->local = atmp->local;
-    new_alarm->seen = atmp->seen;
-    if (!atmp->local)
-      new_alarm->inet_address = atmp->inet_address;
-    if (!atmp->description) {
-      new_alarm->description = NULL;
-    } else {
-      new_alarm->description = ats_strdup(atmp->description);
-    }
-
-    // new alarm is complete now add it
-    ink_mutex_acquire(&mgmt_alarm_event_q->mgmt_alarm_lock);
-
-    // enqueue
-    enqueue(mgmt_alarm_event_q->mgmt_alarm_q, new_alarm);
-
-    ink_mutex_release(&mgmt_alarm_event_q->mgmt_alarm_lock);
-  }
-#endif
 
   for (entry = ink_hash_table_iterator_first(cblist, &iterator_state);
        entry != NULL; entry = ink_hash_table_iterator_next(cblist, &iterator_state)) {
@@ -424,7 +388,7 @@ Alarms::clearUnSeen(char *ip)
  * takes the current list of local alarms and builds an alarm message.
  */
 void
-Alarms::constructAlarmMessage(char *ip, char *message, int max)
+Alarms::constructAlarmMessage(const AppVersionInfo& version, char *ip, char *message, int max)
 {
   int n = 0, bsum = 0;
   char buf[4096];
@@ -435,7 +399,7 @@ Alarms::constructAlarmMessage(char *ip, char *message, int max)
     return;
   }
   // Insert the standard mcast packet header
-  n = ClusterCom::constructSharedPacketHeader(message, ip, max);
+  n = ClusterCom::constructSharedPacketHeader(version, message, ip, max);
 
   ink_mutex_acquire(&mutex);
   if (!((n + (int) strlen("type: alarm\n")) < max)) {
@@ -474,7 +438,6 @@ Alarms::constructAlarmMessage(char *ip, char *message, int max)
       return;
     }
     ink_strlcpy(&message[n], "alarm: none\n", max - n);
-    n += strlen("alarm: none\n");
   }
   ink_mutex_release(&mutex);
   return;
@@ -495,13 +458,13 @@ Alarms::checkSystemNAlert()
 void
 Alarms::execAlarmBin(const char *desc)
 {
-  xptr<char> bindir(alarm_script_dir());
+  ats_scoped_str bindir(alarm_script_dir());
   char cmd_line[MAXPATHLEN];
 
-  xptr<char> alarm_bin(REC_readString("proxy.config.alarm.bin", NULL));
-  xptr<char> alarm_email_from_name;
-  xptr<char> alarm_email_from_addr;
-  xptr<char> alarm_email_to_addr;
+  ats_scoped_str alarm_bin(REC_readString("proxy.config.alarm.bin", NULL));
+  ats_scoped_str alarm_email_from_name;
+  ats_scoped_str alarm_email_from_addr;
+  ats_scoped_str alarm_email_to_addr;
 
   pid_t pid;
 

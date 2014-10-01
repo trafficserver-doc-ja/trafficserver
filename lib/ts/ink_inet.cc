@@ -184,7 +184,7 @@ char const* ats_ip_nptop(
   sockaddr const* addr,
   char* dst, size_t size
 ) {
-  char buff[INET6_ADDRSTRLEN];
+  char buff[INET6_ADDRPORTSTRLEN];
   snprintf(dst, size, "%s:%u",
     ats_ip_ntop(addr, buff, sizeof(buff)),
     ats_ip_port_host_order(addr)
@@ -246,10 +246,10 @@ ats_ip_parse(ts::ConstBuffer src, ts::ConstBuffer* addr, ts::ConstBuffer* port) 
 }
 
 int
-ats_ip_pton(char const* text, sockaddr* ip) {
+ats_ip_pton(const ts::ConstBuffer& src, sockaddr* ip)
+{
   int zret = -1;
   ts::ConstBuffer addr, port;
-  ts::ConstBuffer src(text, strlen(text)+1);
 
   ats_ip_invalidate(ip);
   if (0 == ats_ip_parse(src, &addr, &port)) {
@@ -338,6 +338,15 @@ IpAddr::load(char const* text) {
   return zret;
 }
 
+int 
+IpAddr::load(ts::ConstBuffer const& text) 
+{
+  IpEndpoint ip;
+  int zret = ats_ip_pton(text, &ip.sa);
+  this->assign(&ip.sa);
+  return zret;
+}
+
 char*
 IpAddr::toString(char* dest, size_t len) const {
   IpEndpoint ip;
@@ -365,6 +374,61 @@ operator == (IpAddr const& lhs, sockaddr const* rhs) {
       zret = true;
     }
   } // else different families, not equal.
+  return zret;
+}
+
+/** Compare two IP addresses.
+    This is useful for IPv4, IPv6, and the unspecified address type.
+    If the addresses are of different types they are ordered
+
+    Non-IP < IPv4 < IPv6
+
+     - all non-IP addresses are the same ( including @c AF_UNSPEC )
+     - IPv4 addresses are compared numerically (host order)
+     - IPv6 addresses are compared byte wise in network order (MSB to LSB)
+
+    @return
+      - -1 if @a lhs is less than @a rhs.
+      - 0 if @a lhs is identical to @a rhs.
+      - 1 if @a lhs is greater than @a rhs.
+
+    @internal This looks like a lot of code for an inline but I think it
+    should compile down to something reasonable.
+*/
+inline int
+IpAddr::cmp(self const& that) const {
+  int zret = 0;
+  uint16_t rtype = that._family;
+  uint16_t ltype = _family;
+
+  // We lump all non-IP addresses into a single equivalence class
+  // that is less than an IP address. This includes AF_UNSPEC.
+  if (AF_INET == ltype) {
+    if (AF_INET == rtype) {
+      in_addr_t la = ntohl(_addr._ip4);
+      in_addr_t ra = ntohl(that._addr._ip4);
+      if (la < ra) zret = -1;
+      else if (la > ra) zret = 1;
+      else zret = 0;
+    } else if (AF_INET6 == rtype) { // IPv4 < IPv6
+      zret = -1;
+    } else { // IP > not IP
+      zret = 1;
+    }
+  } else if (AF_INET6 == ltype) {
+    if (AF_INET6 == rtype) {
+      zret = memcmp(&_addr._ip6, &that._addr._ip6, TS_IP6_SIZE);
+    } else {
+      zret = 1; // IPv6 greater than any other type.
+    }
+  } else if (AF_INET == rtype || AF_INET6 == rtype) {
+    // ltype is non-IP so it's less than either IP type.
+    zret = -1;
+  } else {
+    // Both types are non-IP so they're equal.
+    zret = 0;
+  }
+
   return zret;
 }
 
@@ -499,13 +563,13 @@ REGRESSION_TEST(Ink_Inet) (RegressionTest * t, int /* atype */, int * pstatus) {
       box.check(ats_ip_parse(ts::ConstBuffer(names[i].hostspec, strlen(names[i].hostspec)), &addr, &port) == 0,
           "ats_ip_parse(%s)", names[i].hostspec);
       box.check(strncmp(addr.data(), names[i].host, addr.size()) ==  0,
-          "ats_ip_parse(%s) gave addr '%.*s'", names[i].hostspec, addr.size(), addr.data());
+          "ats_ip_parse(%s) gave addr '%.*s'", names[i].hostspec, (int)addr.size(), addr.data());
       if (names[i].port) {
         box.check(strncmp(port.data(), names[i].port, port.size()) ==  0,
-          "ats_ip_parse(%s) gave port '%.*s'", names[i].hostspec, port.size(), port.data());
+          "ats_ip_parse(%s) gave port '%.*s'", names[i].hostspec, (int)port.size(), port.data());
       } else {
         box.check(port.size() == 0,
-          "ats_ip_parse(%s) gave port '%.*s'", names[i].hostspec, port.size(), port.data());
+          "ats_ip_parse(%s) gave port '%.*s'", names[i].hostspec, (int)port.size(), port.data());
       }
 
     }

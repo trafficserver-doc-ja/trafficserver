@@ -547,28 +547,25 @@ PrefetchTransform::redirect(HTTPHdr *resp)
    */
   if ((resp != NULL) && (resp->valid())) {
     response_status = resp->status_get();
+
+    /* OK, so we got the response. Now if the response is a redirect we have to check if we also
+       got a Location: header. This indicates the new location where our object is located.
+       If refirect_url was not found, letz falter back to just a recursion. Since
+       we might find the url in the body.
+     */
+    if (resp->presence(MIME_PRESENCE_LOCATION)) {
+      int redirect_url_len = 0;
+      const char *tmp_url = resp->value_get(MIME_FIELD_LOCATION, MIME_LEN_LOCATION, &redirect_url_len);
+
+      redirect_url = (char *)alloca(redirect_url_len + 1);
+      ink_strlcpy(redirect_url, tmp_url, redirect_url_len + 1);
+      Debug("PrefetchTransform", "redirect_url = %s\n", redirect_url);
+    } else {
+      response_status = -1;
+    }
   } else {
     response_status = -1;
   }
-
-  /* OK, so we got the response. Now if the response is a redirect we have to check if we also
-     got a Location: header. This indicates the new location where our object is located.
-     If refirect_url was not found, letz falter back to just a recursion. Since
-     we might find the url in the body.
-   */
-  if (resp->presence(MIME_PRESENCE_LOCATION)) {
-    int redirect_url_len = 0;
-    const char *tmp_url = resp->value_get(MIME_FIELD_LOCATION, MIME_LEN_LOCATION, &redirect_url_len);
-
-    redirect_url = (char *)alloca(redirect_url_len + 1);
-    ink_strlcpy(redirect_url, tmp_url, redirect_url_len + 1);
-    Debug("PrefetchTransform", "redirect_url = %s\n", redirect_url);
-  } else {
-    response_status = -1;
-  }
-
-
-
 
   if (IS_STATUS_REDIRECT(response_status)) {
     if (redirect_url) {
@@ -639,9 +636,9 @@ PrefetchTransform::hash_add(char *s)
     Debug("PrefetchParserURLs", "Normalized URL: %s\n", s);
 
 
-  INK_MD5 md5;
-  md5.encodeBuffer(s, str_len);
-  index = md5.word(1) % HASH_TABLE_LENGTH;
+  INK_MD5 hash;
+  MD5Context().hash_immediate(hash, s, str_len);
+  index = hash.slice32(1) % HASH_TABLE_LENGTH;
 
   PrefetchUrlEntry **e = &hash_table[index];
   for (; *e; e = &(*e)->hash_link)
@@ -649,7 +646,7 @@ PrefetchTransform::hash_add(char *s)
       return NULL;
 
   *e = prefetchUrlEntryAllocator.alloc();
-  (*e)->init(ats_strdup(s), md5);
+  (*e)->init(ats_strdup(s), hash);
 
   return *e;
 }
@@ -1267,7 +1264,6 @@ PrefetchBlaster::handleCookieHeaders(HTTPHdr *req_hdr,
     for (; s_cookie; s_cookie = s_cookie->m_next_dup) {
       a_raw = s_cookie->value_get(&a_raw_len);
       MIMEField *new_cookie = NULL;
-      bool new_cookie_attached = false;
       StrList a_param_list;
       Str *a_param;
       bool first_move;
@@ -1390,10 +1386,8 @@ PrefetchBlaster::handleCookieHeaders(HTTPHdr *req_hdr,
       if (domain_match == false)
         goto Lnotmatch;
 
-      if (new_cookie && !new_cookie_attached) {
-        new_cookie_attached = true;
-        if (add_cookies == false)
-          add_cookies = true;
+      if (new_cookie) {
+        add_cookies = true;
         new_cookie->name_set(request->m_heap, request->m_mime, MIME_FIELD_COOKIE, MIME_LEN_COOKIE);
         request->field_attach(new_cookie);
       }
@@ -1401,10 +1395,8 @@ PrefetchBlaster::handleCookieHeaders(HTTPHdr *req_hdr,
 
     Lnotmatch:
       if (new_cookie) {
-        if (!new_cookie_attached) {
-          new_cookie->name_set(request->m_heap, request->m_mime, MIME_FIELD_COOKIE, MIME_LEN_COOKIE);
-          request->field_attach(new_cookie);
-        }
+        new_cookie->name_set(request->m_heap, request->m_mime, MIME_FIELD_COOKIE, MIME_LEN_COOKIE);
+        request->field_attach(new_cookie);
         request->field_delete(new_cookie);
         new_cookie = NULL;
       }
@@ -1652,10 +1644,10 @@ PrefetchBlaster::bufferObject(int event, void * /* data ATS_UNUSED */)
       buf->fill(PRELOAD_HEADER_LEN);
 
       int64_t ntoread = INT64_MAX;
-      int len = copy_header(buf, request, NULL);
+      copy_header(buf, request, NULL);
 
       if (cache_http_info) {
-        len += copy_header(buf, cache_http_info->response_get(), NULL);
+        copy_header(buf, cache_http_info->response_get(), NULL);
         ntoread = cache_http_info->object_size_get();
       }
       serverVC->do_io_read(this, ntoread, buf);
@@ -1865,7 +1857,7 @@ PrefetchBlaster::initCacheLookupConfig()
   //The look up parameters are intialized in the same as it is done
   //in HttpSM::init(). Any changes there should come in here.
   HttpConfigParams *http_config_params = HttpConfig::acquire();
-  cache_lookup_config.cache_global_user_agent_header = http_config_params->global_user_agent_header ? true : false;
+  cache_lookup_config.cache_global_user_agent_header = http_config_params->oride.global_user_agent_header ? true : false;
   cache_lookup_config.cache_enable_default_vary_headers =
     http_config_params->cache_enable_default_vary_headers ? true : false;
   cache_lookup_config.cache_vary_default_text = http_config_params->cache_vary_default_text;
@@ -1905,7 +1897,7 @@ config_read_proto(TSPrefetchBlastData &blast, const char *str)
 int
 PrefetchConfiguration::readConfiguration()
 {
-  xptr<char> conf_path;
+  ats_scoped_str conf_path;
   int fd = -1;
 
   local_http_server_port = stuffer_port = 0;

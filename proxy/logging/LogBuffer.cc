@@ -175,14 +175,15 @@ LogBuffer::LogBuffer(LogObject * owner, LogBufferHeader * header):
 
 LogBuffer::~LogBuffer()
 {
+  Debug("log-logbuffer", "[%p] Deleting buffer %u at address %p",
+        this_ethread(), m_id, m_unaligned_buffer ? m_unaligned_buffer : m_buffer);
+
   if (m_unaligned_buffer) {
     delete [] m_unaligned_buffer;
   } else {
     delete [] m_buffer;
   }
 
-  Debug("log-logbuffer", "[%p] Deleted buffer %u at address %p",
-        this_ethread(), m_id, m_unaligned_buffer ? m_unaligned_buffer : m_buffer);
   m_buffer = 0;
   m_unaligned_buffer = 0;
 }
@@ -658,6 +659,7 @@ LogBuffer::to_ascii(LogEntryHeader * entry, LogFormatType type,
 
   int i;
   LogFieldList *fieldlist = NULL;
+  bool delete_fieldlist_p = false; // need to free the fieldlist?
 
   for (i = 0; i < fieldlist_cache_entries; i++) {
     if (strcmp(symbol_str, fieldlist_cache[i].symbol_str) == 0) {
@@ -679,6 +681,8 @@ LogBuffer::to_ascii(LogEntryHeader * entry, LogFormatType type,
       fieldlist_cache[fieldlist_cache_entries].fieldlist = fieldlist;
       fieldlist_cache[fieldlist_cache_entries].symbol_str = ats_strdup(symbol_str);
       fieldlist_cache_entries++;
+    } else {
+      delete_fieldlist_p = true;
     }
   }
 
@@ -724,6 +728,7 @@ LogBuffer::to_ascii(LogEntryHeader * entry, LogFormatType type,
   delete alt_fieldlist;
   ats_free(alt_printf_str);
   ats_free(alt_symbol_str);
+  if (delete_fieldlist_p) delete fieldlist;
 
   return ret;
 }

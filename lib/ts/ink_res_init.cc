@@ -262,7 +262,7 @@ ink_res_setoptions(ink_res_state statp, const char *options, const char *source 
   }
 }
 
-static u_int
+static unsigned
 ink_res_randomid(void) {
   struct timeval now;
 
@@ -621,8 +621,8 @@ parse_host_res_preference(char const* value, HostResPreferenceOrder order) {
       order[np++] = HOST_RES_PREFER_IPV4;
     if (!found[HOST_RES_PREFER_IPV6])
       order[np++] = HOST_RES_PREFER_IPV6;
-    if (np < N_HOST_RES_PREFERENCE)
-      order[np++] = HOST_RES_PREFER_NONE;
+    if (np < N_HOST_RES_PREFERENCE_ORDER) // was N_HOST_RES_PREFERENCE)
+      order[np] = HOST_RES_PREFER_NONE;
   }
 }      
 

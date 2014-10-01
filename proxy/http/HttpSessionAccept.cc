@@ -31,15 +31,15 @@ void
 HttpSessionAccept::accept(NetVConnection * netvc, MIOBuffer * iobuf, IOBufferReader * reader)
 {
   sockaddr const* client_ip = netvc->get_remote_addr();
-  uint32_t acl_method_mask = 0;
+  const AclRecord *acl_record = NULL;
   ip_port_text_buffer ipb;
   IpAllow::scoped_config ipallow;
 
   // The backdoor port is now only bound to "localhost", so no
   // reason to check for if it's incoming from "localhost" or not.
   if (backdoor) {
-    acl_method_mask = IpAllow::AllMethodMask();
-  } else if (ipallow && ((acl_method_mask = ipallow->match(client_ip)) == 0)) {
+    acl_record = IpAllow::AllMethodAcl();
+  } else if (ipallow && (((acl_record = ipallow->match(client_ip)) == NULL) || (acl_record->isEmpty()))) {
     ////////////////////////////////////////////////////
     // if client address forbidden, close immediately //
     ////////////////////////////////////////////////////
@@ -49,7 +49,11 @@ HttpSessionAccept::accept(NetVConnection * netvc, MIOBuffer * iobuf, IOBufferRea
     return;
   }
 
-  netvc->attributes = transport_type;
+  // Set the transport type if not already set
+  if (HttpProxyPort::TRANSPORT_NONE == netvc->attributes) {
+    netvc->attributes = transport_type;
+  }
+
 
   if (is_debug_tag_set("http_seq")) {
     Debug("http_seq", "[HttpSessionAccept:mainEvent %p] accepted connection from %s transport type = %d", netvc, ats_ip_nptop(client_ip, ipb, sizeof(ipb)), netvc->attributes);
@@ -64,9 +68,9 @@ HttpSessionAccept::accept(NetVConnection * netvc, MIOBuffer * iobuf, IOBufferRea
   new_session->outbound_ip6 = outbound_ip6;
   new_session->outbound_port = outbound_port;
   new_session->host_res_style = ats_host_res_from(client_ip->sa_family, host_res_preference);
-  new_session->acl_method_mask = acl_method_mask;
+  new_session->acl_record = acl_record;
 
-  new_session->new_connection(netvc, backdoor, iobuf, reader);
+  new_session->new_connection(netvc, iobuf, reader, backdoor);
 
   return;
 }

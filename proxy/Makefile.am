@@ -17,7 +17,7 @@
 #  limitations under the License.
 
 # Note that hdrs is targeted from ../Makefile.am
-SUBDIRS = congest http spdy logging config
+SUBDIRS = congest http http2 spdy logging config
 noinst_LIBRARIES =
 bin_PROGRAMS = \
   traffic_server \
@@ -122,12 +122,6 @@ LUAJIT = \
   lj_vmevent.o \
   lj_vmmath.o
 
-if STATIC_LIBTS
-    which_libts = $(top_builddir)/lib/ts/.libs/libtsutil.a
-else
-    which_libts = $(top_builddir)/lib/ts/libtsutil.la
-endif
-
 EXTRA_DIST = InkAPITestTool.cc example_alarm_bin.sh example_prep.sh
 
 traffic_server_SOURCES = \
@@ -170,6 +164,8 @@ traffic_server_SOURCES = \
   Prefetch.h \
   ProtocolProbeSessionAccept.cc \
   ProtocolProbeSessionAccept.h \
+  ProxyClientSession.cc \
+  ProxyClientSession.h \
   ReverseProxy.cc \
   ReverseProxy.h \
   SocksProxy.cc \
@@ -190,8 +186,14 @@ if BUILD_TESTS
 endif
 
 traffic_server_LDFLAGS = @EXTRA_CXX_LDFLAGS@ @LIBTOOL_LINK_FLAGS@
+
+if BUILD_STATIC_PROXY
+traffic_server_LDFLAGS += -all-static
+endif
+
 traffic_server_LDADD = \
   http/libhttp.a \
+  http2/libhttp2.a \
   spdy/libspdy.a \
   http/remap/libhttp_remap.a \
   congest/libCongestionControl.a \
@@ -202,8 +204,7 @@ traffic_server_LDADD = \
   shared/libdiagsconfig.a  \
   shared/libsignals.a \
   shared/libxml.a \
-  $(top_builddir)/mgmt/utils/libutils_p.a \
-  $(top_builddir)/mgmt/libmgmt_p.a \
+  $(top_builddir)/mgmt/libmgmt_p.la \
   $(top_builddir)/iocore/utils/libinkutils.a \
   $(top_builddir)/iocore/cluster/libinkcluster.a \
   $(top_builddir)/iocore/dns/libinkdns.a \
@@ -214,16 +215,14 @@ traffic_server_LDADD = \
   $(top_builddir)/iocore/aio/libinkaio.a \
   $(top_builddir)/iocore/net/libinknet.a \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
-  $(top_builddir)/lib/records/librecprocess.a \
+  $(top_builddir)/lib/records/librecords_p.a \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
-  $(which_libts) \
-  $(LUAJIT:%=$(top_builddir)/lib/luajit/src/%) \
-  @hwloc_LIBS@ \
+  $(top_builddir)/lib/ts/libtsutil.la \
+  @HWLOC_LIBS@ \
   @LIBPCRE@ \
   @OPENSSL_LIBS@ \
   @LIBTCL@ \
   @LIBEXPAT@ \
-  @LIBDEMANGLE@ \
   @LIBCAP@ \
   @LIBRESOLV@ \
   @LIBZ@ \
@@ -232,10 +231,13 @@ traffic_server_LDADD = \
   @SPDYLAY_LIBS@ \
   -lm
 
+if BUILD_LUAJIT
+  traffic_server_LDADD += $(LUAJIT:%=$(top_builddir)/lib/luajit/src/%)
 
-# On Darwin LuaJIT requires magic link options, otherwise it will crash in luaL_openlibs() at startup. See
-# http://luajit.org/install.html.
-traffic_server_LDFLAGS += @LUA_LUAJIT_LDFLAGS@
+  # On Darwin LuaJIT requires magic link options, otherwise it will crash in luaL_openlibs() at startup. See
+  # http://luajit.org/install.html.
+  traffic_server_LDFLAGS += $(TS_LUAJIT_LDFLAGS)
+endif
 
 traffic_logcat_SOURCES = logcat.cc
 traffic_logcat_LDFLAGS = @EXTRA_CXX_LDFLAGS@ @LIBTOOL_LINK_FLAGS@
@@ -245,13 +247,12 @@ traffic_logcat_LDADD = \
   shared/libUglyLogStubs.a \
   shared/libsignals.a \
   shared/libxml.a \
-  $(top_builddir)/mgmt/utils/libutils_p.a \
-  $(top_builddir)/mgmt/libmgmt_p.a \
-  $(top_builddir)/lib/records/librecprocess.a \
+  $(top_builddir)/mgmt/libmgmt_p.la \
+  $(top_builddir)/lib/records/librecords_p.a \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
   $(top_builddir)/lib/ts/libtsutil.la \
-  @LIBRESOLV@ @LIBPCRE@ @OPENSSL_LIBS@ @LIBTCL@ @hwloc_LIBS@ \
-  @LIBEXPAT@ @LIBDEMANGLE@ @LIBPROFILER@ -lm
+  @LIBRESOLV@ @LIBPCRE@ @OPENSSL_LIBS@ @LIBTCL@ @HWLOC_LIBS@ \
+  @LIBEXPAT@ @LIBPROFILER@ -lm
 
 traffic_logstats_SOURCES = logstats.cc
 traffic_logstats_LDFLAGS = @EXTRA_CXX_LDFLAGS@ @LIBTOOL_LINK_FLAGS@
@@ -261,13 +262,12 @@ traffic_logstats_LDADD = \
   shared/libUglyLogStubs.a \
   shared/libsignals.a \
   shared/libxml.a \
-  $(top_builddir)/mgmt/utils/libutils_p.a \
-  $(top_builddir)/mgmt/libmgmt_p.a \
-  $(top_builddir)/lib/records/librecprocess.a \
+  $(top_builddir)/mgmt/libmgmt_p.la \
+  $(top_builddir)/lib/records/librecords_p.a \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
   $(top_builddir)/lib/ts/libtsutil.la \
-  @LIBRESOLV@ @LIBPCRE@ @OPENSSL_LIBS@ @LIBTCL@ @hwloc_LIBS@ \
-  @LIBEXPAT@ @LIBDEMANGLE@ @LIBPROFILER@ -lm
+  @LIBRESOLV@ @LIBPCRE@ @OPENSSL_LIBS@ @LIBTCL@ @HWLOC_LIBS@ \
+  @LIBEXPAT@ @LIBPROFILER@ -lm
 
 traffic_sac_SOURCES = \
   sac.cc \
@@ -290,6 +290,8 @@ traffic_sac_SOURCES = \
   Prefetch.cc \
   ProtocolProbeSessionAccept.cc \
   ProtocolProbeSessionAccept.h \
+  ProxyClientSession.cc \
+  ProxyClientSession.h \
   Update.cc \
   Plugin.cc \
   InkAPI.cc \
@@ -299,6 +301,7 @@ traffic_sac_SOURCES = \
 traffic_sac_LDFLAGS = @EXTRA_CXX_LDFLAGS@ @LIBTOOL_LINK_FLAGS@
 traffic_sac_LDADD = \
   http/libhttp.a \
+  http2/libhttp2.a \
   spdy/libspdy.a \
   shared/libdiagsconfig.a \
   http/remap/libhttp_remap.a \
@@ -309,8 +312,7 @@ traffic_sac_LDADD = \
   shared/liberror.a \
   shared/libsignals.a \
   shared/libxml.a \
-  $(top_builddir)/mgmt/utils/libutils_p.a \
-  $(top_builddir)/mgmt/libmgmt_p.a \
+  $(top_builddir)/mgmt/libmgmt_p.la \
   $(top_builddir)/iocore/cluster/libinkcluster.a \
   $(top_builddir)/iocore/dns/libinkdns.a \
   $(top_builddir)/iocore/hostdb/libinkhostdb.a \
@@ -320,10 +322,10 @@ traffic_sac_LDADD = \
   $(top_builddir)/iocore/aio/libinkaio.a \
   $(top_builddir)/iocore/net/libinknet.a \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
-  $(top_builddir)/lib/records/librecprocess.a \
+  $(top_builddir)/lib/records/librecords_p.a \
   $(top_builddir)/lib/ts/libtsutil.la \
-  @LIBRESOLV@ @LIBPCRE@ @OPENSSL_LIBS@ @LIBTCL@ @hwloc_LIBS@ \
-  @LIBEXPAT@ @LIBDEMANGLE@ @LIBZ@ @LIBLZMA@ @LIBPROFILER@ @SPDYLAY_LIBS@ -lm
+  @LIBRESOLV@ @LIBPCRE@ @OPENSSL_LIBS@ @LIBTCL@ @HWLOC_LIBS@ \
+  @LIBEXPAT@ @LIBZ@ @LIBLZMA@ @LIBPROFILER@ @SPDYLAY_LIBS@ -lm
 
 if BUILD_TESTS
   traffic_sac_SOURCES += RegressionSM.cc
@@ -332,9 +334,8 @@ endif
 
 test_xml_parser_SOURCES = test_xml_parser.cc
 test_xml_parser_LDADD = \
-  $(top_builddir)/lib/records/librecprocess.a \
-  $(top_builddir)/mgmt/libmgmt_p.a \
-  $(top_builddir)/mgmt/utils/libutils_p.a \
+  $(top_builddir)/mgmt/libmgmt_p.la \
+  $(top_builddir)/lib/records/librecords_p.a \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
   $(top_builddir)/lib/ts/libtsutil.la \
   shared/libsignals.a \

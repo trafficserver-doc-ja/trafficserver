@@ -201,19 +201,20 @@ LogFilterString::wipe_this_entry(LogAccess * lad)
 
   static const unsigned BUFSIZE = 1024;
   char small_buf[BUFSIZE];
-  char small_buf_upper[BUFSIZE];
   char *big_buf = NULL;
-  char *big_buf_upper = NULL;
   char *buf = small_buf;
-  char *buf_upper = small_buf_upper;
   size_t marsh_len = m_field->marshal_len(lad);      // includes null termination
 
   if (marsh_len > BUFSIZE) {
-    big_buf = (char *)ats_malloc((unsigned int) marsh_len);
+    big_buf = (char *)ats_malloc(marsh_len);
+    ink_assert(big_buf != NULL);
     buf = big_buf;
   }
 
+  ink_assert(buf != NULL);
   m_field->marshal(lad, buf);
+
+  ink_assert(buf != NULL);
 
   bool cond_satisfied = false;
   switch (m_operator) {
@@ -235,26 +236,18 @@ LogFilterString::wipe_this_entry(LogAccess * lad)
     cond_satisfied = _checkConditionAndWipe(&_isSubstring, &buf, marsh_len, m_value, DATA_LENGTH_LARGER);
     break;
   case CASE_INSENSITIVE_CONTAIN:
-    {
-      if (big_buf) {
-        big_buf_upper = (char *)ats_malloc((unsigned int) marsh_len);
-        buf_upper = big_buf_upper;
-      }
-      for (size_t i = 0; i < marsh_len; i++) {
-        buf_upper[i] = ParseRules::ink_toupper(buf[i]);
-      }
-      cond_satisfied = _checkConditionAndWipe(&_isSubstring, &buf_upper, marsh_len, m_value_uppercase, DATA_LENGTH_LARGER);
-      strcpy(buf, buf_upper);
-      break;
+    for (size_t i = 0; i < marsh_len; i++) {
+      buf[i] = ParseRules::ink_toupper(buf[i]);
     }
+    cond_satisfied = _checkConditionAndWipe(&_isSubstring, &buf, marsh_len, m_value_uppercase, DATA_LENGTH_LARGER);
+    break;
   default:
     ink_assert(!"INVALID FILTER OPERATOR");
   }
 
-  ats_free(big_buf);
-  ats_free(big_buf_upper);
-
   m_field->updateField(lad, buf, strlen(buf));
+
+  ats_free(big_buf);
   return cond_satisfied;
 }
 
@@ -288,6 +281,7 @@ bool LogFilterString::toss_this_entry(LogAccess * lad)
 
   if (marsh_len > BUFSIZE) {
     big_buf = (char *)ats_malloc((unsigned int) marsh_len);
+    ink_assert(big_buf != NULL);
     buf = big_buf;
   }
 
@@ -318,6 +312,8 @@ bool LogFilterString::toss_this_entry(LogAccess * lad)
       if (big_buf) {
         big_buf_upper = (char *)ats_malloc((unsigned int) marsh_len);
         buf_upper = big_buf_upper;
+      } else {
+        buf = small_buf; // make clang happy
       }
       for (size_t i = 0; i < marsh_len; i++) {
         buf_upper[i] = ParseRules::ink_toupper(buf[i]);
@@ -633,6 +629,233 @@ LogFilterInt::display_as_XML(FILE * fd)
   fprintf(fd, "</LogFilter>\n");
 }
 
+/*-------------------------------------------------------------------------
+  LogFilterIP::LogFilterIP
+  -------------------------------------------------------------------------*/
+LogFilterIP::LogFilterIP(const char *name, LogField * field,
+                           LogFilter::Action action, LogFilter::Operator oper, IpAddr value)
+  : LogFilter(name, field, action, oper)
+{
+  m_map.mark(value,value);
+  this->init();
+}
+
+LogFilterIP::LogFilterIP(const char *name, LogField * field,
+                           LogFilter::Action action, LogFilter::Operator oper, size_t num_values, IpAddr* value)
+  : LogFilter(name, field, action, oper)
+{
+  for ( IpAddr* limit = value + num_values ; value != limit ; ++value )
+    m_map.mark(*value,*value);
+  this->init();
+}
+
+LogFilterIP::LogFilterIP(const char *name, LogField * field,
+                           LogFilter::Action action, LogFilter::Operator oper, char *values)
+  : LogFilter(name, field, action, oper)
+{
+  // parse the comma-separated list of values and construct array
+  //
+  size_t i = 0;
+  SimpleTokenizer tok(values, ',');
+  size_t n = tok.getNumTokensRemaining();
+  char* t; // temp token pointer.
+
+  if (n) {
+    while (t = tok.getNext(), t != NULL) {
+      IpAddr min, max;
+      char* x = strchr(t, '-');
+      if (x) *x++ = 0;
+      if (0 == min.load(t)) {
+        if (x) {
+          if (0 != max.load(x)) {
+            Warning("LogFilterIP Configuration: '%s-%s' looks like a range but the second address was ill formed", t,x);
+            continue;
+          }
+        } else {
+          max = min;
+        }
+        m_map.mark(min,max);
+        ++i;
+      } else {
+        Warning("LogFilterIP Configuration:  '%s' is ill formed", t);
+      }
+    }
+    if (i < n) {
+      Warning("There were invalid IP values in the definition of filter %s"
+              " only %zu out of %zu values will be used.", name, i, n);
+    }
+  } else {
+    Warning("No values in the definition of filter %s.", name);
+  }
+  this->init();
+}
+
+LogFilterIP::LogFilterIP(const LogFilterIP & rhs)
+  : LogFilter(rhs.m_name, rhs.m_field, rhs.m_action, rhs.m_operator)
+{
+  for ( IpMap::iterator spot(rhs.m_map.begin()), limit(rhs.m_map.end()) ; spot != limit ; ++spot ) {
+    m_map.mark(spot->min(), spot->max(), spot->data());
+  }
+  this->init();
+}
+
+void
+LogFilterIP::init()
+{
+  m_type = IP_FILTER;
+  m_num_values = m_map.getCount();
+}
+
+/*-------------------------------------------------------------------------
+  LogFilterIP::~LogFilterIP
+  -------------------------------------------------------------------------*/
+
+LogFilterIP::~LogFilterIP()
+{
+}
+
+/*-------------------------------------------------------------------------
+  LogFilterIP::operator==
+
+  This operator is not very intelligent and expects the objects being
+  compared to have the same values specified *in the same order*.
+  Filters with the same values specified in different order are considered
+  to be different.
+
+  -------------------------------------------------------------------------*/
+
+bool
+LogFilterIP::operator==(LogFilterIP & rhs)
+{
+  if (m_type == rhs.m_type &&
+      *m_field == *rhs.m_field &&
+      m_action == rhs.m_action &&
+      m_operator == rhs.m_operator &&
+      m_num_values == rhs.m_num_values) {
+
+    IpMap::iterator left_spot(m_map.begin());
+    IpMap::iterator left_limit(m_map.end());
+    IpMap::iterator right_spot(rhs.m_map.begin());
+    IpMap::iterator right_limit(rhs.m_map.end());
+
+    while (left_spot != left_limit && right_spot != right_limit) {
+      if (!ats_ip_addr_eq(left_spot->min(), right_spot->min()) ||
+          !ats_ip_addr_eq(left_spot->max(), right_spot->max()))
+        break;
+      ++left_spot;
+      ++right_spot;
+    }
+
+    return left_spot == left_limit && right_spot == right_limit;
+  }
+  return false;
+}
+
+/*-------------------------------------------------------------------------
+  LogFilterIP::toss_this_entry
+  -------------------------------------------------------------------------*/
+
+bool
+LogFilterIP::is_match(LogAccess* lad)
+{
+  bool zret = false;
+
+  if (m_field && lad) {
+    LogFieldIpStorage value;
+    m_field->marshal(lad, reinterpret_cast<char *>(&value));
+    // This is bad, we abuse the fact that the initial layout of LogFieldIpStorage and IpAddr
+    // are identical. We should look at converting the log stuff to use IpAddr directly.
+    zret = m_map.contains(reinterpret_cast<IpAddr&>(value));
+  }
+
+  return zret;
+}
+
+bool
+LogFilterIP::toss_this_entry(LogAccess* lad)
+{
+  bool cond_satisfied = this->is_match(lad);
+  return (m_action == REJECT && cond_satisfied) || (m_action == ACCEPT && !cond_satisfied);
+}
+
+bool
+LogFilterIP::wipe_this_entry(LogAccess*)
+{
+# if 0
+  bool zret = WIPE_FIELD_VALUE == m_action && this->is_match(lad);
+  if (zret) {
+    // set to ADDR_ANY.
+  }
+  return zret;
+# else
+  return false;
+# endif
+}
+
+/*-------------------------------------------------------------------------
+  LogFilterIP::display
+  -------------------------------------------------------------------------*/
+
+void
+LogFilterIP::displayRange(FILE* fd, IpMap::iterator const& iter)
+{
+  ip_text_buffer ipb;
+
+  fprintf(fd, "%s", ats_ip_ntop(iter->min(), ipb, sizeof(ipb)));
+
+  if (!ats_ip_addr_eq(iter->min(), iter->max()))
+    fprintf(fd, "-%s", ats_ip_ntop(iter->max(), ipb, sizeof(ipb)));
+}
+
+void
+LogFilterIP::displayRanges(FILE * fd)
+{
+  IpMap::iterator spot(m_map.begin()), limit(m_map.end());
+  ink_assert(spot != limit);
+
+  this->displayRange(fd, spot);
+  for ( ++spot ; spot != limit ; ++spot ) {
+    for (size_t i = 1; i < m_num_values; ++i) {
+      fprintf(fd, ",");
+      this->displayRange(fd, spot);
+    }
+  }
+}
+
+void
+LogFilterIP::display(FILE* fd)
+{
+  ink_assert(fd != NULL);
+
+  if (0 == m_map.getCount()) {
+    fprintf(fd, "Filter \"%s\" is inactive, no values specified\n", m_name);
+  } else {
+    fprintf(fd, "Filter \"%s\" %sS records if %s %s ", m_name, ACTION_NAME[m_action], m_field->symbol(), OPERATOR_NAME[m_operator]);
+    this->displayRanges(fd);
+    fprintf(fd, "\n");
+  }
+}
+
+
+void
+LogFilterIP::display_as_XML(FILE * fd)
+{
+  ink_assert(fd != NULL);
+  fprintf(fd,
+          "<LogFilter>\n"
+          "  <Name      = \"%s\"/>\n"
+          "  <Action    = \"%s\"/>\n"
+          "  <Condition = \"%s %s ", m_name, ACTION_NAME[m_action], m_field->symbol(), OPERATOR_NAME[m_operator]);
+
+  if (m_map.getCount() == 0) {
+    fprintf(fd, "<no values>");
+  } else {
+    this->displayRanges(fd);
+  }
+  fprintf(fd, "\"/>\n");
+  fprintf(fd, "</LogFilter>\n");
+}
+
 bool
 filters_are_equal(LogFilter * filt1, LogFilter * filt2)
 {
@@ -643,6 +866,8 @@ filters_are_equal(LogFilter * filt1, LogFilter * filt2)
     if (filt1->type() == LogFilter::INT_FILTER) {
       Debug("log-filter-compare", "int compare");
       ret = (*((LogFilterInt *) filt1) == *((LogFilterInt *) filt2));
+    } else if (filt1->type() == LogFilter::IP_FILTER) {
+      ret = (*((LogFilterIP *) filt1) == *((LogFilterIP *) filt2));
     } else if (filt1->type() == LogFilter::STRING_FILTER) {
       ret = (*((LogFilterString *) filt1) == *((LogFilterString *) filt2));
     } else {
@@ -723,6 +948,9 @@ LogFilterList::add(LogFilter * filter, bool copy)
   if (copy) {
     if (filter->type() == LogFilter::INT_FILTER) {
       LogFilterInt *f = new LogFilterInt(*((LogFilterInt *) filter));
+      m_filter_list.enqueue(f);
+    } else if (filter->type() == LogFilter::IP_FILTER) {
+      LogFilterIP *f = new LogFilterIP(*((LogFilterIP *) filter));
       m_filter_list.enqueue(f);
     } else {
       LogFilterString *f = new LogFilterString(*((LogFilterString *) filter));

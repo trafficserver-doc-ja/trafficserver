@@ -48,10 +48,10 @@ TSRemapDoRemap(void *ih, TSHttpTxn rh, TSRemapRequestInfo* rri)
   MD5_CTX ctx;
   struct sockaddr_in *in;
   const char *qh, *ph, *ip;
-  char *s, *ptr, *val, hash[32];
   unsigned char md[MD5_DIGEST_LENGTH];
   secure_link_info *sli = (secure_link_info *)ih;
   char *token = NULL, *expire = NULL, *path = NULL;
+  char *s, *ptr, *saveptr = NULL, *val, hash[32] = "";
 
   in = (struct sockaddr_in *)TSHttpTxnClientAddrGet(rh);
   ip = inet_ntoa(in->sin_addr);
@@ -62,7 +62,7 @@ TSRemapDoRemap(void *ih, TSHttpTxn rh, TSRemapRequestInfo* rri)
   qh = TSUrlHttpQueryGet(rri->requestBufp, rri->requestUrl, &len);
   if(qh && len > 0) {
     s = (char *)TSstrndup(qh, len);
-    if((ptr = strtok(s, "&")) != NULL) {
+    if((ptr = strtok_r(s, "&", &saveptr)) != NULL) {
       do {
         if((val = strchr(ptr, '=')) != NULL) {
           *val++ = '\0';
@@ -75,14 +75,16 @@ TSRemapDoRemap(void *ih, TSHttpTxn rh, TSRemapRequestInfo* rri)
           TSError("Invalid parameter [%s]", ptr);
           break;
         }
-      } while((ptr = strtok(NULL, "&")) != NULL);
+      } while((ptr = strtok_r(NULL, "&", &saveptr)) != NULL);
+    } else {
+      TSError("strtok didn't find a & in the query string");
+      /* this is just example, so set fake params to prevent plugin crash */
+      token = TSstrdup("d41d8cd98f00b204e9800998ecf8427e");
+      expire = TSstrdup("00000000");
     }
     TSfree(s);
   } else {
     TSError("TSUrlHttpQueryGet returns empty value");
-    /* this is just example, so set fake params to prevent plugin crash */
-    token = TSstrdup("d41d8cd98f00b204e9800998ecf8427e");
-    expire = TSstrdup("00000000");
   }
 
   ph = TSUrlPathGet(rri->requestBufp, rri->requestUrl, &len);
@@ -101,8 +103,10 @@ TSRemapDoRemap(void *ih, TSHttpTxn rh, TSRemapRequestInfo* rri)
   MD5_Init(&ctx);
   MD5_Update(&ctx, sli->secret, strlen(sli->secret));
   MD5_Update(&ctx, ip, strlen(ip));
-  MD5_Update(&ctx, path, strlen(path));
-  MD5_Update(&ctx, expire, strlen(expire));
+  if (path) 
+    MD5_Update(&ctx, path, strlen(path));
+  if (expire)
+    MD5_Update(&ctx, expire, strlen(expire));
   MD5_Final(md, &ctx);
   for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
     sprintf(&hash[i * 2], "%02x", md[i]);

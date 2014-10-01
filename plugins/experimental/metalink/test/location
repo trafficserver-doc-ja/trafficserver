@@ -39,6 +39,10 @@ class factory(http.HTTPFactory):
 
         if target == '/location':
 
+          # Satisfy every case of
+          # proxy.config.http.cache.required_headers
+          ctx.setHeader('Cache-Control', 'max-age=1')
+
           ctx.write('location')
           ctx.finish()
 
@@ -76,7 +80,8 @@ class factory(protocol.ClientFactory):
     # that the Location header is not rewritten.  Then get the same
     # response after caching a matching file from a different URL and
     # check that this time the header is rewritten.
-    connectionMade = lambda ctx: ctx.transport.write('GET {0}:{1} HTTP/1.1\r\n\r\nGET {0}:{1}/location HTTP/1.1\r\n\r\nGET {0}:{1} HTTP/1.1\r\n\r\n'.format(*origin.socket.getsockname()))
+    def connectionMade(ctx):
+      ctx.transport.write('GET {0}:{1} HTTP/1.1\r\n\r\nGET {0}:{1}/location HTTP/1.1\r\n\r\nGET {0}:{1} HTTP/1.1\r\n\r\n'.format(*origin.socket.getsockname()))
 
     def handleResponsePart(ctx, data):
       try:

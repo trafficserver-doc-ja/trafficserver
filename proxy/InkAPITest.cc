@@ -159,13 +159,10 @@ REGRESSION_TEST(SDK_API_TSPluginDirGet) (RegressionTest * test, int /* atype ATS
     return;
   }
 
-  // Note: This doesn't have to be true
-  //      since the location can be anywhere
-  //      We only pass this test, with the default layout.
-  if (strstr(plugin_dir, "libexec/trafficserver") == NULL) {
+  if (strstr(plugin_dir, TS_BUILD_LIBEXECDIR) == NULL) {
     SDK_RPRINT(test, "TSPluginDirGet", "TestCase2", TC_FAIL,
-               "plugin dir(%s) is incorrect, expected (%s) in path. Are you using the default layout?",
-               plugin_dir,"libexec/trafficserver");
+               "plugin dir(%s) is incorrect, expected (%s) in path.",
+               plugin_dir, TS_BUILD_LIBEXECDIR);
     *pstatus = REGRESSION_TEST_FAILED;
     return;
   }
@@ -1567,7 +1564,7 @@ REGRESSION_TEST(SDK_API_TSMutexCreate) (RegressionTest * test, int /* atype ATS_
   /* This is normal because all locking is from the same thread */
   TSReturnCode lock = TS_ERROR;
 
-  lock = TSMutexLockTry(mutexp);
+  TSMutexLockTry(mutexp);
   lock = TSMutexLockTry(mutexp);
 
   if (TS_SUCCESS == lock) {
@@ -3258,7 +3255,6 @@ REGRESSION_TEST(SDK_API_TSHttpHdr) (RegressionTest * test, int /* atype ATS_UNUS
         if ((TSHttpHdrUrlGet(bufp1, hdr_loc1, &url_loc1) != TS_SUCCESS) ||
             (TSHttpHdrUrlGet(bufp3, hdr_loc3, &url_loc2) != TS_SUCCESS)) {
           SDK_RPRINT(test, "TSHttpHdrCopy", "TestCase1", TC_FAIL, "TSHttpVersionGet returns TS_ERROR");
-          flag = false;
         } else {
           const char *scheme1;
           const char *scheme2;
@@ -3372,7 +3368,6 @@ REGRESSION_TEST(SDK_API_TSHttpHdr) (RegressionTest * test, int /* atype ATS_UNUS
         if ((TSHttpHdrUrlGet(bufp1, hdr_loc1, &url_loc1) != TS_SUCCESS) ||
             (TSHttpHdrUrlGet(bufp4, hdr_loc4, &url_loc2) != TS_SUCCESS)) {
           SDK_RPRINT(test, "TSHttpHdrClone", "TestCase1", TC_FAIL, "TSHttpVersionGet returns TS_ERROR");
-          flag = false;
         } else {
           const char *scheme1;
           const char *scheme2;
@@ -4522,8 +4517,7 @@ REGRESSION_TEST(SDK_API_TSHttpHdrParse) (RegressionTest * test, int /* atype ATS
     start = resp;
     end = resp + strlen(resp) + 1;
     if ((retval = TSHttpHdrParseResp(parser, respbufp, resp_hdr_loc, &start, end)) == TS_PARSE_ERROR) {
-      SDK_RPRINT(test, "TSHttpHdrParseReq", "TestCase1", TC_FAIL,
-                 "TSHttpHdrParseReq returns TS_PARSE_ERROR. Maybe an error with TSHttpParserClear.");
+      SDK_RPRINT(test, "TSHttpHdrParseResp", "TestCase1", TC_FAIL, "TSHttpHdrParseResp returns TS_PARSE_ERROR.");
     } else {
       if (retval == TS_PARSE_DONE) {
         test_passed_parse_resp = true;
@@ -5341,7 +5335,7 @@ REGRESSION_TEST(SDK_API_TSTextLog) (RegressionTest * test, int /* atype ATS_UNUS
 
   /* Generate a random log file name, so if we run the test several times, we won't use the
      same log file name. */
-  xptr<char> tmp(RecConfigReadLogDir());
+  ats_scoped_str tmp(RecConfigReadLogDir());
   snprintf(logname, sizeof(logname), "RegressionTestLog%d.log", (int) getpid());
   snprintf(fullpath_logname, sizeof(fullpath_logname), "%s/%s", (const char *)tmp, logname);
 
@@ -5559,6 +5553,10 @@ typedef enum
   ORIG_TS_HTTP_PRE_REMAP_HOOK,
   ORIG_TS_HTTP_POST_REMAP_HOOK,
   ORIG_TS_HTTP_RESPONSE_CLIENT_HOOK,
+  ORIG_TS_SSL_FIRST_HOOK,
+  ORIG_TS_VCONN_PRE_ACCEPT_HOOK = ORIG_TS_SSL_FIRST_HOOK,
+  ORIG_TS_SSL_SNI_HOOK,
+  ORIG_TS_SSL_LAST_HOOK = ORIG_TS_SSL_SNI_HOOK,
   ORIG_TS_HTTP_LAST_HOOK
 } ORIG_TSHttpHookID;
 
@@ -7420,6 +7418,8 @@ const char *SDK_Overridable_Configs[TS_CONFIG_LAST_ENTRY] = {
   "proxy.config.http.cache.open_read_retry_time",
   "proxy.config.http.cache.max_open_read_retries",
   "proxy.config.http.cache.range.write",
+  "proxy.config.http.post.check.content_length.enabled",
+  "proxy.config.http.global_user_agent_header",
 };
 
 REGRESSION_TEST(SDK_API_OVERRIDABLE_CONFIGS) (RegressionTest * test, int /* atype ATS_UNUSED */, int *pstatus)
@@ -7510,6 +7510,16 @@ REGRESSION_TEST(SDK_API_OVERRIDABLE_CONFIGS) (RegressionTest * test, int /* atyp
     SDK_RPRINT(test, "TSHttpTxnConfigStringSet", "TestCase1", TC_PASS, "ok");
   } else {
     *pstatus = REGRESSION_TEST_FAILED;
+  }
+
+  Tokenizer whiteTok(" \t");
+
+  char cur_line[] = "map https://abc.com https://abc.com @plugin=conf_remap.so @pparam=proxy.config.abc='ABC DEF'";
+
+  int tok_count = whiteTok.Initialize((char*)cur_line, (SHARE_TOKS | ALLOW_SPACES));
+
+  for (int i=0; i<tok_count; i++) {
+    SDK_RPRINT(test, "Tokenizer::Initialize", "TokenizerTest", TC_PASS, "Token %d : %s\n", i, whiteTok[i]);
   }
 
   return;

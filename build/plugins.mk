@@ -19,15 +19,15 @@
 TS_PLUGIN_LDFLAGS = \
   -module \
   -shared \
-  -avoid-version
+  -avoid-version \
+  -export-symbols-regex '^(TSRemapInit|TSRemapDone|TSRemapDoRemap|TSRemapNewInstance|TSRemapDeleteInstance|TSRemapOSResponse|TSPluginInit)$$'
 
 TS_PLUGIN_CPPFLAGS = \
-  -D__STDC_LIMIT_MACROS=1 \
-  -D__STDC_FORMAT_MACROS=1 \
   -I$(top_builddir)/proxy/api \
   -I$(top_srcdir)/proxy/api \
   -I$(top_builddir)/lib/ts \
-  -I$(top_srcdir)/lib/ts
+  -I$(top_srcdir)/lib/ts \
+  -I$(top_srcdir)/lib
 
 # Provide a default AM_CPPFLAGS. Automake handles this correctly, but libtool
 # throws an error if we try to do the same with AM_LDFLAGS. Hence, we provide

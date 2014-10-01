@@ -433,6 +433,16 @@ mime_hdr_presence_unset(MIMEHdrImpl *h, int well_known_str_index)
  *                  S L O T    A C C E L E R A T O R S                 *
  *                                                                     *
  ***********************************************************************/
+inline void
+mime_hdr_init_accelerators_and_presence_bits(MIMEHdrImpl* mh)
+{
+  mh->m_presence_bits = 0;
+  mh->m_slot_accelerators[0] = 0xFFFFFFFF;
+  mh->m_slot_accelerators[1] = 0xFFFFFFFF;
+  mh->m_slot_accelerators[2] = 0xFFFFFFFF;
+  mh->m_slot_accelerators[3] = 0xFFFFFFFF;
+}
+
 inline uint32_t
 mime_hdr_get_accelerator_slotnum(MIMEHdrImpl *mh, int32_t slot_id)
 {
@@ -493,6 +503,24 @@ mime_hdr_unset_accelerators_and_presence_bits(MIMEHdrImpl *mh, MIMEField *field)
   slot_id = hdrtoken_index_to_slotid(field->m_wks_idx);
   if (slot_id != MIME_SLOTID_NONE)
     mime_hdr_set_accelerator_slotnum(mh, slot_id, MIME_FIELD_SLOTNUM_MAX);
+}
+
+/// Reset data in the header.
+/// Clear all the presence bits and accelerators.
+/// Update all the m_wks_idx values, presence bits and accelerators.
+inline void
+mime_hdr_reset_accelerators_and_presence_bits(MIMEHdrImpl* mh) {
+  mime_hdr_init_accelerators_and_presence_bits(mh);
+
+  for (MIMEFieldBlockImpl* fblock = &(mh->m_first_fblock); fblock != NULL; fblock = fblock->m_next) {
+    for ( MIMEField *field = fblock->m_field_slots, *limit = field + fblock->m_freetop ; field < limit ; ++field) {
+      if (field->is_live()) {
+        field->m_wks_idx = hdrtoken_tokenize(field->m_ptr_name, field->m_len_name);
+        if (field->is_dup_head())
+          mime_hdr_set_accelerators_and_presence_bits(mh, field);
+      }
+    }
+  }
 }
 
 int
@@ -995,11 +1023,7 @@ mime_hdr_cooked_stuff_init(MIMEHdrImpl *mh, MIMEField *changing_field_or_null)
 void
 mime_hdr_init(MIMEHdrImpl *mh)
 {
-  mh->m_presence_bits = 0;
-  mh->m_slot_accelerators[0] = 0xFFFFFFFF;
-  mh->m_slot_accelerators[1] = 0xFFFFFFFF;
-  mh->m_slot_accelerators[2] = 0xFFFFFFFF;
-  mh->m_slot_accelerators[3] = 0xFFFFFFFF;
+  mime_hdr_init_accelerators_and_presence_bits(mh);
 
   mime_hdr_cooked_stuff_init(mh, NULL);
 
@@ -2160,7 +2184,7 @@ MIMEField* MIMEHdr::get_host_port_values(
 
   if (field) {
     ts::ConstBuffer b(field->m_ptr_value, field->m_len_value);
-    ts::ConstBuffer host(0), port(0);
+    ts::ConstBuffer host, port;
 
     if (b) {
       char const* x;
@@ -2523,11 +2547,7 @@ mime_parser_parse(MIMEParser *parser, HdrHeap *heap, MIMEHdrImpl *mh, const char
       intptr_t delta = dup - field_name_first;
 
       field_name_first += delta;
-      field_name_last += delta;
       field_value_first += delta;
-      field_value_last += delta;
-      field_line_first += delta;
-      field_line_last += delta;
     }
     ///////////////////////
     // tokenize the name //
@@ -3036,7 +3056,7 @@ mime_format_date(char *buffer, time_t value)
   buf[3] = '\0';
   buf += 3;
 
-  return 29;                    // not counting NUL
+  return buf - buffer;                    // not counting NUL
 }
 
 int32_t
@@ -3656,6 +3676,11 @@ void
 MIMEHdrImpl::check_strings(HeapCheck *heaps, int num_heaps)
 {
   m_first_fblock.check_strings(heaps, num_heaps);
+}
+
+void
+MIMEHdrImpl::recompute_accelerators_and_presence_bits() {
+  mime_hdr_reset_accelerators_and_presence_bits(this);
 }
 
 

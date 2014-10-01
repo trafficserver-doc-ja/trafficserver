@@ -27,20 +27,6 @@
 #include "HTTP.h"
 #include "PluginVC.h"
 
-static const char *http_method[] = {
-  "NONE",
-  "GET",
-  "POST",
-  "CONNECT",
-  "DELETE",
-  "HEAD",
-  "PURGE",
-  "PUT",
-  "OPTIONS",
-  "TRACE",
-  "LAST",
-};
-
 #define DEBUG_TAG "FetchSM"
 #define FETCH_LOCK_RETRY_TIME HRTIME_MSECONDS(10)
 
@@ -74,6 +60,18 @@ FetchSM::httpConnect()
 
   Debug(DEBUG_TAG, "[%s] calling httpconnect write", __FUNCTION__);
   http_vc = reinterpret_cast<PluginVC*>(TSHttpConnectWithPluginId(&_addr.sa, tag, id));
+
+  /*
+   * TS-2906: We need a way to unset internal request when using FetchSM, the use case for this
+   * is SPDY when it creates outgoing requests it uses FetchSM and the outgoing requests
+   * are spawned via SPDY SYN packets which are definitely not internal requests.
+   */
+  if (!is_internal_request) {
+    PluginVC* other_side = reinterpret_cast<PluginVC*>(http_vc)->get_other_side();
+    if (other_side != NULL) {
+      other_side->set_is_internal_request(false);
+    }
+  }
 
   read_vio = http_vc->do_io_read(this, INT64_MAX, resp_buffer);
   write_vio = http_vc->do_io_write(this, getReqLen() + req_content_length, req_reader);
@@ -112,9 +110,6 @@ FetchSM::has_body()
   // http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4
   //
 
-  if (req_method == TS_FETCH_METHOD_HEAD)
-    return false;
-
   hdr = &client_response_hdr;
 
   status_code = hdr->status_get();
@@ -122,6 +117,9 @@ FetchSM::has_body()
     return false;
 
   if (check_chunked())
+    return true;
+
+  if (check_connection_close())
     return true;
 
   resp_content_length = hdr->value_get_int64(MIME_FIELD_CONTENT_LENGTH, MIME_LEN_CONTENT_LENGTH);
@@ -135,7 +133,7 @@ bool
 FetchSM::check_body_done()
 {
   if (!check_chunked()) {
-    if (resp_content_length == resp_recived_body_len + resp_reader->read_avail())
+    if (resp_content_length == resp_received_body_len + resp_reader->read_avail())
       return true;
 
     return false;
@@ -148,42 +146,57 @@ FetchSM::check_body_done()
 }
 
 bool
-FetchSM::check_chunked()
+FetchSM::check_for_field_value(char const* name, size_t name_len, char const* value, size_t value_len)
 {
-  int ret;
+  bool zret = false; // not found.
   StrList slist;
   HTTPHdr *hdr = &client_response_hdr;
-
-  if (resp_is_chunked >= 0)
-    return resp_is_chunked;
+  int ret = hdr->value_get_comma_list(name, name_len, &slist);
 
   ink_release_assert(header_done);
 
-  resp_is_chunked = 0;
-  ret = hdr->value_get_comma_list(MIME_FIELD_TRANSFER_ENCODING,
-                                  MIME_LEN_TRANSFER_ENCODING, &slist);
   if (ret) {
     for (Str *f = slist.head; f != NULL; f = f->next) {
-      if (f->len == 0)
-        continue;
-
-      size_t len = sizeof("chunked") - 1;
-      len = len > f->len ? f->len : len;
-      if (!strncasecmp(f->str, "chunked", len)) {
-        resp_is_chunked = 1;
-        if (fetch_flags & TS_FETCH_FLAGS_DECHUNK) {
-          ChunkedHandler *ch = &chunked_handler;
-          ch->init_by_action(resp_reader, ChunkedHandler::ACTION_DECHUNK);
-          ch->dechunked_reader = ch->dechunked_buffer->alloc_reader();
-          ch->state = ChunkedHandler::CHUNK_READ_SIZE;
-          resp_reader->dealloc();
-        }
-        return true;
+      if (f->len == value_len && 0 == strncasecmp(f->str, value, value_len)) {
+        Debug(DEBUG_TAG, "[%s] field '%.*s', value '%.*s'", __FUNCTION__, static_cast<int>(name_len), name, static_cast<int>(value_len), value);
+        zret = true;
+        break;
       }
     }
   }
+  return zret;
+}
 
-  return resp_is_chunked;
+bool
+FetchSM::check_chunked()
+{
+  static char const CHUNKED_TEXT[] = "chunked";
+  static size_t const CHUNKED_LEN = sizeof(CHUNKED_TEXT) - 1;
+
+  if (resp_is_chunked < 0) {
+    resp_is_chunked = static_cast<int>(this->check_for_field_value(MIME_FIELD_TRANSFER_ENCODING, MIME_LEN_TRANSFER_ENCODING, CHUNKED_TEXT, CHUNKED_LEN));
+
+    if (resp_is_chunked && (fetch_flags & TS_FETCH_FLAGS_DECHUNK)) {
+      ChunkedHandler *ch = &chunked_handler;
+      ch->init_by_action(resp_reader, ChunkedHandler::ACTION_DECHUNK);
+      ch->dechunked_reader = ch->dechunked_buffer->alloc_reader();
+      ch->state = ChunkedHandler::CHUNK_READ_SIZE;
+      resp_reader->dealloc();
+    }
+  }
+  return resp_is_chunked > 0;
+}
+
+bool
+FetchSM::check_connection_close()
+{
+  static char const CLOSE_TEXT[] = "close";
+  static size_t const CLOSE_LEN = sizeof(CLOSE_TEXT) - 1;
+ 
+  if (resp_received_close < 0) {
+    resp_received_close = static_cast<int>(this->check_for_field_value(MIME_FIELD_CONNECTION, MIME_LEN_CONNECTION, CLOSE_TEXT, CLOSE_LEN));
+  }
+  return resp_received_close > 0;
 }
 
 int
@@ -206,10 +219,12 @@ FetchSM::dechunk_body()
 }
 
 void
-FetchSM::InvokePluginExt(int error_event)
+FetchSM::InvokePluginExt(int fetch_event)
 {
   int event;
   EThread *mythread = this_ethread();
+  bool read_complete_event =
+       (fetch_event == TS_EVENT_VCONN_READ_COMPLETE)||(fetch_event == TS_EVENT_VCONN_EOS);
 
   //
   // Increasing *recursion* to prevent
@@ -224,8 +239,8 @@ FetchSM::InvokePluginExt(int error_event)
   if (!contp)
     goto out;
 
-  if (error_event) {
-    contp->handleEvent(error_event, this);
+  if (fetch_event && !read_complete_event) {
+    contp->handleEvent(fetch_event, this);
     goto out;
   }
 
@@ -239,19 +254,26 @@ FetchSM::InvokePluginExt(int error_event)
     goto out;
   }
 
-  Debug(DEBUG_TAG, "[%s] chunked:%d, content_len: %" PRId64 ", recived_len: %" PRId64 ", avail: %" PRId64 "\n",
-        __FUNCTION__, resp_is_chunked, resp_content_length, resp_recived_body_len,
+  Debug(DEBUG_TAG, "[%s] chunked:%d, content_len: %" PRId64 ", received_len: %" PRId64 ", avail: %" PRId64 "\n",
+        __FUNCTION__, resp_is_chunked, resp_content_length, resp_received_body_len,
         resp_is_chunked > 0 ? chunked_handler.chunked_reader->read_avail() : resp_reader->read_avail());
 
   if (resp_is_chunked > 0) {
-    if (!chunked_handler.chunked_reader->read_avail())
+    if (!chunked_handler.chunked_reader->read_avail()) {
+      if (read_complete_event) {
+        contp->handleEvent(TS_FETCH_EVENT_EXT_BODY_DONE, this);
+      }
       goto out;
+    }
   } else if (!resp_reader->read_avail()) {
+      if (read_complete_event) {
+        contp->handleEvent(TS_FETCH_EVENT_EXT_BODY_DONE, this);
+      }
       goto out;
   }
 
   if (!check_chunked()) {
-    if (!check_body_done())
+    if (!check_body_done() && !read_complete_event)
       contp->handleEvent(TS_FETCH_EVENT_EXT_BODY_READY, this);
     else
       contp->handleEvent(TS_FETCH_EVENT_EXT_BODY_DONE, this);
@@ -310,7 +332,8 @@ FetchSM::get_info_from_buffer(IOBufferReader *the_reader)
   info = (char *)ats_malloc(sizeof(char) * (read_avail+1));
   client_response = info;
 
-  if (!check_chunked()) {
+  // To maintain backwards compatability we don't allow chunking when it's not streaming.
+  if (!(fetch_flags & TS_FETCH_FLAGS_STREAM) || !check_chunked()) {
     /* Read the data out of the reader */
     while (read_avail > 0) {
       if (reader->block != NULL)
@@ -373,11 +396,28 @@ FetchSM::process_fetch_read(int event)
   Debug(DEBUG_TAG, "[%s] I am here read", __FUNCTION__);
   int64_t bytes;
   int bytes_used;
+  int64_t total_bytes_copied = 0;
 
   switch (event) {
   case TS_EVENT_VCONN_READ_READY:
-    bytes = resp_reader->read_avail();
-    Debug(DEBUG_TAG, "[%s] number of bytes in read ready %" PRId64, __FUNCTION__, bytes);
+    // duplicate the bytes for backward compatibility with TSFetchUrl()
+    if (!(fetch_flags & TS_FETCH_FLAGS_STREAM)) {
+      bytes = resp_reader->read_avail();
+      Debug(DEBUG_TAG, "[%s] number of bytes in read ready %" PRId64, __FUNCTION__, bytes);
+
+      while (total_bytes_copied < bytes) {
+         int64_t actual_bytes_copied;
+         actual_bytes_copied = resp_buffer->write(resp_reader, bytes, 0);
+         Debug(DEBUG_TAG, "[%s] copied %" PRId64 " bytes", __FUNCTION__, actual_bytes_copied);
+         if (actual_bytes_copied <= 0) {
+             break;
+         }
+         total_bytes_copied += actual_bytes_copied;
+      }
+      Debug(DEBUG_TAG, "[%s] total copied %" PRId64 " bytes", __FUNCTION__, total_bytes_copied);
+      resp_reader->consume(total_bytes_copied);
+    }
+
     if (header_done == 0 && ((fetch_flags & TS_FETCH_FLAGS_STREAM) || callback_options == AFTER_HEADER)) {
       if (client_response_hdr.parse_resp(&http_parser, resp_reader, &bytes_used, 0) == PARSE_DONE) {
         header_done = 1;
@@ -389,15 +429,13 @@ FetchSM::process_fetch_read(int event)
     } else {
       if (fetch_flags & TS_FETCH_FLAGS_STREAM)
         return InvokePluginExt();
-      else
-        InvokePlugin(TS_FETCH_EVENT_EXT_BODY_READY, this);
     }
     read_vio->reenable();
     break;
   case TS_EVENT_VCONN_READ_COMPLETE:
   case TS_EVENT_VCONN_EOS:
     if (fetch_flags & TS_FETCH_FLAGS_STREAM)
-      return InvokePluginExt();
+      return InvokePluginExt(event);
     if(callback_options == AFTER_HEADER || callback_options == AFTER_BODY) {
       get_info_from_buffer(resp_reader);
       InvokePlugin( callback_events.success_event_id, (void *) this);
@@ -461,7 +499,7 @@ FetchSM::fetch_handler(int event, void *edata)
 }
 
 void
-FetchSM::ext_init(Continuation *cont, TSFetchMethod method,
+FetchSM::ext_init(Continuation *cont, const char *method,
                   const char *url, const char *version,
                   const sockaddr *client_addr, int flags)
 {
@@ -481,6 +519,9 @@ FetchSM::ext_init(Continuation *cont, TSFetchMethod method,
   // Enable stream IO automatically.
   //
   fetch_flags = (TS_FETCH_FLAGS_STREAM | flags);
+  if (fetch_flags & TS_FETCH_FLAGS_NOT_INTERNAL_REQUEST) {
+    set_internal_request(false);
+  }
 
   //
   // These options are not used when enable
@@ -489,8 +530,7 @@ FetchSM::ext_init(Continuation *cont, TSFetchMethod method,
   memset(&callback_options, 0, sizeof(callback_options));
   memset(&callback_events, 0, sizeof(callback_events));
 
-  req_method = method;
-  req_buffer->write(http_method[method], strlen(http_method[method]));
+  req_buffer->write(method, strlen(method));
   req_buffer->write(" ", 1);
   req_buffer->write(url, strlen(url));
   req_buffer->write(" ", 1);
@@ -523,27 +563,15 @@ FetchSM::ext_lanuch()
 void
 FetchSM::ext_write_data(const void *data, size_t len)
 {
-  bool writeReady = (header_done ||
-		    (req_method == TS_FETCH_METHOD_POST) ||
-		    (req_method == TS_FETCH_METHOD_PUT));
-
-  if (writeReady && (fetch_flags & TS_FETCH_FLAGS_NEWLOCK)) {
+  if (fetch_flags & TS_FETCH_FLAGS_NEWLOCK) {
     MUTEX_TAKE_LOCK(mutex, this_ethread());
   }
-
   req_buffer->write(data, len);
 
-  //
-  // Before header_done, FetchSM may not
-  // be initialized.
-  //
-  if (writeReady) {
-    Debug(DEBUG_TAG, "[%s] re-enabling write_vio, header_done %u, req_method %u", __FUNCTION__, header_done, req_method);
-    write_vio->reenable();
-    fetch_handler(TS_EVENT_VCONN_WRITE_READY, write_vio);
-  }
+  Debug(DEBUG_TAG, "[%s] re-enabling write_vio, header_done %u", __FUNCTION__, header_done);
+  write_vio->reenable();
 
-  if (writeReady && (fetch_flags & TS_FETCH_FLAGS_NEWLOCK)) {
+  if (fetch_flags & TS_FETCH_FLAGS_NEWLOCK) {
     MUTEX_UNTAKE_LOCK(mutex, this_ethread());
   }
 }
@@ -591,7 +619,7 @@ FetchSM::ext_read_data(char *buf, size_t len)
     blk = next_blk;
   }
 
-  resp_recived_body_len += already;
+  resp_received_body_len += already;
   TSIOBufferReaderConsume(reader, already);
 
   read_vio->reenable();

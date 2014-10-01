@@ -1281,6 +1281,7 @@ HttpConfig::startup()
   HttpEstablishStaticConfigByte(c.oride.flow_control_enabled, "proxy.config.http.flow_control.enabled");
   HttpEstablishStaticConfigLongLong(c.oride.flow_high_water_mark, "proxy.config.http.flow_control.high_water");
   HttpEstablishStaticConfigLongLong(c.oride.flow_low_water_mark, "proxy.config.http.flow_control.low_water");
+  HttpEstablishStaticConfigByte(c.oride.post_check_content_length_enabled, "proxy.config.http.post.check.content_length.enabled");
 //HttpEstablishStaticConfigByte(c.oride.share_server_sessions, "proxy.config.http.share_server_sessions");
 
   // 4.2 Backwards compatibility
@@ -1338,8 +1339,10 @@ HttpConfig::startup()
   HttpEstablishStaticConfigByte(c.oride.anonymize_remove_client_ip, "proxy.config.http.anonymize_remove_client_ip");
   HttpEstablishStaticConfigByte(c.oride.anonymize_insert_client_ip, "proxy.config.http.anonymize_insert_client_ip");
   HttpEstablishStaticConfigStringAlloc(c.anonymize_other_header_list, "proxy.config.http.anonymize_other_header_list");
-  HttpEstablishStaticConfigStringAlloc(c.global_user_agent_header, "proxy.config.http.global_user_agent_header");
-  c.global_user_agent_header_size = c.global_user_agent_header ? strlen(c.global_user_agent_header) : 0;
+
+  HttpEstablishStaticConfigStringAlloc(c.oride.global_user_agent_header, "proxy.config.http.global_user_agent_header");
+  c.oride.global_user_agent_header_size = c.oride.global_user_agent_header ?
+    strlen(c.oride.global_user_agent_header) : 0;
 
   HttpEstablishStaticConfigByte(c.oride.proxy_response_server_enabled, "proxy.config.http.response_server_enabled");
   HttpEstablishStaticConfigStringAlloc(c.oride.proxy_response_server_string, "proxy.config.http.response_server_str");
@@ -1391,6 +1394,7 @@ HttpConfig::startup()
   HttpEstablishStaticConfigByte(c.oride.cache_ignore_auth, "proxy.config.http.cache.ignore_authentication");
   HttpEstablishStaticConfigByte(c.oride.cache_urls_that_look_dynamic, "proxy.config.http.cache.cache_urls_that_look_dynamic");
   HttpEstablishStaticConfigByte(c.cache_enable_default_vary_headers, "proxy.config.http.cache.enable_default_vary_headers");
+  HttpEstablishStaticConfigByte(c.cache_post_method, "proxy.config.http.cache.post_method");
 
   HttpEstablishStaticConfigByte(c.ignore_accept_mismatch, "proxy.config.http.cache.ignore_accept_mismatch");
   HttpEstablishStaticConfigByte(c.ignore_accept_language_mismatch, "proxy.config.http.cache.ignore_accept_language_mismatch");
@@ -1422,8 +1426,6 @@ HttpConfig::startup()
   HttpEstablishStaticConfigLongLong(c.slow_log_threshold, "proxy.config.http.slow.log.threshold");
 
   HttpEstablishStaticConfigByte(c.record_cop_page, "proxy.config.http.record_heartbeat");
-
-  HttpEstablishStaticConfigByte(c.record_tcp_mem_hit, "proxy.config.http.record_tcp_mem_hit");
 
   HttpEstablishStaticConfigByte(c.oride.send_http11_requests, "proxy.config.http.send_http11_requests");
 
@@ -1463,6 +1465,10 @@ HttpConfig::startup()
   HttpEstablishStaticConfigLongLong(c.number_of_redirections, "proxy.config.http.number_of_redirections");
   HttpEstablishStaticConfigLongLong(c.post_copy_size, "proxy.config.http.post_copy_size");
 
+  // Local Manager
+  HttpEstablishStaticConfigLongLong(c.autoconf_port, "proxy.config.admin.autoconf_port");
+  HttpEstablishStaticConfigByte(c.autoconf_localhost_only, "proxy.config.admin.autoconf.localhost_only");
+
   // Cluster time delta gets it own callback since it needs
   //  to use ink_atomic_swap
   c.cluster_time_delta = 0;
@@ -1498,7 +1504,7 @@ HttpConfig::reconfigure()
   params->no_dns_forward_to_parent = INT_TO_BOOL(m_master.no_dns_forward_to_parent);
   params->uncacheable_requests_bypass_parent = INT_TO_BOOL(m_master.uncacheable_requests_bypass_parent);
   params->no_origin_server_dns = INT_TO_BOOL(m_master.no_origin_server_dns);
-  params->use_client_target_addr = INT_TO_BOOL(m_master.use_client_target_addr);
+  params->use_client_target_addr = m_master.use_client_target_addr;
   params->use_client_source_port = INT_TO_BOOL(m_master.use_client_source_port);
   params->oride.maintain_pristine_host_hdr = INT_TO_BOOL(m_master.oride.maintain_pristine_host_hdr);
 
@@ -1536,6 +1542,8 @@ HttpConfig::reconfigure()
   params->oride.chunking_enabled = INT_TO_BOOL(m_master.oride.chunking_enabled);
   params->oride.http_chunking_size = m_master.oride.http_chunking_size;
 
+  params->oride.post_check_content_length_enabled = INT_TO_BOOL(m_master.oride.post_check_content_length_enabled);
+
   params->oride.flow_control_enabled = INT_TO_BOOL(m_master.oride.flow_control_enabled);
   params->oride.flow_high_water_mark = m_master.oride.flow_high_water_mark;
   params->oride.flow_low_water_mark = m_master.oride.flow_low_water_mark;
@@ -1554,6 +1562,7 @@ HttpConfig::reconfigure()
 //  params->oride.share_server_sessions = m_master.oride.share_server_sessions;
   params->oride.server_session_sharing_pool = m_master.oride.server_session_sharing_pool;
   params->oride.server_session_sharing_match = m_master.oride.server_session_sharing_match;
+  params->oride.keep_alive_post_out = m_master.oride.keep_alive_post_out;
 
   params->oride.keep_alive_no_activity_timeout_in = m_master.oride.keep_alive_no_activity_timeout_in;
   params->oride.keep_alive_no_activity_timeout_out = m_master.oride.keep_alive_no_activity_timeout_out;
@@ -1591,9 +1600,9 @@ HttpConfig::reconfigure()
   params->oride.anonymize_insert_client_ip = INT_TO_BOOL(m_master.oride.anonymize_insert_client_ip);
   params->anonymize_other_header_list = ats_strdup(m_master.anonymize_other_header_list);
 
-  params->global_user_agent_header = ats_strdup(m_master.global_user_agent_header);
-  params->global_user_agent_header_size = params->global_user_agent_header ?
-    strlen(params->global_user_agent_header) : 0;
+  params->oride.global_user_agent_header = ats_strdup(m_master.oride.global_user_agent_header);
+  params->oride.global_user_agent_header_size = params->oride.global_user_agent_header ?
+    strlen(params->oride.global_user_agent_header) : 0;
 
   params->oride.proxy_response_server_string = ats_strdup(m_master.oride.proxy_response_server_string);
   params->oride.proxy_response_server_string_len = params->oride.proxy_response_server_string ?
@@ -1641,6 +1650,7 @@ HttpConfig::reconfigure()
   params->oride.cache_ignore_auth = INT_TO_BOOL(m_master.oride.cache_ignore_auth);
   params->oride.cache_urls_that_look_dynamic = INT_TO_BOOL(m_master.oride.cache_urls_that_look_dynamic);
   params->cache_enable_default_vary_headers = INT_TO_BOOL(m_master.cache_enable_default_vary_headers);
+  params->cache_post_method = INT_TO_BOOL(m_master.cache_post_method);
 
   params->ignore_accept_mismatch = m_master.ignore_accept_mismatch;
   params->ignore_accept_language_mismatch = m_master.ignore_accept_language_mismatch;
@@ -1668,7 +1678,6 @@ params->push_method_enabled = INT_TO_BOOL(m_master.push_method_enabled);
   params->errors_log_error_pages = INT_TO_BOOL(m_master.errors_log_error_pages);
   params->slow_log_threshold = m_master.slow_log_threshold;
   params->record_cop_page = INT_TO_BOOL(m_master.record_cop_page);
-  params->record_tcp_mem_hit = INT_TO_BOOL(m_master.record_tcp_mem_hit);
   params->oride.send_http11_requests = m_master.oride.send_http11_requests;
   params->oride.doc_in_cache_skip_dns = INT_TO_BOOL(m_master.oride.doc_in_cache_skip_dns);
   params->oride.default_buffer_size_index = m_master.oride.default_buffer_size_index;
@@ -1706,6 +1715,10 @@ params->push_method_enabled = INT_TO_BOOL(m_master.push_method_enabled);
   params->redirection_host_no_port = INT_TO_BOOL(m_master.redirection_host_no_port);
   params->number_of_redirections = m_master.number_of_redirections;
   params->post_copy_size = m_master.post_copy_size;
+
+  // Local Manager
+  params->autoconf_port = m_master.autoconf_port;
+  params->autoconf_localhost_only = m_master.autoconf_localhost_only;
 
   m_id = configProcessor.set(m_id, params);
 

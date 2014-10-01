@@ -90,6 +90,7 @@ typedef struct {
   /* Digest header field value index */
   int idx;
 
+  TSVConn connp;
   TSIOBuffer cache_bufp;
 
   const char *value;
@@ -163,7 +164,7 @@ cache_open_write(TSCont contp, void *edata)
 
   TSfree(value);
 
-  /* Reuse the TSCacheWrite() continuation */
+  /* Reentrant!  Reuse the TSCacheWrite() continuation. */
   TSVConnWrite(data->connp, contp, readerp, nbytes);
 
   return 0;
@@ -229,7 +230,9 @@ write_handler(TSCont contp, TSEvent event, void *edata)
  *
  *    1.  Check if we are "closed" before doing anything else to avoid
  *        errors.
+ *
  *    2.  Then deal with any input that's available now.
+ *
  *    3.  Check if the input is complete after dealing with any
  *        available input in case it was the last of it.  If it is
  *        complete, tell downstream, thank upstream, and finish
@@ -293,23 +296,24 @@ write_handler(TSCont contp, TSEvent event, void *edata)
  * and the transaction won't get logged.  (If there are upstream
  * transformations they won't get a chance to clean up otherwise!)
  *
- * Summary of the cases into which each event can fall:
+ * Summary of the cases each event can fall into:
  *
  *    Closed        *We* are "closed".  Clean up allocated data.
- *
- *       Start      First (and last) time the handler was called.
- *                  (This happens when the response is 304 Not Modified.)
- *
- *       Not start  (This happens when the client or origin disconnect
+ *     │
+ *     ├ Start      First (and last) time the handler was called.
+ *     │            (This happens when the response is 304 Not
+ *     │            Modified.)
+ *     │
+ *     └ Not start  (This happens when the client or origin disconnect
  *                  before the message is complete.)
  *
  *    Start         First time the handler was called.  Initialize
- *                  data here because we can't call TSVConnWrite()
- *                  before TS_HTTP_RESPONSE_TRANSFORM_HOOK.
- *
- *       Content length
- *
- *       Chunked response
+ *     │            data here because we can't call TSVConnWrite()
+ *     │            before TS_HTTP_RESPONSE_TRANSFORM_HOOK.
+ *     │
+ *     ├ Content length
+ *     │
+ *     └ Chunked response
  *
  *    Upstream closed
  *                  (This happens when the content length is zero or
@@ -319,13 +323,13 @@ write_handler(TSCont contp, TSEvent event, void *edata)
  *    Available input
  *
  *    Input complete
- *
- *       Deja vu    There might be multiple TS_EVENT_IMMEDIATE events
- *                  between the end of the input and the
- *                  TS_EVENT_VCONN_WRITE_COMPLETE event from
- *                  downstream.
- *
- *       Not deja vu
+ *     │
+ *     ├ Deja vu    There might be multiple TS_EVENT_IMMEDIATE events
+ *     │            between the end of the input and the
+ *     │            TS_EVENT_VCONN_WRITE_COMPLETE event from
+ *     │            downstream.
+ *     │
+ *     └ Not deja vu
  *                  Tell downstream and thank upstream.
  *
  *    Downstream complete
@@ -374,7 +378,8 @@ vconn_write_ready(TSCont contp, void */* edata ATS_UNUSED */)
 
     /* Determines the Content-Length header (or a chunked response) */
 
-    /* Avoid failed assert "nbytes >= 0" if the response is chunked */
+    /* Reentrant!  Avoid failed assert "nbytes >= 0" if the response
+     * is chunked. */
     int nbytes = TSVIONBytesGet(input_viop);
     transform_data->output_viop = TSVConnWrite(output_connp, contp, readerp, nbytes < 0 ? INT64_MAX : nbytes);
 
@@ -468,6 +473,7 @@ vconn_write_ready(TSCont contp, void */* edata ATS_UNUSED */)
     contp = TSContCreate(write_handler, NULL);
     TSContDataSet(contp, write_data);
 
+    /* Reentrant! */
     TSCacheWrite(contp, write_data->key);
   }
 
@@ -539,13 +545,12 @@ static int
 cache_open_read(TSCont contp, void *edata)
 {
   SendData *data = (SendData *) TSContDataGet(contp);
-
-  TSVConn connp = (TSVConn) edata;
+  data->connp = (TSVConn) edata;
 
   data->cache_bufp = TSIOBufferCreate();
 
-  /* Reuse the TSCacheRead() continuation */
-  TSVConnRead(connp, contp, data->cache_bufp, INT64_MAX);
+  /* Reentrant!  Reuse the TSCacheRead() continuation. */
+  TSVConnRead(data->connp, contp, data->cache_bufp, INT64_MAX);
 
   return 0;
 }
@@ -579,6 +584,8 @@ rewrite_handler(TSCont contp, TSEvent event, void */* edata ATS_UNUSED */)
   SendData *data = (SendData *) TSContDataGet(contp);
   TSContDestroy(contp);
 
+  TSCacheKeyDestroy(data->key);
+
   switch (event) {
 
   /* Yes: Rewrite the Location header and reenable the response */
@@ -599,8 +606,6 @@ rewrite_handler(TSCont contp, TSEvent event, void */* edata ATS_UNUSED */)
 
   TSIOBufferDestroy(data->cache_bufp);
 
-  TSCacheKeyDestroy(data->key);
-
   TSHandleMLocRelease(data->resp_bufp, data->hdr_loc, data->location_loc);
   TSHandleMLocRelease(data->resp_bufp, TS_NULL_MLOC, data->hdr_loc);
 
@@ -617,6 +622,8 @@ vconn_read_ready(TSCont contp, void */* edata ATS_UNUSED */)
 {
   SendData *data = (SendData *) TSContDataGet(contp);
   TSContDestroy(contp);
+
+  TSVConnClose(data->connp);
 
   TSIOBufferReader readerp = TSIOBufferReaderAlloc(data->cache_bufp);
 
@@ -665,6 +672,10 @@ vconn_read_ready(TSCont contp, void */* edata ATS_UNUSED */)
   contp = TSContCreate(rewrite_handler, NULL);
   TSContDataSet(contp, data);
 
+  /* Reentrant!  (Particularly in case of a cache miss.)
+   * rewrite_handler() will clean up the TSVConnRead() buffer so be
+   * sure to close this virtual connection or CacheVC::openReadMain()
+   * will continue operating on it! */
   TSCacheRead(contp, data->key);
 
   return 0;
@@ -732,6 +743,7 @@ location_handler(TSCont contp, TSEvent event, void */* edata ATS_UNUSED */)
     contp = TSContCreate(digest_handler, NULL);
     TSContDataSet(contp, data);
 
+    /* Reentrant! */
     TSCacheRead(contp, data->key);
 
     return 0;
@@ -786,6 +798,7 @@ http_send_response_hdr(TSCont contp, void *edata)
   /* Assumption: We want to minimize cache reads, so check first that
    *
    *    1.  the response has a Location header and
+   *
    *    2.  the response has a Digest header.
    *
    * Then scan if the URL or digest already exist in the cache. */
@@ -853,6 +866,7 @@ http_send_response_hdr(TSCont contp, void *edata)
       contp = TSContCreate(location_handler, NULL);
       TSContDataSet(contp, data);
 
+      /* Reentrant! */
       TSCacheRead(contp, data->key);
 
       return 0;

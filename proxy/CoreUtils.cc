@@ -227,7 +227,6 @@ CoreUtils::read_core_memory(intptr_t vaddr, intptr_t length, char *buf, FILE * f
       for (int j = 0; j < length; j++) {
         *buf++ = (char) getc(fp);
       }
-      buf -= length;
     }
     return 1;
   }
@@ -249,7 +248,6 @@ CoreUtils::read_core_memory(intptr_t offset, intptr_t vaddr, intptr_t length, ch
       for (int j = 0; j < length; j++) {
         *buf++ = (char) getc(fp);
       }
-      buf -= length;
     }
     return 1;
   }
@@ -430,6 +428,10 @@ CoreUtils::test_HdrHeap(void *arg)
 
 // test whether a given register is an HttpSM
 //   if it is, call process_HttpSM on it
+//
+// This code generates errors from Clang, on hsm_test not being initialized
+// properly. Currently this is not used, so ifdef'ing out to suppress.
+#ifndef __clang_analyzer__
 void
 CoreUtils::test_HttpSM_from_tunnel(void *arg)
 {
@@ -450,6 +452,7 @@ CoreUtils::test_HttpSM_from_tunnel(void *arg)
     }
   }
 }
+#endif
 
 // test whether a given register is an HttpSM
 //   if it is, call process_HttpSM on it

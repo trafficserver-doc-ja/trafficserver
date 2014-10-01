@@ -16,24 +16,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-source /home/jenkins/bin/environment.sh
+# This does intentionally not run the regressions, it's primarily a "build" test
 
-if test "${JOB_NAME#*type=out_of_tree}" != "${JOB_NAME}"; then
-    cd "${WORKSPACE}/src_out-of-tree"
+cd "${WORKSPACE}/src"
 
-    # This runs its own configure, so don't use the one from snapshot.sh
-    ${ATS_MAKE} -i distclean
-    mkdir -p BUILDS && cd BUILDS
-    ../configure \
-	--enable-ccache \
-	--enable-debug \
-	--enable-werror \
-	--enable-experimental-plugins \
-	--enable-example-plugins \
-	--enable-test-tools
+autoreconf -fi
+mkdir -p BUILDS && cd BUILDS
+../configure \
+    --enable-ccache \
+    --enable-werror \
+    --enable-experimental-plugins \
+    --enable-example-plugins \
+    --enable-test-tools \
+    CORES=2
 
-    ${ATS_MAKE} -j4
-    ${ATS_MAKE} check
-
-    ${ATS_MAKE} clean
-fi
+${ATS_MAKE} -j5 V=1
+${ATS_MAKE} check VERBOSE=Y
+${ATS_MAKE} clean

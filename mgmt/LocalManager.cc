@@ -30,6 +30,9 @@
 #include "LocalManager.h"
 #include "MgmtSocket.h"
 #include "ink_cap.h"
+#include "FileManager.h"
+#include "ClusterCom.h"
+#include "VMap.h"
 
 #if TS_USE_POSIX_CAP
 #include <sys/capability.h>
@@ -51,9 +54,7 @@ LocalManager::mgmtCleanup()
   if (virt_map) {
     virt_map->rl_downAddrs();   // We are bailing done need to worry about table
   }
-#ifdef MGMT_USE_SYSLOG
   closelog();
-#endif /* MGMT_USE_SYSLOG */
   return;
 }
 
@@ -144,7 +145,7 @@ LocalManager::clearStats(const char *name)
   //   that operation works even when the proxy is off
   //
   if (this->proxy_running == 0) {
-    xptr<char> statsPath(RecConfigReadPersistentStatsPath());
+    ats_scoped_str statsPath(RecConfigReadPersistentStatsPath());
     if (unlink(statsPath) < 0) {
       if (errno != ENOENT) {
         mgmt_log(stderr, "[LocalManager::clearStats] Unlink of %s failed : %s\n", (const char *)statsPath, strerror(errno));
@@ -198,15 +199,13 @@ LocalManager::processRunning()
 }
 
 LocalManager::LocalManager(bool proxy_on)
-  : BaseManager(), run_proxy(proxy_on)
+  : BaseManager(), run_proxy(proxy_on), configFiles(NULL)
 {
   bool found;
-  xptr<char> rundir(RecConfigReadRuntimeDir());
-  xptr<char> bindir(RecConfigReadBinDir());
+  ats_scoped_str rundir(RecConfigReadRuntimeDir());
+  ats_scoped_str bindir(RecConfigReadBinDir());
 
-#ifdef MGMT_USE_SYSLOG
   syslog_facility = 0;
-#endif
 
   ccom = NULL;
   proxy_started_at = -1;
@@ -242,13 +241,13 @@ LocalManager::LocalManager(bool proxy_on)
 
 #if TS_HAS_WCCP
   // Bind the WCCP address if present.
-  xptr<char> wccp_addr_str(REC_readString("proxy.config.wccp.addr", &found));
+  ats_scoped_str wccp_addr_str(REC_readString("proxy.config.wccp.addr", &found));
   if (found && wccp_addr_str && *wccp_addr_str) {
     wccp_cache.setAddr(inet_addr(wccp_addr_str));
     mgmt_log("[LocalManager::LocalManager] WCCP identifying address set to %s.\n", static_cast<char*>(wccp_addr_str));
   }
 
-  xptr<char> wccp_config_str(REC_readString("proxy.config.wccp.services", &found));
+  ats_scoped_str wccp_config_str(REC_readString("proxy.config.wccp.services", &found));
   if (found && wccp_config_str && *wccp_config_str) {
     bool located = true;
     if (access(wccp_config_str, R_OK) == -1) {
@@ -293,6 +292,18 @@ LocalManager::LocalManager(bool proxy_on)
   return;
 }
 
+LocalManager::~LocalManager()
+{
+  delete alarm_keeper;
+  delete virt_map;
+  delete ccom;
+  ats_free(absolute_proxy_binary);
+  ats_free(proxy_name);
+  ats_free(proxy_binary);
+  ats_free(proxy_options);
+  ats_free(env_prep);
+}
+
 void
 LocalManager::initAlarm()
 {
@@ -304,9 +315,9 @@ LocalManager::initAlarm()
  *   Function initializes cluster communication structure held by local manager.
  */
 void
-LocalManager::initCCom(int mcport, char *addr, int rsport)
+LocalManager::initCCom(const AppVersionInfo& version, FileManager * configFiles, int mcport, char *addr, int rsport)
 {
-  xptr<char> rundir(RecConfigReadRuntimeDir());
+  ats_scoped_str rundir(RecConfigReadRuntimeDir());
   bool found;
   IpEndpoint cluster_ip;    // ip addr of the cluster interface
   ip_text_buffer clusterAddrStr;         // cluster ip addr as a String
@@ -354,6 +365,12 @@ LocalManager::initCCom(int mcport, char *addr, int rsport)
 
   ccom = new ClusterCom(ats_ip4_addr_cast(&cluster_ip), hostname, mcport, addr, rsport, rundir);
   virt_map = new VMap(intrName, ats_ip4_addr_cast(&cluster_ip), &lmgmt->ccom->mutex);
+
+  ccom->appVersionInfo = version;
+  ccom->configFiles = configFiles;
+
+  virt_map->appVersionInfo = version;
+
   virt_map->downAddrs();        // Just to be safe
   ccom->establishChannels();
   ats_free(intrName);
@@ -368,7 +385,7 @@ LocalManager::initCCom(int mcport, char *addr, int rsport)
 void
 LocalManager::initMgmtProcessServer()
 {
-  xptr<char> rundir(RecConfigReadRuntimeDir());
+  ats_scoped_str rundir(RecConfigReadRuntimeDir());
   char fpath[MAXPATHLEN];
   int servlen, one = 1;
   struct sockaddr_un serv_addr;
@@ -654,7 +671,7 @@ LocalManager::handleMgmtMsgFromProcesses(MgmtMessageHdr * mh)
     alarm_keeper->signalAlarm(MGMT_ALARM_PROXY_HTTP_ALLEVIATED_SERVER, data_raw);
     break;
     // Congestion Control - end
-  case INK_MGMT_SIGNAL_SAC_SERVER_DOWN:
+  case MGMT_SIGNAL_SAC_SERVER_DOWN:
     alarm_keeper->signalAlarm(MGMT_ALARM_SAC_SERVER_DOWN, data_raw);
     break;
 
@@ -725,9 +742,8 @@ LocalManager::sendMgmtMsgToProcesses(MgmtMessageHdr * mh)
       mgmt_elog(stderr, 0, "[LocalManager:sendMgmtMsgToProcesses] Unknown file change: '%s'\n", data_raw);
     }
     ink_assert(found);
-    if (!(configFiles->getRollbackObj(fname, &rb)) &&
+    if (!(configFiles && configFiles->getRollbackObj(fname, &rb)) &&
         (strcmp(data_raw, "proxy.config.cluster.cluster_configuration") != 0) &&
-        (strcmp(data_raw, "proxy.config.arm.acl_filename_master") != 0) &&
         (strcmp(data_raw, "proxy.config.body_factory.template_sets_dir") != 0)) {
       mgmt_elog(stderr, 0, "[LocalManager::sendMgmtMsgToProcesses] "
                 "Invalid 'data_raw' for MGMT_EVENT_CONFIG_FILE_UPDATE\n");
@@ -922,7 +938,7 @@ LocalManager::startProxy()
       int res;
 
       char env_prep_bin[MAXPATHLEN];
-      xptr<char> bindir(RecConfigReadBinDir());
+      ats_scoped_str bindir(RecConfigReadBinDir());
 
       ink_filepath_make(env_prep_bin, sizeof(env_prep_bin), bindir, env_prep);
       res = execl(env_prep_bin, env_prep_bin, (char*)NULL);

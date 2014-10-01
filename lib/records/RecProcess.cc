@@ -33,9 +33,10 @@
 #include "P_RecFile.h"
 
 #include "mgmtapi.h"
+#include "ProcessManager.h"
 
-static bool g_initialized = false;
-static bool g_message_initialized = false;
+// Marks whether the message handler has been initialized.
+static bool message_initialized_p = false;
 static bool g_started = false;
 static EventNotify g_force_req_notify;
 static int g_rec_raw_stat_sync_interval_ms = REC_RAW_STAT_SYNC_INTERVAL_MS;
@@ -46,7 +47,7 @@ static Event *config_update_cont_event;
 static Event *sync_cont_event;
 
 //-------------------------------------------------------------------------
-// i_am_the_record_owner, only used for librecprocess.a
+// i_am_the_record_owner, only used for librecords_p.a
 //-------------------------------------------------------------------------
 bool
 i_am_the_record_owner(RecT rec_type)
@@ -334,7 +335,7 @@ struct raw_stat_sync_cont: public Continuation
     SET_HANDLER(&raw_stat_sync_cont::exec_callbacks);
   }
 
-  int exec_callbacks(int event, Event *e)
+  int exec_callbacks(int /* event */, Event * /* e */)
   {
     RecExecRawStatSyncCbs();
     Debug("statsproc", "raw_stat_sync_cont() processed");
@@ -355,7 +356,7 @@ struct config_update_cont: public Continuation
     SET_HANDLER(&config_update_cont::exec_callbacks);
   }
 
-  int exec_callbacks(int event, Event *e)
+  int exec_callbacks(int /* event */, Event * /* e */)
   {
     RecExecConfigUpdateCbs(REC_PROCESS_UPDATE_REQUIRED);
     Debug("statsproc", "config_update_cont() processed");
@@ -387,7 +388,7 @@ struct sync_cont: public Continuation
     }
   }
 
-  int sync(int event, Event *e)
+  int sync(int /* event */, Event * /* e */)
   {
     send_push_message();
     RecSyncStatsFile();
@@ -407,7 +408,9 @@ struct sync_cont: public Continuation
 int
 RecProcessInit(RecModeT mode_type, Diags *_diags)
 {
-  if (g_initialized) {
+  static bool initialized_p = false;
+
+  if (initialized_p) {
     return REC_ERR_OKAY;
   }
 
@@ -436,11 +439,19 @@ RecProcessInit(RecModeT mode_type, Diags *_diags)
    }
    */
 
-  g_initialized = true;
+  initialized_p = true;
 
   return REC_ERR_OKAY;
 }
 
+
+void
+RecMessageInit()
+{
+  ink_assert(g_mode_type != RECM_NULL);
+  pmgmt->registerMgmtCallback(MGMT_EVENT_LIBRECORDS, RecMessageRecvThis, NULL);
+  message_initialized_p = true;
+}
 
 //-------------------------------------------------------------------------
 // RecProcessInitMessage
@@ -448,14 +459,13 @@ RecProcessInit(RecModeT mode_type, Diags *_diags)
 int
 RecProcessInitMessage(RecModeT mode_type)
 {
-  if (g_message_initialized) {
+  static bool initialized_p = false;
+
+  if (initialized_p) {
     return REC_ERR_OKAY;
   }
 
-  if (RecMessageInit() == REC_ERR_FAIL) {
-    return REC_ERR_FAIL;
-  }
-
+  RecMessageInit();
   if (RecMessageRegisterRecvCb(recv_message_cb__process, NULL)) {
     return REC_ERR_FAIL;
   }
@@ -467,7 +477,7 @@ RecProcessInitMessage(RecModeT mode_type)
     g_force_req_notify.unlock();
   }
 
-  g_message_initialized = true;
+  initialized_p = true;
 
   return REC_ERR_OKAY;
 }
@@ -887,3 +897,39 @@ RecExecRawStatSyncCbs()
 
   return REC_ERR_OKAY;
 }
+
+void
+RecSignalManager(int id, const char * msg, size_t msgsize)
+{
+  ink_assert(pmgmt);
+  pmgmt->signalManager(id, msg, msgsize);
+}
+
+int
+RecRegisterManagerCb(int _signal, RecManagerCb _fn, void *_data)
+{
+  return pmgmt->registerMgmtCallback(_signal, _fn, _data);
+}
+
+//-------------------------------------------------------------------------
+// RecMessageSend
+//-------------------------------------------------------------------------
+
+int
+RecMessageSend(RecMessage * msg)
+{
+  int msg_size;
+
+  if (!message_initialized_p)
+    return REC_ERR_OKAY;
+
+  // Make a copy of the record, but truncate it to the size actually used
+  if (g_mode_type == RECM_CLIENT || g_mode_type == RECM_SERVER) {
+    msg->o_end = msg->o_write;
+    msg_size = sizeof(RecMessageHdr) + (msg->o_write - msg->o_start);
+    pmgmt->signalManager(MGMT_SIGNAL_LIBRECORDS, (char *) msg, msg_size);
+  }
+
+  return REC_ERR_OKAY;
+}
+

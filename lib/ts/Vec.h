@@ -61,6 +61,7 @@ class Vec {
   void push_back(C a) { add(a); } // std::vector name
   bool add_exclusive(C a);
   C& add();
+  void drop();
   C pop();
   void reset();
   void clear();
@@ -111,6 +112,7 @@ class Vec {
   int write(int fd);
   int read(int fd);
   void qsort(bool (*lt)(C,C));
+  void qsort(bool (*lt)(const C &, const C &));
   
 private:
   void move_internal(Vec<C,A,S> &v);
@@ -122,11 +124,11 @@ private:
 
 // c -- class, p -- pointer to elements of v, v -- vector
 #define forv_Vec(_c, _p, _v) if ((_v).n) for (_c *qq__##_p = (_c*)0, *_p = (_v).v[0]; \
-                    ((intptr_t)(qq__##_p) < (_v).length()) && ((_p = (_v).v[(intptr_t)qq__##_p]) || 1); qq__##_p = (_c*)(((intptr_t)qq__##_p) + 1))
+                    ((uintptr_t)(qq__##_p) < (_v).length()) && ((_p = (_v).v[(intptr_t)qq__##_p]) || 1); qq__##_p = (_c*)(((intptr_t)qq__##_p) + 1))
 #define for_Vec(_c, _p, _v) if ((_v).n) for (_c *qq__##_p = (_c*)0, _p = (_v).v[0]; \
-                    ((intptr_t)(qq__##_p) < (_v).length()) && ((_p = (_v).v[(intptr_t)qq__##_p]) || 1); qq__##_p = (_c*)(((intptr_t)qq__##_p) + 1))
+                    ((uintptr_t)(qq__##_p) < (_v).length()) && ((_p = (_v).v[(intptr_t)qq__##_p]) || 1); qq__##_p = (_c*)(((intptr_t)qq__##_p) + 1))
 #define forvp_Vec(_c, _p, _v) if ((_v).n) for (_c *qq__##_p = (_c*)0, *_p = &(_v).v[0]; \
-                    ((intptr_t)(qq__##_p) < (_v).length()) && ((_p = &(_v).v[(intptr_t)qq__##_p]) || 1); qq__##_p = (_c*)(((intptr_t)qq__##_p) + 1))
+                    ((uintptr_t)(qq__##_p) < (_v).length()) && ((_p = &(_v).v[(intptr_t)qq__##_p]) || 1); qq__##_p = (_c*)(((intptr_t)qq__##_p) + 1))
 
 template <class C, class A = DefaultAlloc, int S = VEC_INTEGRAL_SHIFT_DEFAULT> class Accum { public:
   Vec<C,A,S> asset;
@@ -209,6 +211,12 @@ Vec<C,A,S>::add() {
   else
     ret = &add_internal();
   return *ret;
+}
+
+template <class C, class A, int S> inline void
+Vec<C,A,S>::drop() {
+  if (n && 0 == --n)
+    clear();
 }
 
 template <class C, class A, int S> inline C
@@ -787,7 +795,7 @@ inline void qsort_Vec(C *left, C *right, bool (*lt)(C,C)) {
 }
 
 template <class C> 
-inline void qsort_VecRef(C *left, C *right, bool (*lt)(C&,C&)) {
+inline void qsort_VecRef(C *left, C *right, bool (*lt)(const C &, const C &)) {
  Lagain:
   if (right - left < 5) {
     for (C *y = right - 1; y > left; y--) {
@@ -828,6 +836,11 @@ inline void Vec<C,A,S>::qsort(bool (*lt)(C,C)) {
     qsort_Vec<C>(&v[0], end(), lt);
 }
 
+template <class C, class A, int S> 
+inline void Vec<C,A,S>::qsort(bool (*lt)(const C &, const C &)) {
+  if (n)
+    qsort_VecRef<C>(&v[0], end(), lt);
+}
 void test_vec();
 
 #endif

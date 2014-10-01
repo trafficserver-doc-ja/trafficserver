@@ -320,6 +320,7 @@ Rule::cacheParse(char *rule, unsigned short minNumToken, unsigned short maxNumTo
       // Every token must have a '=' sign
       if (numSubRuleTok < 2) {
         setErrorHint("'=' is expected in space-delimited token");
+        delete m_tokenList;
         return NULL;
       }
 
@@ -405,7 +406,7 @@ Rule::icpParse(char *rule, unsigned short minNumToken, unsigned short maxNumToke
   tok_iter_state ruleTok_state;
   const char *tokenStr = ruleTok.iterFirst(&ruleTok_state);
   Token *token;
-  TokenList *m_tokenList = new TokenList();
+  TokenList *m_tokenList;
 
   // Sanity Check -- number of token
   if (numRuleTok < minNumToken) {
@@ -419,6 +420,7 @@ Rule::icpParse(char *rule, unsigned short minNumToken, unsigned short maxNumToke
   }
 
 
+  m_tokenList = new TokenList();
   for (; tokenStr; tokenStr = ruleTok.iterNext(&ruleTok_state)) {
     token = new Token();
     token->setName(tokenStr);
@@ -726,6 +728,7 @@ Rule::splitdnsParse(char *rule)
       // Every token must have a '=' sign
       if (numSubRuleTok < 2) {
         setErrorHint("'=' is expected in space-delimited token");
+        delete m_tokenList;
         return NULL;
       }
 
