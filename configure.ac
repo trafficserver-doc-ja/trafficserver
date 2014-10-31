@@ -1107,13 +1107,6 @@ AX_LIB_CURL([7.19], [
 )
 
 #
-# The header_rewrite module depends on boost.
-AX_BOOST_BASE([1.33],
-  [ AM_CONDITIONAL([BUILD_HAVE_BOOST], [true]) ],
-  [ AM_CONDITIONAL([BUILD_HAVE_BOOST], [false]) ]
-)
-
-#
 # Check for SSL presence and usability
 TS_CHECK_CRYPTO
 
@@ -1170,6 +1163,7 @@ fi
 
 AC_CHECK_FUNCS([clock_gettime kqueue epoll_ctl posix_memalign posix_fadvise posix_madvise posix_fallocate inotify_init])
 AC_CHECK_FUNCS([lrand48_r srand48_r port_create strlcpy strlcat sysconf getpagesize])
+AC_CHECK_FUNCS([getreuid getresuid getresgid setreuid setresuid])
 
 # Check for eventfd() and sys/eventfd.h (both must exist ...)
 AC_CHECK_HEADERS([sys/eventfd.h], [
@@ -1205,6 +1199,18 @@ else
 fi
 AC_SUBST(execinfoh)
 AC_SUBST(has_backtrace)
+
+# Remote process unwinding is only implemented on Linux because it depends on various Linux-specific
+# features such as /proc filesystem nodes, ptrace(2) and waitpid(2) extensions.
+AS_IF([test "$host_os_def" = "linux"], [
+  PKG_CHECK_MODULES([LIBUNWIND], [libunwind-ptrace], [
+    enable_remote_unwinding=yes
+  ], [
+    dnl no remote unwind support
+  ])
+])
+TS_ARG_ENABLE_VAR([use], [remote_unwinding])
+AC_SUBST(use_remote_unwinding)
 
 use_epoll=0
 use_kqueue=0
@@ -1850,6 +1856,7 @@ AC_CONFIG_FILES([
   cmd/traffic_line/Makefile
   cmd/traffic_manager/Makefile
   cmd/traffic_top/Makefile
+  cmd/traffic_via/Makefile
   doc/Makefile
   example/Makefile
   iocore/Makefile
@@ -1967,6 +1974,7 @@ AS_IF([test "x$enable_cppapi" = xyes], [
   lib/atscppapi/examples/stat_example/Makefile
   lib/atscppapi/examples/timeout_example/Makefile
   lib/atscppapi/examples/transactionhook/Makefile
+  lib/atscppapi/examples/async_http_fetch_streaming/Makefile
   lib/atscppapi/src/Makefile
 ])])
 

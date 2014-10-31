@@ -23,7 +23,6 @@
 #define __CONDITIONS_H__ 1
 
 #include <string>
-#include <boost/lexical_cast.hpp>
 #include <cstring>
 
 #include "ts/ts.h"
@@ -347,6 +346,24 @@ public:
 
 protected:
   bool eval(const Resources &res);
+};
+
+class ConditionIncomingPort : public Condition
+{
+public:
+  ConditionIncomingPort()
+  {
+    TSDebug(PLUGIN_NAME_DBG, "Calling CTOR for ConditionIncomingPort");
+  }
+
+  void initialize(Parser& p);
+  void append_value(std::string &s, const Resources &res);
+
+protected:
+  bool eval(const Resources &res);
+
+private:
+  DISALLOW_COPY_AND_ASSIGN(ConditionIncomingPort);
 };
 
 #endif // __CONDITIONS_H

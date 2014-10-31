@@ -724,6 +724,13 @@ Log::init_fields()
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "phi", field);
 
+  field = new LogField("proxy_host_port", "php",
+                       LogField::sINT,
+                       &LogAccess::marshal_proxy_host_port,
+                       &LogAccess::unmarshal_int_to_str);
+                       global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "php", field);
+
   // server -> proxy fields
 
   field = new LogField("server_host_ip", "shi",
@@ -768,6 +775,34 @@ Log::init_fields()
                        &LogAccess::unmarshal_http_version);
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "sshv", field);
+
+  field = new LogField("server_resp_time", "stms",
+                       LogField::sINT,
+                       &LogAccess::marshal_server_resp_time_ms,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "stms", field);
+
+  field = new LogField("server_resp_time_hex", "stmsh",
+                       LogField::sINT,
+                       &LogAccess::marshal_server_resp_time_ms,
+                       &LogAccess::unmarshal_int_to_str_hex);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "stmsh", field);
+
+  field = new LogField("server_resp_time_fractional", "stmsf",
+                       LogField::sINT,
+                       &LogAccess::marshal_server_resp_time_ms,
+                       &LogAccess::unmarshal_ttmsf);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "stmsf", field);
+
+  field = new LogField("server_resp_time_sec", "sts",
+                       LogField::sINT,
+                       &LogAccess::marshal_server_resp_time_s,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "sts", field);
 
   field = new LogField("cached_resp_status_code", "csssc",
                        LogField::sINT,

@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sstream>
 
 #include "ts/ts.h"
 
@@ -64,7 +65,9 @@ ConditionStatus::eval(const Resources& res)
 void
 ConditionStatus::append_value(std::string& s, const Resources& res)
 {
-  s += boost::lexical_cast<std::string>(res.resp_status);
+  std::ostringstream oss;
+  oss << res.resp_status;
+  s += oss.str();
   TSDebug(PLUGIN_NAME, "Appending STATUS(%d) to evaluation value -> %s", res.resp_status, s.c_str());
 }
 
@@ -99,7 +102,9 @@ ConditionRandom::eval(const Resources& /* res ATS_UNUSED */)
 void
 ConditionRandom::append_value(std::string& s, const Resources& /* res ATS_UNUSED */)
 {
-  s += boost::lexical_cast<std::string>(rand_r(&_seed) % _max);
+  std::ostringstream oss;
+  oss << rand_r(&_seed) % _max;
+  s += oss.str();
   TSDebug(PLUGIN_NAME, "Appending RANDOM(%d) to evaluation value -> %s", _max, s.c_str());
 }
 
@@ -485,4 +490,33 @@ ConditionClientIp::append_value(std::string &s, const Resources &res)
   if (getIP(TSHttpTxnClientAddrGet(res.txnp), ip)) {
     s.append(ip);
   }
+}
+
+void
+ConditionIncomingPort::initialize(Parser &p)
+{
+  Condition::initialize(p);
+
+  Matchers<uint16_t>* match = new Matchers<uint16_t>(_cond_op);
+  match->set(static_cast<uint16_t>(strtoul(p.get_arg().c_str(), NULL, 10)));
+  _matcher = match;
+}
+
+bool
+ConditionIncomingPort::eval(const Resources &res)
+{
+  uint16_t port = getPort(TSHttpTxnIncomingAddrGet(res.txnp));
+  bool rval = static_cast<const Matchers<uint16_t>*>(_matcher)->test(port);
+  TSDebug(PLUGIN_NAME, "Evaluating INCOMING-PORT(): %d: rval: %d", port, rval);
+  return rval;
+}
+
+void
+ConditionIncomingPort::append_value(std::string &s, const Resources &res)
+{
+  std::ostringstream oss;
+  uint16_t port = getPort(TSHttpTxnIncomingAddrGet(res.txnp));
+  oss << port;
+  s += oss.str();
+  TSDebug(PLUGIN_NAME, "Appending %d to evaluation value -> %s", port, s.c_str());
 }

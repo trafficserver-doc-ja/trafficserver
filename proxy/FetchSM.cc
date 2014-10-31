@@ -245,9 +245,24 @@ FetchSM::InvokePluginExt(int fetch_event)
   }
 
   if (!has_sent_header) {
-    contp->handleEvent(TS_FETCH_EVENT_EXT_HEAD_DONE, this);
-    has_sent_header = true;
+    if (fetch_event != TS_EVENT_VCONN_EOS) {
+      contp->handleEvent(TS_FETCH_EVENT_EXT_HEAD_DONE, this);
+      has_sent_header = true;
+    } else {
+      contp->handleEvent(fetch_event, this);
+      goto out;
+    }
   }
+
+  // TS-3112: always check 'contp' after handleEvent() 
+  // since handleEvent effectively calls the plugin (or SPDY layer)
+  // which may call TSFetchDestroy in error conditions. 
+  // TSFetchDestroy sets contp to NULL, but, doesn't destroy FetchSM yet, 
+  // since, it¹s in a tight loop protected by 'recursion' counter. 
+  // When handleEvent returns, 'recursion' is decremented and contp is 
+  // already null, so, FetchSM gets destroyed.
+  if (!contp)
+    goto out;
 
   if (!has_body()) {
     contp->handleEvent(TS_FETCH_EVENT_EXT_BODY_DONE, this);
@@ -290,6 +305,11 @@ FetchSM::InvokePluginExt(int fetch_event)
       }
 
       contp->handleEvent(event, this);
+
+      // contp may be null after handleEvent
+      if (!contp)
+        goto out;
+
     } while (chunked_handler.state == ChunkedHandler::CHUNK_FLOW_CONTROL);
   } else if (check_body_done()){
     contp->handleEvent(TS_FETCH_EVENT_EXT_BODY_DONE, this);

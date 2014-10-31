@@ -102,7 +102,6 @@ extern "C" int plock(int);
 #define DEFAULT_COMMAND_FLAG              0
 
 #define DEFAULT_VERBOSE_FLAG              0
-#define DEFAULT_VERSION_FLAG              0
 #define DEFAULT_STACK_TRACE_FLAG          0
 
 #if DEFAULT_COMMAND_FLAG
@@ -119,8 +118,6 @@ static const long MAX_LOGIN =  sysconf(_SC_LOGIN_NAME_MAX) <= 0 ? _POSIX_LOGIN_N
 static void * mgmt_restart_shutdown_callback(void *, char *, int data_len);
 static void*  mgmt_storage_device_cmd_callback(void* x, char* data, int len);
 static void init_ssl_ctx_callback(void *ctx, bool server);
-
-static int version_flag = DEFAULT_VERSION_FLAG;
 
 static int num_of_net_threads = ink_number_of_processors();
 static int num_of_udp_threads = 0;
@@ -174,7 +171,6 @@ static const ArgumentDescription argument_descriptions[] = {
    "PROXY_HTTP_ACCEPT_PORT", NULL},
   {"cluster_port", 'P', "Cluster Port Number", "I", &cluster_port_number, "PROXY_CLUSTER_PORT", NULL},
   {"dprintf_level", 'o', "Debug output level", "I", &cmd_line_dprintf_level, "PROXY_DPRINTF_LEVEL", NULL},
-  {"version", 'V', "Print Version String", "T", &version_flag, NULL, NULL},
 
 #if TS_HAS_TESTS
   {"regression", 'R',
@@ -210,7 +206,8 @@ static const ArgumentDescription argument_descriptions[] = {
 
   {"accept_mss", ' ', "MSS for client connections", "I", &accept_mss, NULL, NULL},
   {"poll_timeout", 't', "poll timeout in milliseconds", "I", &poll_timeout, NULL, NULL},
-  {"help", 'h', "HELP!", NULL, NULL, NULL, usage},
+  HELP_ARGUMENT_DESCRIPTION(),
+  VERSION_ARGUMENT_DESCRIPTION()
 };
 
 //
@@ -300,6 +297,11 @@ initialize_process_manager()
   // Temporary Hack to Enable Communication with LocalManager
   if (getenv("PROXY_REMOTE_MGMT")) {
     remote_management_flag = true;
+  }
+
+  if (remote_management_flag) {
+    // We are being managed by traffic_manager, TERM ourselves if it goes away.
+    EnableDeathSignal(SIGTERM);
   }
 
   RecProcessInit(remote_management_flag ? RECM_CLIENT : RECM_STAND_ALONE, diags);
@@ -1167,77 +1169,46 @@ adjust_num_of_net_threads(int nthreads)
  * @param user User name in the passwd file to change the uid and gid to.
  */
 static void
-change_uid_gid(const char *user)
+change_uid_gid(const char * user)
 {
-  struct passwd pwbuf;
-  struct passwd *pwbufp = NULL;
-#if defined(freebsd) // TODO: investigate sysconf(_SC_GETPW_R_SIZE_MAX)) failure
-  long buflen = 1024; // or 4096?
-#else
-  long buflen = sysconf(_SC_GETPW_R_SIZE_MAX);
+#if !TS_USE_POSIX_CAP
+  RecInt enabled;
+
+  if (RecGetRecordInt("proxy.config.ssl.cert.load_elevated", &enabled) == REC_ERR_OKAY && enabled) {
+    Warning("ignoring proxy.config.ssl.cert.load_elevated because Traffic Server was built without POSIX capabilities support");
+  }
+
+  if (RecGetRecordInt("proxy.config.plugin.load_elevated", &enabled) == REC_ERR_OKAY && enabled) {
+    Warning("ignoring proxy.config.plugin.load_elevated because Traffic Server was built without POSIX capabilities support");
+  }
+#endif /* TS_USE_POSIX_CAP */
+
+  // This is primarily for regression tests, where people just run "traffic_server -R1" as a regular user. Dropping
+  // privilege is never going to succeed unless we were privileged in the first place. I guess we ought to check
+  // capabilities as well :-/
+  if (getuid() != 0 && geteuid() != 0) {
+    Note("Traffic Server is running unprivileged, not switching to user '%s'", user);
+    return;
+  }
+
+  Debug("privileges", "switching to unprivileged user '%s'", user);
+  ImpersonateUser(user, IMPERSONATE_PERMANENT);
+
+#if !defined(BIG_SECURITY_HOLE) || (BIG_SECURITY_HOLE != 0)
+  if (getuid() == 0 || geteuid() == 0) {
+    ink_fatal_die(
+      "Trafficserver has not been designed to serve pages while\n"
+      "\trunning as root. There are known race conditions that\n"
+      "\twill allow any local user to read any file on the system.\n"
+      "\tIf you still desire to serve pages as root then\n"
+      "\tadd -DBIG_SECURITY_HOLE to the CFLAGS env variable\n"
+      "\tand then rebuild the server.\n"
+      "\tIt is strongly suggested that you instead modify the\n"
+      "\tproxy.config.admin.user_id directive in your\n"
+      "\trecords.config file to list a non-root user.\n");
+  }
 #endif
-  if (buflen < 0) {
-    ink_fatal_die("sysconf() failed for _SC_GETPW_R_SIZE_MAX");
-  }
 
-  char *buf = (char *)ats_malloc(buflen);
-
-  if (0 != geteuid() && 0 == getuid())
-    ATS_UNUSED_RETURN(seteuid(0)); // revert euid if possible.
-  if (0 != geteuid()) {
-    // Not root so can't change user ID. Logging isn't operational yet so
-    // we have to write directly to stderr. Perhaps this should be fatal?
-    fprintf(stderr,
-          "Can't change user to '%s' because running with effective uid=%d\n",
-          user, geteuid());
-  }
-  else {
-    if (user[0] == '#') {
-      // numeric user notation
-      uid_t uid = (uid_t)atoi(&user[1]);
-      getpwuid_r(uid, &pwbuf, buf, buflen, &pwbufp);
-    }
-    else {
-      // read the entry from the passwd file
-      getpwnam_r(user, &pwbuf, buf, buflen, &pwbufp);
-    }
-    // check to see if we found an entry
-    if (pwbufp == NULL) {
-      ink_fatal_die("Can't find entry in password file for user: %s", user);
-    }
-#if !defined (BIG_SECURITY_HOLE)
-    if (pwbuf.pw_uid == 0) {
-      ink_fatal_die("Trafficserver has not been designed to serve pages while\n"
-        "\trunning as root.  There are known race conditions that\n"
-        "\twill allow any local user to read any file on the system.\n"
-        "\tIf you still desire to serve pages as root then\n"
-        "\tadd -DBIG_SECURITY_HOLE to the CFLAGS env variable\n"
-        "\tand then rebuild the server.\n"
-        "\tIt is strongly suggested that you instead modify the\n"
-        "\tproxy.config.admin.user_id  directive in your\n"
-        "\trecords.config file to list a non-root user.\n");
-    }
-#endif
-    // change the gid to passwd entry if we are not already running as that gid
-    if (getgid() != pwbuf.pw_gid) {
-      if (setgid(pwbuf.pw_gid) != 0) {
-        ink_fatal_die("Can't change group to user: %s, gid: %d",
-                      user, pwbuf.pw_gid);
-      }
-    }
-    // change the uid to passwd entry if we are not already running as that uid
-    if (getuid() != pwbuf.pw_uid) {
-      if (setuid(pwbuf.pw_uid) != 0) {
-        ink_fatal_die("Can't change uid to user: %s, uid: %d",
-                      user, pwbuf.pw_uid);
-      }
-    }
-  }
-  ats_free(buf);
-
-  // Ugly but this gets reset when the process user ID is changed so
-  // it must be udpated here.
-  EnableCoreFile(enable_core_file_p);
 }
 
 //
@@ -1269,13 +1240,7 @@ main(int /* argc ATS_UNUSED */, char **argv)
   Layout::create();
   chdir_root(); // change directory to the install root of traffic server.
 
-  process_args(argument_descriptions, countof(argument_descriptions), argv);
-
-  // Check for version number request
-  if (version_flag) {
-    fprintf(stderr, "%s\n", appVersionInfo.FullVersionInfoStr);
-    _exit(0);
-  }
+  process_args(&appVersionInfo, argument_descriptions, countof(argument_descriptions), argv);
 
   // Set stdout/stdin to be unbuffered
   setbuf(stdout, NULL);
@@ -1366,10 +1331,8 @@ main(int /* argc ATS_UNUSED */, char **argv)
   diags->prefix_str = "Server ";
   if (is_debug_tag_set("diags"))
     diags->dump();
-# if TS_USE_POSIX_CAP
-  if (is_debug_tag_set("server"))
-    DebugCapabilities("server"); // Can do this now, logging is up.
-# endif
+
+  DebugCapabilities("privileges"); // Can do this now, logging is up.
 
   // Check if we should do mlockall()
 #if defined(MCL_FUTURE)
@@ -1661,7 +1624,6 @@ main(int /* argc ATS_UNUSED */, char **argv)
 # if ! TS_USE_POSIX_CAP
   if (admin_user_p) {
     change_uid_gid(user);
-    DebugCapabilities("server");
   }
 # endif
 

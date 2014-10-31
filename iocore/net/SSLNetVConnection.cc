@@ -612,19 +612,33 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
 
 
 int64_t
-SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, int64_t &total_wrote, MIOBufferAccessor & buf, int &needs)
+SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, int64_t &total_written, MIOBufferAccessor & buf, int &needs)
 {
   ProxyMutex *mutex = this_ethread()->mutex;
   int64_t r = 0;
   int64_t l = 0;
+  uint32_t dynamic_tls_record_size = 0;
   ssl_error_t err = SSL_ERROR_NONE;
 
   // XXX Rather than dealing with the block directly, we should use the IOBufferReader API.
   int64_t offset = buf.reader()->start_offset;
   IOBufferBlock *b = buf.reader()->block;
 
+  // Dynamic TLS record sizing
+  ink_hrtime now = 0;
+  if (SSLConfigParams::ssl_maxrecord == -1) {
+    now = ink_get_hrtime_internal();
+    int msec_since_last_write = ink_hrtime_diff_msec(now, sslLastWriteTime);
+
+    if (msec_since_last_write > SSL_DEF_TLS_RECORD_MSEC_THRESHOLD) {
+      // reset sslTotalBytesSent upon inactivity for SSL_DEF_TLS_RECORD_MSEC_THRESHOLD
+      sslTotalBytesSent = 0;
+    }
+    Debug("ssl", "SSLNetVConnection::loadBufferAndCallWrite, now %" PRId64 ",lastwrite %" PRId64 " ,msec_since_last_write %d", now, sslLastWriteTime, msec_since_last_write);
+  }
+
   if (HttpProxyPort::TRANSPORT_BLIND_TUNNEL == this->attributes) {
-    return this->super::load_buffer_and_write(towrite, wattempted, total_wrote, buf, needs);
+    return this->super::load_buffer_and_write(towrite, wattempted, total_written, buf, needs);
   }
 
   do {
@@ -637,7 +651,7 @@ SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, i
       continue;
     }
     // check if to amount to write exceeds that in this buffer
-    int64_t wavail = towrite - total_wrote;
+    int64_t wavail = towrite - total_written;
 
     if (l > wavail) {
       l = wavail;
@@ -648,7 +662,18 @@ SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, i
     // operations.
     int64_t orig_l = l;
     if (SSLConfigParams::ssl_maxrecord > 0 && l > SSLConfigParams::ssl_maxrecord) {
-        l = SSLConfigParams::ssl_maxrecord;
+      l = SSLConfigParams::ssl_maxrecord;
+    } else if (SSLConfigParams::ssl_maxrecord == -1) {
+      if (sslTotalBytesSent < SSL_DEF_TLS_RECORD_BYTE_THRESHOLD) {
+        dynamic_tls_record_size = SSL_DEF_TLS_RECORD_SIZE;
+        SSL_INCREMENT_DYN_STAT(ssl_total_dyn_def_tls_record_count);
+      } else {
+        dynamic_tls_record_size = SSL_MAX_TLS_RECORD_SIZE;
+        SSL_INCREMENT_DYN_STAT(ssl_total_dyn_max_tls_record_count);
+      }
+      if (l > dynamic_tls_record_size) {
+        l = dynamic_tls_record_size;
+      }
     }
 
     if (!l) {
@@ -656,12 +681,13 @@ SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, i
     }
 
     wattempted = l;
-    total_wrote += l;
+    total_written += l;
     Debug("ssl", "SSLNetVConnection::loadBufferAndCallWrite, before SSLWriteBuffer, l=%" PRId64", towrite=%" PRId64", b=%p",
           l, towrite, b);
     err = SSLWriteBuffer(ssl, b->start() + offset, l, r);
+
     if (r == l) {
-      wattempted = total_wrote;
+      wattempted = total_written;
     }
     if (l == orig_l) {
         // on to the next block
@@ -671,19 +697,21 @@ SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, i
         offset += l;
     }
 
-    Debug("ssl", "SSLNetVConnection::loadBufferAndCallWrite,Number of bytes written=%" PRId64" , total=%" PRId64"", r, total_wrote);
+    Debug("ssl", "SSLNetVConnection::loadBufferAndCallWrite,Number of bytes written=%" PRId64" , total=%" PRId64"", r, total_written);
     NET_DEBUG_COUNT_DYN_STAT(net_calls_to_write_stat, 1);
-  } while (r == l && total_wrote < towrite && b);
+  } while (r == l && total_written < towrite && b);
 
   if (r > 0) {
-    if (total_wrote != wattempted) {
+    sslLastWriteTime = now;
+    sslTotalBytesSent += total_written;
+    if (total_written != wattempted) {
       Debug("ssl", "SSLNetVConnection::loadBufferAndCallWrite, wrote some bytes, but not all requested.");
       // I'm not sure how this could happen. We should have tried and hit an EAGAIN.
       needs |= EVENTIO_WRITE;
       return (r);
     } else {
       Debug("ssl", "SSLNetVConnection::loadBufferAndCallWrite, write successful.");
-      return (total_wrote);
+      return (total_written);
     }
   } else {
     switch (err) {
@@ -732,6 +760,8 @@ SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, i
 SSLNetVConnection::SSLNetVConnection():
   ssl(NULL),
   sslHandshakeBeginTime(0),
+  sslLastWriteTime(0),
+  sslTotalBytesSent(0),
   hookOpRequested(TS_SSL_HOOK_OP_DEFAULT),
   sslHandShakeComplete(false),
   sslClientConnection(false),
@@ -744,7 +774,6 @@ SSLNetVConnection::SSLNetVConnection():
   npnSet(NULL),
   npnEndpoint(NULL)
 {
-  sniServername[0] = '\0';
 }
 
 void
@@ -771,6 +800,8 @@ SSLNetVConnection::free(EThread * t) {
   }
   sslHandShakeComplete = false;
   sslClientConnection = false;
+  sslLastWriteTime = 0;
+  sslTotalBytesSent = 0;
   sslClientRenegotiationAbort = false;
   if (SSL_HOOKS_ACTIVE == sslPreAcceptHookState) {
     Error("SSLNetVconnection freed with outstanding hook");

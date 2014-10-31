@@ -26,6 +26,7 @@
 #include "P_Net.h"
 #include "ink_cap.h"
 #include "P_OCSPStapling.h"
+#include "SSLSessionCache.h"
 
 #include <string>
 #include <openssl/err.h>
@@ -100,6 +101,8 @@ struct ssl_user_config
   ats_scoped_str dialog; // ssl_key_dialog - Private key dialog
   SSLCertContext::Option opt;
 };
+
+SSLSessionCache *session_cache; // declared extern in P_SSLConfig.h
 
 // Check if the ticket_key callback #define is available, and if so, enable session tickets.
 #ifdef SSL_CTX_set_tlsext_ticket_key_cb
@@ -176,6 +179,61 @@ SSL_CTX_add_extra_chain_cert_file(SSL_CTX * ctx, const char * chainfile)
   return true;
 }
 
+
+static SSL_SESSION* ssl_get_cached_session(SSL *ssl, unsigned char *id, int len, int *copy) {
+  *copy = 0;
+
+  SSLSessionID sid(id, len);
+  if (diags->tag_activated("ssl.session_cache")) {
+    char printable_buf[(len * 2) + 1];
+    sid.toString(printable_buf, sizeof(printable_buf));
+    Debug("ssl.session_cache.get", "ssl_get_cached_session cached session '%s' context %p", printable_buf, SSL_get_SSL_CTX(ssl));
+  }
+
+  SSL_SESSION *session = NULL;
+  if(session_cache->getSession(sid, &session)) {
+    return session;
+  }
+  else
+    return NULL;
+
+}
+
+static int ssl_new_cached_session(SSL *ssl, SSL_SESSION *sess) {
+  unsigned int len = 0;
+  const unsigned char *id = SSL_SESSION_get_id(sess, &len);
+
+  SSLSessionID sid(id, len);
+  if (diags->tag_activated("ssl.session_cache")) {
+    char printable_buf[(len * 2) + 1];
+    sid.toString(printable_buf, sizeof(printable_buf));
+    Debug("ssl.session_cache.insert", "ssl_new_cached_session session '%s' and context %p", printable_buf, SSL_get_SSL_CTX(ssl));
+  }
+
+  SSL_INCREMENT_DYN_STAT(ssl_session_cache_new_session);
+  session_cache->insertSession(sid, sess);
+
+  return 0;
+}
+
+static void ssl_rm_cached_session(SSL_CTX *ctx, SSL_SESSION *sess) {
+  SSL_CTX_remove_session(ctx, sess);
+
+  unsigned int len = 0;
+  const unsigned char *id = SSL_SESSION_get_id(sess, &len);
+
+  SSLSessionID sid(id, len);
+  if (diags->tag_activated("ssl.session_cache")) {
+    char printable_buf[(len * 2) + 1];
+    sid.toString(printable_buf, sizeof(printable_buf));
+    Debug("ssl.session_cache.remove", "ssl_rm_cached_session cached session '%s'", printable_buf);
+  }
+
+  session_cache->removeSession(sid);
+}
+
+
+
 #if TS_USE_TLS_SNI
 
 static int
@@ -195,10 +253,6 @@ ssl_servername_callback(SSL * ssl, int * ad, void * /*arg*/)
 
   Debug("ssl", "ssl_servername_callback ssl=%p ad=%d server=%s handshake_complete=%d", ssl, *ad, servername,
     netvc->getSSLHandShakeComplete());
-
-  if (servername != NULL) {
-    ink_strlcpy(netvc->sniServername, servername, TS_MAX_HOST_NAME_LEN);
-  }
 
   // catch the client renegotiation early on
   if (SSLConfigParams::ssl_allow_client_renegotiation == false && netvc->getSSLHandShakeComplete()) {
@@ -695,6 +749,26 @@ SSLInitializeStatistics()
                      RECD_INT, RECP_PERSISTENT, (int) ssl_total_tickets_renewed_stat,
                      RecRawStatSyncCount);
 
+  RecRegisterRawStat(ssl_rsb, RECT_PROCESS, "proxy.process.ssl.ssl_session_cache_hit",
+                     RECD_INT, RECP_PERSISTENT, (int) ssl_session_cache_hit,
+                     RecRawStatSyncCount);
+
+  RecRegisterRawStat(ssl_rsb, RECT_PROCESS, "proxy.process.ssl.ssl_session_cache_new_session",
+                       RECD_INT, RECP_PERSISTENT, (int) ssl_session_cache_new_session,
+                       RecRawStatSyncCount);
+
+  RecRegisterRawStat(ssl_rsb, RECT_PROCESS, "proxy.process.ssl.ssl_session_cache_miss",
+                     RECD_INT, RECP_PERSISTENT, (int) ssl_session_cache_miss,
+                     RecRawStatSyncCount);
+
+  RecRegisterRawStat(ssl_rsb, RECT_PROCESS, "proxy.process.ssl.ssl_session_cache_eviction",
+                     RECD_INT, RECP_PERSISTENT, (int) ssl_session_cache_eviction,
+                     RecRawStatSyncCount);
+
+  RecRegisterRawStat(ssl_rsb, RECT_PROCESS, "proxy.process.ssl.ssl_session_cache_lock_contention",
+                     RECD_INT, RECP_PERSISTENT, (int) ssl_session_cache_lock_contention,
+                     RecRawStatSyncCount);
+
   /* error stats */
   RecRegisterRawStat(ssl_rsb, RECT_PROCESS, "proxy.process.ssl.ssl_error_want_write",
                      RECD_INT, RECP_PERSISTENT, (int) ssl_error_want_write,
@@ -864,12 +938,10 @@ SSLDiagnostic(const SrcLoc& loc, bool debug, SSLNetVConnection * vc, const char 
   int line, flags;
   unsigned long es;
   va_list ap;
+  ip_text_buffer ip_buf =  { '\0' };
 
-  ip_text_buffer ip_buf;
-  bool ip_buf_flag = false;
   if (vc) {
     ats_ip_ntop(vc->get_remote_addr(), ip_buf, sizeof(ip_buf));
-    ip_buf_flag = true;
   }
 
   es = CRYPTO_thread_id();
@@ -879,13 +951,13 @@ SSLDiagnostic(const SrcLoc& loc, bool debug, SSLNetVConnection * vc, const char 
         diags->log("ssl", DL_Debug, loc.file, loc.func, loc.line,
             "SSL::%lu:%s:%s:%d%s%s%s%s", es, ERR_error_string(l, buf), file, line,
           (flags & ERR_TXT_STRING) ? ":" : "", (flags & ERR_TXT_STRING) ? data : "",
-          ip_buf_flag? ": peer address is " : "", ip_buf);
+          vc ? ": peer address is " : "", ip_buf);
       }
     } else {
       diags->error(DL_Error, loc.file, loc.func, loc.line,
           "SSL::%lu:%s:%s:%d%s%s%s%s", es, ERR_error_string(l, buf), file, line,
           (flags & ERR_TXT_STRING) ? ":" : "", (flags & ERR_TXT_STRING) ? data : "",
-          ip_buf_flag? ": peer address is " : "", ip_buf);
+          vc ? ": peer address is " : "", ip_buf);
     }
 
     // Tally desired stats (only client/server connection stats, not init
@@ -991,26 +1063,52 @@ SSLInitServerContext(
     const SSLConfigParams * params,
     const ssl_user_config & sslMultCertSettings)
 {
-  int         session_id_context;
   int         server_verify_client;
   ats_scoped_str  completeServerCertPath;
   SSL_CTX *   ctx = SSLDefaultServerContext();
+  EVP_MD_CTX digest;
+  STACK_OF(X509_NAME) *ca_list;
+  unsigned char hash_buf[EVP_MAX_MD_SIZE];
+  unsigned int hash_len = 0;
+  char const* setting_cert = sslMultCertSettings.cert.get();
 
   // disable selected protocols
   SSL_CTX_set_options(ctx, params->ssl_ctx_options);
 
+  Debug("ssl.session_cache", "ssl context=%p: using session cache options, enabled=%d, size=%d, num_buckets=%d, skip_on_contention=%d, timeout=%d, auto_clear=%d",
+        ctx, params->ssl_session_cache, params->ssl_session_cache_size, params->ssl_session_cache_num_buckets,
+        params->ssl_session_cache_skip_on_contention, params->ssl_session_cache_timeout, params->ssl_session_cache_auto_clear);
+
   if (params->ssl_session_cache_timeout) {
-        SSL_CTX_set_timeout(ctx, params->ssl_session_cache_timeout);
+    SSL_CTX_set_timeout(ctx, params->ssl_session_cache_timeout);
   }
+
+  int additional_cache_flags = 0;
+  additional_cache_flags |= (params->ssl_session_cache_auto_clear == 0) ? SSL_SESS_CACHE_NO_AUTO_CLEAR : 0;
 
   switch (params->ssl_session_cache) {
   case SSLConfigParams::SSL_SESSION_CACHE_MODE_OFF:
-    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF|SSL_SESS_CACHE_NO_INTERNAL);
+    Debug("ssl.session_cache", "disabling SSL session cache");
+
+    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF | SSL_SESS_CACHE_NO_INTERNAL);
     break;
-  case SSLConfigParams::SSL_SESSION_CACHE_MODE_SERVER:
-    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER);
+  case SSLConfigParams::SSL_SESSION_CACHE_MODE_SERVER_OPENSSL_IMPL:
+    Debug("ssl.session_cache", "enabling SSL session cache with OpenSSL implementation");
+
+    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER | additional_cache_flags);
     SSL_CTX_sess_set_cache_size(ctx, params->ssl_session_cache_size);
     break;
+  case SSLConfigParams::SSL_SESSION_CACHE_MODE_SERVER_ATS_IMPL: {
+    Debug("ssl.session_cache", "enabling SSL session cache with ATS implementation");
+    /* Add all the OpenSSL callbacks */
+    SSL_CTX_sess_set_new_cb(ctx, ssl_new_cached_session);
+    SSL_CTX_sess_set_remove_cb(ctx, ssl_rm_cached_session);
+    SSL_CTX_sess_set_get_cb(ctx, ssl_get_cached_session);
+
+    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER | SSL_SESS_CACHE_NO_INTERNAL | additional_cache_flags);
+
+    break;
+    }
   }
 
 #ifdef SSL_MODE_RELEASE_BUFFERS
@@ -1049,7 +1147,7 @@ SSLInitServerContext(
     SSL_CTX_set_default_passwd_cb_userdata(ctx, &ud);
   }
 
-  if (!params->serverCertChainFilename && !sslMultCertSettings.ca && sslMultCertSettings.cert) {
+  if (sslMultCertSettings.cert) {
     SimpleTokenizer cert_tok((const char *)sslMultCertSettings.cert, SSL_CERT_SEPARATE_DELIM);
     SimpleTokenizer key_tok((sslMultCertSettings.key ? (const char *)sslMultCertSettings.key : ""), SSL_CERT_SEPARATE_DELIM);
 
@@ -1070,12 +1168,6 @@ SSLInitServerContext(
         goto fail;
       }
     }
-  } else if (sslMultCertSettings.first_cert) { // For backward compatible
-      completeServerCertPath = Layout::relative_to(params->serverCertPathOnly, sslMultCertSettings.first_cert);
-      if (!SSL_CTX_use_certificate_chain_file(ctx, completeServerCertPath)) {
-          SSLError("failed to load certificate from %s", (const char *) completeServerCertPath);
-          goto fail;
-      }
 
     // First, load any CA chains from the global chain file.
     if (params->serverCertChainFilename) {
@@ -1093,10 +1185,6 @@ SSLInitServerContext(
         SSLError("failed to load certificate chain from %s", (const char *) completeServerCertChainPath);
         goto fail;
       }
-    }
-
-    if (!SSLPrivateKeyHandler(ctx, params, completeServerCertPath, sslMultCertSettings.key)) {
-      goto fail;
     }
   }
 
@@ -1139,16 +1227,50 @@ SSLInitServerContext(
       server_verify_client = SSL_VERIFY_NONE;
       Error("illegal client certification level %d in records.config", server_verify_client);
     }
-
-    // XXX I really don't think that this is a good idea. We should be setting this a some finer granularity,
-    // possibly per SSL CTX. httpd uses md5(host:port), which seems reasonable.
-    session_id_context = 1;
-    SSL_CTX_set_session_id_context(ctx, (const unsigned char *) &session_id_context, sizeof(session_id_context));
-
     SSL_CTX_set_verify(ctx, server_verify_client, NULL);
     SSL_CTX_set_verify_depth(ctx, params->verify_depth); // might want to make configurable at some point.
+  }
 
-    SSL_CTX_set_client_CA_list(ctx, SSL_load_client_CA_file(params->serverCACertFilename));
+  ca_list = SSL_load_client_CA_file(params->serverCACertFilename);
+  SSL_CTX_set_client_CA_list(ctx, ca_list);
+  EVP_MD_CTX_init(&digest);
+
+  if (EVP_DigestInit_ex(&digest, evp_md_func, NULL) == 0) {
+   SSLError("EVP_DigestInit_ex failed");
+   goto fail;
+  }
+
+  Debug("ssl", "Using '%s' in hash for session id context", sslMultCertSettings.cert.get());
+
+  if (NULL != setting_cert) {
+    if (EVP_DigestUpdate(&digest, sslMultCertSettings.cert, strlen(setting_cert)) == 0) {
+     SSLError("EVP_DigestUpdate failed");
+     goto fail;
+    }
+  }
+
+  if (ca_list != NULL) {
+   size_t num_certs = sk_X509_NAME_num(ca_list);
+
+   for (size_t i = 0; i < num_certs; i++) {
+     X509_NAME *name = sk_X509_NAME_value(ca_list, i);
+     if (X509_NAME_digest(name, evp_md_func, hash_buf /* borrow our final hash buffer. */, &hash_len) == 0 ||
+         EVP_DigestUpdate(&digest, hash_buf, hash_len) == 0) {
+       SSLError("Adding X509 name to digest failed");
+       goto fail;
+     }
+   }
+  }
+
+  if (EVP_DigestFinal_ex(&digest, hash_buf, &hash_len) == 0) {
+   SSLError("EVP_DigestFinal_ex failed");
+   goto fail;
+  }
+
+  EVP_MD_CTX_cleanup(&digest);
+  if (SSL_CTX_set_session_id_context(ctx, hash_buf, hash_len) == 0) {
+   SSLError("SSL_CTX_set_session_id_context failed");
+   goto fail;
   }
 
   if (params->cipherSuite != NULL) {
@@ -1541,10 +1663,12 @@ SSLParseCertificateConfiguration(
     return false;
   }
 
+#if TS_USE_POSIX_CAP
   // elevate/allow file access to root read only files/certs
   uint32_t elevate_setting = 0;
   REC_ReadConfigInteger(elevate_setting, "proxy.config.ssl.cert.load_elevated");
   ElevateAccess elevate_access(elevate_setting != 0); // destructor will demote for us
+#endif /* TS_USE_POSIX_CAP */
 
   line = tokLine(file_buf, &tok_state);
   while (line != NULL) {
@@ -1671,6 +1795,10 @@ SSLWriteBuffer(SSL * ssl, const void * buf, int64_t nbytes, int64_t& nwritten)
   int ret = SSL_write(ssl, buf, (int)nbytes);
   if (ret > 0) {
     nwritten = ret;
+    BIO *bio = SSL_get_wbio(ssl);
+    if (bio != NULL) {
+      (void)BIO_flush(bio);
+    }
     return SSL_ERROR_NONE;
   }
 

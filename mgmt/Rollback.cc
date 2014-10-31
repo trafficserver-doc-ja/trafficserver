@@ -224,10 +224,8 @@ char *
 Rollback::createPathStr(version_t version)
 {
 
-  char *buffer;
   int bufSize = strlen(Layout::get()->sysconfdir) + fileNameLen + MAX_VERSION_DIGITS + 1;
-
-  buffer = new char[bufSize];
+  char * buffer = (char *)ats_malloc(bufSize);
 
   Layout::get()->relative_to(buffer, bufSize, Layout::get()->sysconfdir, fileName);
 
@@ -248,44 +246,17 @@ Rollback::createPathStr(version_t version)
 int
 Rollback::statFile(version_t version, struct stat *buf)
 {
-  char *filePath;
   int statResult;
-#if !TS_USE_POSIX_CAP
-  uid_t saved_euid = 0;
-#endif
 
   if (version == this->currentVersion) {
     version = ACTIVE_VERSION;
   }
-  filePath = createPathStr(version);
 
-  if (root_access_needed) {
-    if (
-#if TS_USE_POSIX_CAP
-      elevateFileAccess(true)
-#else
-      restoreRootPriv(&saved_euid)
-#endif
-	!= true) {
-      mgmt_log(stderr, "[Rollback] Unable to acquire root privileges.\n");
-    }
-  }
+  ats_scoped_str filePath(createPathStr(version));
+  ElevateAccess access(root_access_needed);
 
   statResult = stat(filePath, buf);
 
-  if (root_access_needed) {
-    if (
-#if TS_USE_POSIX_CAP
-      elevateFileAccess(false)
-#else
-      removeRootPriv(saved_euid)
-#endif
-      != true) {
-      mgmt_log(stderr, "[Rollback] Unable to restore non-root privileges.\n");
-    }
-  }
-
-  delete[]filePath;
   return statResult;
 }
 
@@ -297,53 +268,24 @@ Rollback::statFile(version_t version, struct stat *buf)
 int
 Rollback::openFile(version_t version, int oflags, int *errnoPtr)
 {
-  char *filePath;
   int fd;
-#if !TS_USE_POSIX_CAP
-  uid_t saved_euid = 0;
-#endif
 
-  filePath = createPathStr(version);
-
-  if (root_access_needed) {
-    if (
-#if TS_USE_POSIX_CAP
-      elevateFileAccess(true)
-#else
-      restoreRootPriv(&saved_euid)
-#endif
-      != true) {
-      mgmt_log(stderr, "[Rollback] Unable to acquire root privileges.\n");
-    }
-  }
+  ats_scoped_str filePath(createPathStr(version));
+  ElevateAccess access(root_access_needed);
 
   // TODO: Use the original permissions
   //       Anyhow the _1 files should not be created inside Syconfdir.
   //
   fd = mgmt_open_mode(filePath, oflags, 0644);
-  if (root_access_needed) {
-    if (
-#if TS_USE_POSIX_CAP
-      elevateFileAccess(false)
-#else
-      removeRootPriv(saved_euid)
-#endif
-      != true) {
-      mgmt_log(stderr, "[Rollback] Unable to restore non-root privileges.\n");
-    }
-  }
 
   if (fd < 0) {
     if (errnoPtr != NULL) {
       *errnoPtr = errno;
     }
     mgmt_log(stderr, "[Rollback::openFile] Open of %s failed: %s\n", fileName, strerror(errno));
-  }
-  else {
+  } else {
     fcntl(fd, F_SETFD, 1);
   }
-
-  delete[]filePath;
 
   return fd;
 }
@@ -425,7 +367,7 @@ Rollback::internalUpdate(textBuffer * buf, version_t newVersion, bool notifyChan
   char *activeVersion;
   char *currentVersion_local;
   char *nextVersion;
-  int writeBytes;
+  ssize_t writeBytes;
   int diskFD;
   int ret;
   versionInfo *toRemove;
@@ -472,7 +414,7 @@ Rollback::internalUpdate(textBuffer * buf, version_t newVersion, bool notifyChan
   // Write the buffer into the new configuration file
   writeBytes = write(diskFD, buf->bufPtr(), buf->spaceUsed());
   ret = closeFile(diskFD, true);
-  if ((ret < 0) || (writeBytes != buf->spaceUsed())) {
+  if ((ret < 0) || ((size_t)writeBytes != buf->spaceUsed())) {
     mgmt_log(stderr, "[Rollback::internalUpdate] Unable to write new version of %s : %s\n", fileName, strerror(errno));
     returnCode = SYS_CALL_ERROR_ROLLBACK;
     goto UPDATE_CLEANUP;
@@ -622,7 +564,7 @@ Rollback::getVersion_ml(version_t version, textBuffer ** buffer)
     }
   } while (readResult > 0);
 
-  if (newBuffer->spaceUsed() != fileInfo.st_size) {
+  if ((off_t)newBuffer->spaceUsed() != fileInfo.st_size) {
     mgmt_log(stderr,
              "[Rollback::getVersion] Incorrect amount of data retrieved from %s version %d.  Expected: %d   Got: %d\n",
              fileName, version, fileInfo.st_size, newBuffer->spaceUsed());

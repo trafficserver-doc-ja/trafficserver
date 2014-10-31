@@ -30,11 +30,21 @@ is not able to cache request / responses with byte ranges.
 Using the plugin
 ----------------
 
-This plugin currently only functions as a global plugin, and it takes not
-arguments or parameters. In :file:`plugin.config`, simply add::
+This plugin functions as either a global or per remap plugin, and 
+it takes an optional argument for specifying a config file with exclusion 
+criteria. The config file can be specified both via an absolute path or
+via a relative path to the install dir
 
-  background_fetch.so
+To activate the plugin in global mode, in :file:`plugin.config`, simply add::
 
+  background_fetch.so --exclude <config-file>
+
+To activate the plugin in per remap mode, in :file:`remap.config`, simply append the
+below to the specific remap line::
+
+  @plugin=background_fetch.so @pparam=<config-file>
+
+Note that the config file argument with exclusion is optional
 
 Functionality
 -------------
@@ -58,16 +68,29 @@ original client request, which continues as normal.
 Only one background fetch per URL is ever performed, making sure we do not
 accidentally put pressure on the origin servers.
 
+The plugin now supports a config file that can specify exclusion of background
+fetch based on the below criteria:
+1. Client-IP
+2. Content-Type
+3. User-Agent
 
+To specify the exclusion criteria, the plugin needs to be activated as below:
+
+background_fetch.so --exclude <config-file>
+
+The contents of the config-file could be as below:
+
+Client-IP 127.0.0.1
+User-Agent ABCDEF
+Content-Type text
+
+The plugin also now supports per remap activation. To activate the plugin for
+a given remap, add the below on the remap line:
+
+@plugin=background_fetch.so @pparam=<config-file>
 
 Future additions
 ----------------
 
-The infrastructure is in place for providing global and per-remap
-configurations. This could include:
-
-- Limiting the background fetches to certain Content-Types
 - Limiting the background fetches to content of certain sizes
 
-
-None of this is currently not implemented.

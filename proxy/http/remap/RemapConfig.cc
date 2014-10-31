@@ -631,12 +631,12 @@ remap_load_plugin(const char ** argv, int argc, url_mapping *mp, char *errbuf, i
     }
     Debug("remap_plugin", "New remap plugin info created for \"%s\"", c);
 
-    // elevate the access to read files as root if compiled with capabilities, if not
-    // change the effective user to root
     {
+#if TS_USE_POSIX_CAP
       uint32_t elevate_access = 0;
       REC_ReadConfigInteger(elevate_access, "proxy.config.plugin.load_elevated");
       ElevateAccess access(elevate_access != 0);
+#endif /* TS_USE_POSIX_CAP */
 
       if ((pi->dlh = dlopen(c, RTLD_NOW)) == NULL) {
 #if defined(freebsd) || defined(openbsd)
@@ -984,7 +984,7 @@ remap_parse_config_bti(const char * path, BUILD_TABLE_INFO * bti)
       goto MAP_ERROR;
     }
 
-    new_mapping = new url_mapping(cln);  // use line # for rank for now
+    new_mapping = new url_mapping();
 
     // apply filter rules if we have to
     if ((errStr = process_filter_opt(new_mapping, bti, errStrBuf, sizeof(errStrBuf))) != NULL) {

@@ -52,6 +52,17 @@
 #define SSL_TLSEXT_ERR_NOACK 3
 #endif
 
+// TS-2503: dynamic TLS record sizing
+// For smaller records, we should also reserve space for various TCP options
+// (timestamps, SACKs.. up to 40 bytes [1]), and account for TLS record overhead
+// (another 20-60 bytes on average, depending on the negotiated ciphersuite [2]).
+// All in all: 1500 - 40 (IP) - 20 (TCP) - 40 (TCP options) - TLS overhead (60-100)
+// For larger records, the size is determined by TLS protocol record size
+#define SSL_DEF_TLS_RECORD_SIZE               1300 // 1500 - 40 (IP) - 20 (TCP) - 40 (TCP options) - TLS overhead (60-100)
+#define SSL_MAX_TLS_RECORD_SIZE              16383 // 2^14 - 1
+#define SSL_DEF_TLS_RECORD_BYTE_THRESHOLD  1000000
+#define SSL_DEF_TLS_RECORD_MSEC_THRESHOLD     1000
+
 class SSLNextProtocolSet;
 struct SSLCertLookup;
 
@@ -92,7 +103,7 @@ public:
   int sslServerHandShakeEvent(int &err);
   int sslClientHandShakeEvent(int &err);
   virtual void net_read_io(NetHandler * nh, EThread * lthread);
-  virtual int64_t load_buffer_and_write(int64_t towrite, int64_t &wattempted, int64_t &total_wrote, MIOBufferAccessor & buf, int &needs);
+  virtual int64_t load_buffer_and_write(int64_t towrite, int64_t &wattempted, int64_t &total_written, MIOBufferAccessor & buf, int &needs);
   void registerNextProtocolSet(const SSLNextProtocolSet *);
 
   ////////////////////////////////////////////////////////////
@@ -105,6 +116,8 @@ public:
 
   SSL *ssl;
   ink_hrtime sslHandshakeBeginTime;
+  ink_hrtime sslLastWriteTime;
+  int64_t    sslTotalBytesSent;
 
   static int advertise_next_protocol(SSL * ssl, const unsigned char ** out, unsigned * outlen, void *);
   static int select_next_protocol(SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned inlen, void *);
@@ -134,9 +147,6 @@ public:
 
   /// Set by asynchronous hooks to request a specific operation.
   TSSslVConnOp hookOpRequested;
-
-  // Store the servername returned by SNI
-  char sniServername[TS_MAX_HOST_NAME_LEN];
 
   int64_t read_raw_data();
   void initialize_handshake_buffers() {

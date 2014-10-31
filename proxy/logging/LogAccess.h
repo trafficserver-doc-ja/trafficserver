@@ -196,6 +196,7 @@ public:
   inkcoreapi virtual int marshal_proxy_resp_header_len(char *); // INT
   inkcoreapi virtual int marshal_proxy_finish_status_code(char *);      // INT
   inkcoreapi virtual int marshal_cache_result_code(char *);     // INT
+  inkcoreapi virtual int marshal_proxy_host_port(char *); // INT
 
   //
   // proxy -> server fields
@@ -217,6 +218,8 @@ public:
   inkcoreapi virtual int marshal_server_resp_content_len(char *);       // INT
   inkcoreapi virtual int marshal_server_resp_header_len(char *);        // INT
   inkcoreapi virtual int marshal_server_resp_http_version(char *);      // INT
+  inkcoreapi virtual int marshal_server_resp_time_ms(char *);           // INT
+  inkcoreapi virtual int marshal_server_resp_time_s(char *);            // INT
 
   //
   // cache -> client fields

@@ -283,7 +283,6 @@ is_negative_caching_appropriate(HttpTransact::State* s)
 inline static HttpTransact::LookingUp_t
 find_server_and_update_current_info(HttpTransact::State* s)
 {
-  URL *url = s->hdr_info.client_request.url_get();
   int host_len;
   const char *host = s->hdr_info.client_request.host_get(&host_len);
 
@@ -291,9 +290,6 @@ find_server_and_update_current_info(HttpTransact::State* s)
     // Do not forward requests to local_host onto a parent.
     // I just wanted to do this for cop heartbeats, someone else
     // wanted it for all requests to local_host.
-    s->parent_result.r = PARENT_DIRECT;
-  } else if (url->scheme_get_wksidx() == URL_WKSIDX_HTTPS) {
-    // Do not forward HTTPS requests onto a parent.
     s->parent_result.r = PARENT_DIRECT;
   } else if (s->method == HTTP_WKSIDX_CONNECT && s->http_config_param->disable_ssl_parenting) {
     s->parent_result.r = PARENT_DIRECT;
@@ -966,8 +962,6 @@ done:
     otherwise, 502/404 the request right now. /eric
   */
   if (!s->reverse_proxy && s->state_machine->plugin_tunnel_type == HTTP_NO_PLUGIN_TUNNEL) {
-    // TS-2879: Let's initialize the state variables so the connection can be kept alive.
-    initialize_state_variables_from_request(s, &s->hdr_info.client_request);
     DebugTxn("http_trans", "END HttpTransact::EndRemapRequest");
     HTTP_INCREMENT_TRANS_STAT(http_invalid_client_requests_stat);
     TRANSACT_RETURN(SM_ACTION_SEND_ERROR_CACHE_NOOP, NULL);
@@ -5531,8 +5525,6 @@ HttpTransact::initialize_state_variables_from_request(State* s, HTTPHdr* obsolet
   if (!s->server_info.name || s->redirect_info.redirect_in_process) {
     s->server_info.name = s->arena.str_store(host_name, host_len);
     s->server_info.port = incoming_request->port_get();
-  } else {
-    ink_assert(s->server_info.port != 0);
   }
 
   s->next_hop_scheme = s->scheme = incoming_request->url_get()->scheme_get_wksidx();
@@ -7972,14 +7964,18 @@ HttpTransact::build_error_response(State *s, HTTPStatus status_code, const char 
     url_string = NULL;
   }
 
+  // Make sure that if this error occured before we initailzied the state variables that we do now.
+  initialize_state_variables_from_request(s, &s->hdr_info.client_request);
+
   //////////////////////////////////////////////////////
   //  If there is a request body, we must disable     //
   //  keep-alive to prevent the body being read as    //
   //  the next header (unless we've already drained   //
   //  which we do for NTLM auth)                      //
   //////////////////////////////////////////////////////
-  if (s->hdr_info.request_content_length != 0 &&
-      s->state_machine->client_request_body_bytes < s->hdr_info.request_content_length) {
+  if (status_code == HTTP_STATUS_REQUEST_TIMEOUT ||
+      s->hdr_info.client_request.get_content_length() != 0 ||
+      s->client_info.transfer_encoding == HttpTransact::CHUNKED_ENCODING) {
     s->client_info.keep_alive = HTTP_NO_KEEPALIVE;
   } else {
     // We don't have a request body.  Since we are

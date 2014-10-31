@@ -35,4 +35,5 @@ SUBDIRS = \
 	timeout_example \
 	internal_transaction_handling \
 	async_timer \
-	intercept
+	intercept \
+        async_http_fetch_streaming

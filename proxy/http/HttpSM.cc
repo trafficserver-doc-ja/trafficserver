@@ -96,6 +96,9 @@ static const int boundary_size = 2 + sizeof("RANGE_SEPARATOR") - 1 + 2;
 static const char *str_100_continue_response = "HTTP/1.1 100 Continue\r\n\r\n";
 static const int len_100_continue_response = strlen(str_100_continue_response);
 
+static const char *str_408_request_timeout_response = "HTTP/1.1 408 Request Timeout\r\nConnection: close\r\n\r\n";
+static const int  len_408_request_timeout_response = strlen(str_408_request_timeout_response);
+
 /**
  * Takes two milestones and returns the difference.
  * @param start The start time
@@ -2646,11 +2649,28 @@ HttpSM::tunnel_handler_post(int event, void *data)
 {
   STATE_ENTER(&HttpSM::tunnel_handler_post, event);
 
+  HttpTunnelProducer *p = tunnel.get_producer(ua_session);
+  if (event != HTTP_TUNNEL_EVENT_DONE) {
+    if (t_state.http_config_param->send_408_post_timeout_response && p->handler_state == HTTP_SM_POST_UA_FAIL) {
+      Debug("http_tunnel", "cleanup tunnel in tunnel_handler_post");
+      hsm_release_assert(ua_entry->in_tunnel == true);
+      ink_assert((event == VC_EVENT_WRITE_COMPLETE) || (event == VC_EVENT_EOS));
+      free_MIOBuffer(ua_entry->write_buffer);
+      ua_entry->write_buffer = NULL;
+      vc_table.cleanup_all();
+      tunnel.chain_abort_all(p);
+      p->read_vio = NULL;
+      p->vc->do_io_close(EHTTP_ERROR);
+      tunnel_handler_post_or_put(p);
+      tunnel.kill_tunnel();
+      return 0;
+    }
+  }
+
   ink_assert(event == HTTP_TUNNEL_EVENT_DONE);
   ink_assert(data == &tunnel);
   // The tunnel calls this when it is done
 
-  HttpTunnelProducer *p = tunnel.get_producer(ua_session);
   int p_handler_state = p->handler_state;
   tunnel_handler_post_or_put(p);
 
@@ -3036,7 +3056,7 @@ HttpSM::is_bg_fill_necessary(HttpTunnelConsumer * c)
   ink_assert(c->vc_type == HT_HTTP_CLIENT);
 
   if (c->producer->alive && // something there to read
-      server_entry && server_entry->vc && // from an origin server
+      server_entry && server_entry->vc && server_session->get_netvc() && // from an origin server
       c->producer->num_consumers > 1  // with someone else reading it
     ) {
 
@@ -3327,21 +3347,56 @@ HttpSM::tunnel_handler_post_ua(int event, HttpTunnelProducer * p)
 {
   STATE_ENTER(&HttpSM::tunnel_handler_post_ua, event);
   client_request_body_bytes = p->init_bytes_done + p->bytes_read;
+  int64_t alloc_index, nbytes;
+  IOBufferReader* buf_start;
 
   switch (event) {
+  case VC_EVENT_INACTIVITY_TIMEOUT:
+  case VC_EVENT_ACTIVE_TIMEOUT:
+    if (t_state.http_config_param->send_408_post_timeout_response && client_response_hdr_bytes == 0) {
+      p->handler_state = HTTP_SM_POST_UA_FAIL;
+      set_ua_abort(HttpTransact::ABORTED, event);
+
+      switch (event) {
+        case VC_EVENT_INACTIVITY_TIMEOUT:
+          HttpTransact::build_error_response(&t_state, HTTP_STATUS_REQUEST_TIMEOUT, "POST Request timeout", "timeout#inactivity", NULL);
+          break;
+        case VC_EVENT_ACTIVE_TIMEOUT:
+          HttpTransact::build_error_response(&t_state, HTTP_STATUS_REQUEST_TIMEOUT, "POST Request timeout", "timeout#activity", NULL);
+          break;
+      }
+
+      // send back 408 request timeout
+      alloc_index = buffer_size_to_index (len_408_request_timeout_response + t_state.internal_msg_buffer_size);
+      if (ua_entry->write_buffer) {
+        free_MIOBuffer(ua_entry->write_buffer);
+        ua_entry->write_buffer = NULL;
+      }
+      ua_entry->write_buffer = new_MIOBuffer(alloc_index);
+      buf_start = ua_entry->write_buffer->alloc_reader();
+
+      DebugSM("http_tunnel", "send 408 response to client to vc %p, tunnel vc %p", ua_session->get_netvc(), p->vc);
+
+      nbytes = ua_entry->write_buffer->write(str_408_request_timeout_response, len_408_request_timeout_response);
+      nbytes += ua_entry->write_buffer->write(t_state.internal_msg_buffer, t_state.internal_msg_buffer_size);
+
+      p->vc->do_io_write(this, nbytes, buf_start);
+      p->vc->do_io_shutdown(IO_SHUTDOWN_READ);
+      return 0;
+    }
+    // fall through
   case VC_EVENT_EOS:
     // My reading of spec says that user agents can not terminate
     //  posts with a half close so this is an error
   case VC_EVENT_ERROR:
-  case VC_EVENT_INACTIVITY_TIMEOUT:
-  case VC_EVENT_ACTIVE_TIMEOUT:
     //  Did not complete post tunnling.  Abort the
     //   server and close the ua
     p->handler_state = HTTP_SM_POST_UA_FAIL;
+    set_ua_abort(HttpTransact::ABORTED, event);
+
     tunnel.chain_abort_all(p);
     p->read_vio = NULL;
     p->vc->do_io_close(EHTTP_ERROR);
-    set_ua_abort(HttpTransact::ABORTED, event);
 
     // the in_tunnel status on both the ua & and
     //   it's consumer must already be set to true.  Previously
@@ -4223,7 +4278,7 @@ HttpSM::parse_range_and_compare(MIMEField *field, int64_t content_length)
       int frag_offset_cnt = t_state.cache_info.object_read->get_frag_offset_count();
 
       if (!frag_offset_tbl || !frag_offset_cnt || (frag_offset_tbl[frag_offset_cnt - 1] < (uint64_t)end)) {
-        Debug("http_range", "request range in cache, end %" PRId64 ", frg_offset_cnt %d, frag_size %" PRId64, end, frag_offset_cnt, frag_offset_tbl[frag_offset_cnt - 1]);
+        Debug("http_range", "request range in cache, end %" PRId64 ", frg_offset_cnt %d" PRId64, end, frag_offset_cnt);
         t_state.range_in_cache = false;
       }
     }

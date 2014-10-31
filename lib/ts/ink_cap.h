@@ -30,69 +30,49 @@ extern void DebugCapabilities(
   char const* tag ///< Debug message tag.
 );
 /// Set capabilities to persist across change of user id.
-/// @return 0 on success, non-zero otherwise.
-extern int PreserveCapabilities();
+/// @return true on success
+extern bool PreserveCapabilities();
 /// Initialize and restrict the capabilities of a thread.
-/// @return 0 on success, non-zero otherwise.
-extern int RestrictCapabilities();
+/// @return true on success
+extern bool RestrictCapabilities();
 
 /** Control generate of core file on crash.
     @a flag sets whether core files are enabled on crash.
-    @return 0 on success, @c errno on failre.
+    @return true on success
  */
-extern int EnableCoreFile(
+extern bool EnableCoreFile(
   bool flag ///< New enable state.
 );
 
+void EnableDeathSignal(int signum);
 
+enum ImpersonationLevel {
+  IMPERSONATE_EFFECTIVE,  // Set the effective credential set.
+  IMPERSONATE_PERMANENT   // Set the real credential (permanently).
+};
 
-#if TS_USE_POSIX_CAP
-bool elevateFileAccess(bool);
-#else
-bool restoreRootPriv(uid_t *old_euid = NULL);
-bool removeRootPriv(uid_t euid);
-#endif
-
+void ImpersonateUser(const char * user, ImpersonationLevel level);
+void ImpersonateUserID(uid_t user, ImpersonationLevel level);
 
 class ElevateAccess {
 public:
-  ElevateAccess(const bool state): elevated(false), saved_uid(0) {
-    if (state == true) {
-      elevate();
-    }
-  }
 
-  void elevate() {
-#if TS_USE_POSIX_CAP
-    elevateFileAccess(true);
-#else
-    // Since we are setting a process-wide credential, we have to block any other thread
-    // attempting to elevate until this one demotes.
-    restoreRootPriv(&saved_uid);
-    ink_mutex_acquire(&lock);
-#endif
-    elevated = true;
-  }
+  typedef enum {
+    FILE_PRIVILEGE  = 0x1u, // Access filesystem objects with privilege
+    TRACE_PRIVILEGE = 0x2u  // Trace other processes with privilege
+  } privilege_level;
 
-  void demote() {
-#if TS_USE_POSIX_CAP
-    elevateFileAccess(false);
-#else
-    removeRootPriv(saved_uid);
-    ink_mutex_release(&lock);
-#endif
-    elevated = false;
-  }
+  ElevateAccess(const bool state, unsigned level = FILE_PRIVILEGE);
+  ~ElevateAccess();
 
-  ~ElevateAccess() {
-    if (elevated == true) {
-      demote();
-    }
-  }
+  void elevate();
+  void demote();
 
 private:
   bool elevated;
   uid_t saved_uid;
+  unsigned level;
+
 #if !TS_USE_POSIX_CAP
   static ink_mutex lock; // only one thread at a time can elevate
 #endif
