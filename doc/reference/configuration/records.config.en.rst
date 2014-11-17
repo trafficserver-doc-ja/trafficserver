@@ -252,6 +252,20 @@ Value Effect
 
    Set the maximum number of file handles for the traffic_server process as a percentage of the the fs.file-max proc value in Linux. The default is 90%.
 
+.. ts:cv:: CONFIG proxy.config.crash_log_helper STRING traffic_crashlog
+
+   This option directs :program:`traffic_server` to spawn a crash
+   log helper at startup. The value should be the path to an
+   executable program. If the path is not absolute, it is located
+   relative to configured ``bin`` directory.  Any user-provided
+   program specified here must behave in a fashion compatible with
+   :program:`traffic_crashlog`. Specifically, it must implement
+   the :option:`traffic_crashlog --wait` behavior.
+
+   This setting not reloadable because the helper must be spawned
+   before :program:`traffic_server` drops privilege. If this variable
+   is set to ``NULL``, no helper will be spawned.
+
 Network
 =======
 
@@ -2512,6 +2526,16 @@ Sockets
 
    Specifies the number of task threads to run. These threads are used for
    various tasks that should be off-loaded from the normal network threads.
+
+.. ts:cv:: CONFIG proxy.config.allocator.thread_freelist_size INT 512
+
+   Sets the maximum number of elements that can be contained in a ProxyAllocator (per-thread)
+   before returning the objects to the global pool
+
+.. ts:cv:: CONFIG proxy.config.allocator.thread_freelist_low_watermark INT 32 
+
+   Sets the minimum number of items a ProxyAllocator (per-thread) will guarantee to be
+   holding at any one time.
 
 .. ts:cv:: CONFIG proxy.config.http.enabled INT 1
 

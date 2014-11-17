@@ -17,6 +17,7 @@
 
 SUBDIRS = \
   traffic_cop \
+  traffic_crashlog \
   traffic_layout \
   traffic_line \
   traffic_manager \

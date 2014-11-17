@@ -22,7 +22,8 @@
 */
 #include "I_EventSystem.h"
 
-int thread_freelist_size = 512;
+int thread_freelist_high_watermark = 512;
+int thread_freelist_low_watermark = 32;
 
 void*
 thread_alloc(Allocator &a, ProxyAllocator &l)
@@ -31,7 +32,7 @@ thread_alloc(Allocator &a, ProxyAllocator &l)
   if (l.freelist) {
     void *v = (void *) l.freelist;
     l.freelist = *(void **) l.freelist;
-    l.allocated--;
+    --(l.allocated);
     return v;
   }
 #else
@@ -43,11 +44,27 @@ thread_alloc(Allocator &a, ProxyAllocator &l)
 void
 thread_freeup(Allocator &a, ProxyAllocator &l)
 {
-  while (l.freelist) {
-    void *v = (void *) l.freelist;
+#if !TS_USE_RECLAIMABLE_FREELIST
+  void *head = (void *) l.freelist;
+#endif
+  void *tail = (void *) l.freelist;
+  size_t count = 0;
+  while(l.freelist && l.allocated > thread_freelist_low_watermark){
+    tail = l.freelist;
     l.freelist = *(void **) l.freelist;
-    l.allocated--;
-    a.free_void(v);                  // we could use a bulk free here
+    --(l.allocated);
+    ++count;
+#if TS_USE_RECLAIMABLE_FREELIST
+    a.free_void(tail);
+#endif
   }
-  ink_assert(!l.allocated);
+#if !TS_USE_RECLAIMABLE_FREELIST
+  if (unlikely(count == 1)) {
+    a.free_void(tail);
+  } else if(count > 0) {
+    a.free_void_bulk(head, tail, count);
+  }
+
+  ink_assert(l.allocated >= thread_freelist_low_watermark);
+#endif
 }

@@ -176,12 +176,12 @@ TransformTerminus::handle_event(int event, void * /* edata ATS_UNUSED */)
       int64_t towrite;
 
       MUTEX_TRY_LOCK(trylock1, m_write_vio.mutex, this_ethread());
-      if (!trylock1) {
+      if (!trylock1.is_locked()) {
         RETRY();
       }
 
       MUTEX_TRY_LOCK(trylock2, m_read_vio.mutex, this_ethread());
-      if (!trylock2) {
+      if (!trylock2.is_locked()) {
         RETRY();
       }
 
@@ -236,7 +236,7 @@ TransformTerminus::handle_event(int event, void * /* edata ATS_UNUSED */)
     }
   } else {
     MUTEX_TRY_LOCK(trylock2, m_read_vio.mutex, this_ethread());
-    if (!trylock2) {
+    if (!trylock2.is_locked()) {
       RETRY();
     }
 
@@ -561,7 +561,7 @@ TransformControl::handle_event(int event, void * /* edata ATS_UNUSED */)
   case TRANSFORM_READ_READY:
     {
       MIOBuffer *buf = new_empty_MIOBuffer();
-  
+
       m_read_buf = buf->alloc_reader();
       m_tvc->do_io_read(this, INT64_MAX, buf);
       break;
@@ -656,7 +656,7 @@ NullTransform::handle_event(int event, void *edata)
         }
 
         MUTEX_TRY_LOCK(trylock, m_write_vio.mutex, this_ethread());
-        if (!trylock) {
+        if (!trylock.is_locked()) {
           retry(10);
           return 0;
         }
@@ -805,7 +805,7 @@ RangeTransform::handle_event(int event, void *edata)
       }
 
       MUTEX_TRY_LOCK(trylock, m_write_vio.mutex, this_ethread());
-      if (!trylock) {
+      if (!trylock.is_locked()) {
         retry(10);
         return 0;
       }
@@ -998,7 +998,7 @@ RangeTransform::change_response_header()
   MIMEField *field;
   char *reason_phrase;
   HTTPStatus status_code;
-  
+
   ink_release_assert(m_transform_resp);
 
   status_code = HTTP_STATUS_PARTIAL_CONTENT;

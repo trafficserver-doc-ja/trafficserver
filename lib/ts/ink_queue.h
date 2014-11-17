@@ -62,6 +62,8 @@ extern "C"
 {
 #endif                          /* __cplusplus */
 
+  extern int fastmemtotal;
+
   void ink_queue_load_64(void *dst, void *src);
 
 #ifdef __x86_64__
@@ -184,6 +186,7 @@ extern "C"
                                     uint32_t alignment);
   inkcoreapi void *ink_freelist_new(InkFreeList * f);
   inkcoreapi void ink_freelist_free(InkFreeList * f, void *item);
+  inkcoreapi void ink_freelist_free_bulk(InkFreeList * f, void *head, void *tail, size_t num_item);
   void ink_freelists_dump(FILE * f);
   void ink_freelists_dump_baselinerel(FILE * f);
   void ink_freelists_snap_baseline();

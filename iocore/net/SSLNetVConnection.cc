@@ -27,6 +27,10 @@
 #include "P_SSLUtils.h"
 #include "InkAPIInternal.h"	// Added to include the ssl_hook definitions
 
+// Defined in SSLInternal.c, should probably make a separate include
+// file for this at some point
+void SSL_set_rbio(SSLNetVConnection *sslvc, BIO *rbio);
+
 #define SSL_READ_ERROR_NONE	  0
 #define SSL_READ_ERROR		  1
 #define SSL_READ_READY		  2
@@ -78,7 +82,7 @@ namespace {
       EThread* eth = this_ethread();
 
       MUTEX_TRY_LOCK(lock, _target->mutex, eth);
-      if (lock) { // got the target lock, we can proceed.
+      if (lock.is_locked()) { // got the target lock, we can proceed.
         _target->handleEvent(_eventId, _edata);
         delete this;
       } else { // can't get both locks, try again.
@@ -105,7 +109,7 @@ namespace {
       ) {
       EThread* eth = this_ethread();
       MUTEX_TRY_LOCK(lock, target->mutex, eth);
-      if (lock) {
+      if (lock.is_locked()) {
         target->handleEvent(eventId, edata);
       } else {
         eventProcessor.schedule_imm(new ContWrapper(mutex, target, eventId, edata), ET_NET);
@@ -138,7 +142,7 @@ make_ssl_connection(SSL_CTX * ctx, SSLNetVConnection * netvc)
       netvc->initialize_handshake_buffers();
       BIO *rbio = BIO_new(BIO_s_mem());
       BIO *wbio = BIO_new_fd(netvc->get_socket(), BIO_NOCLOSE);
-      BIO_set_mem_eof_return(wbio, -1); 
+      BIO_set_mem_eof_return(wbio, -1);
       SSL_set_bio(ssl, rbio, wbio);
     }
 
@@ -249,7 +253,7 @@ ssl_read_from_net(SSLNetVConnection * sslvc, EThread * lthread, int64_t &ret)
       default:
         event = SSL_READ_ERROR;
         ret = errno;
-        SSL_CLR_ERR_INCR_DYN_STAT(ssl_error_ssl, "[SSL_NetVConnection::ssl_read_from_net]: errno=%d", errno);
+        SSL_CLR_ERR_INCR_DYN_STAT(sslvc, ssl_error_ssl, "[SSL_NetVConnection::ssl_read_from_net]: errno=%d", errno);
         break;
       }                         // switch
       break;
@@ -282,9 +286,9 @@ ssl_read_from_net(SSLNetVConnection * sslvc, EThread * lthread, int64_t &ret)
 }
 
 /**
- * Read from socket directly for handshake data.  Store the data in 
+ * Read from socket directly for handshake data.  Store the data in
  * a MIOBuffer.  Place the data in the read BIO so the openssl library
- * has access to it.  
+ * has access to it.
  * If for some ready we much abort out of the handshake, we can replay
  * the stored data (e.g. back out to blind tunneling)
  */
@@ -361,16 +365,16 @@ SSLNetVConnection::read_raw_data()
   // Sets up the buffer as a read only bio target
   // Must be reset on each read
   BIO *rbio = BIO_new_mem_buf(start, end - start);
-  BIO_set_mem_eof_return(rbio, -1); 
+  BIO_set_mem_eof_return(rbio, -1);
   // Assigning directly into the SSL structure
   // is dirty, but there is no openssl function that only
   // assigns the read bio.  Originally I was getting and
-  // resetting the same write bio, but that caused the 
+  // resetting the same write bio, but that caused the
   // inserted buffer bios to be freed and then reinserted.
   //BIO *wbio = SSL_get_wbio(this->ssl);
   //SSL_set_bio(this->ssl, rbio, wbio);
-  this->ssl->rbio = rbio;
- 
+  SSL_set_rbio(this, rbio);
+
   return r;
 }
 
@@ -399,7 +403,7 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
   }
 
   MUTEX_TRY_LOCK_FOR(lock, s->vio.mutex, lthread, s->vio._cont);
-  if (!lock) {
+  if (!lock.is_locked()) {
     readReschedule(nh);
     return;
   }
@@ -438,8 +442,8 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
         }
         else {  // Now in blind tunnel. Set things up to read what is in the buffer
           this->readSignalDone(VC_EVENT_READ_COMPLETE, nh);
-  
-          // If the handshake isn't set yet, this means the tunnel 
+
+          // If the handshake isn't set yet, this means the tunnel
           // decision was make in the SNI callback.  We must move
           // the client hello message back into the standard read.vio
           // so it will get forwarded onto the origin server
@@ -453,7 +457,7 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
             int64_t r = buf.writer()->write(this->handShakeHolder);
             s->vio.nbytes += r;
             s->vio.ndone += r;
- 
+
             // Clean up the handshake buffers
             this->free_handshake_buffers();
 
@@ -505,31 +509,31 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
   // At this point we are at the post-handshake SSL processing
   // If the read BIO is not already a socket, consider changing it
   if (this->handShakeReader) {
-    if (this->handShakeReader->read_avail() <= 0) { 
+    if (this->handShakeReader->read_avail() <= 0) {
       // Switch the read bio over to a socket bio
       SSL_set_rfd(this->ssl, this->get_socket());
       this->free_handshake_buffers();
-    } 
+    }
     else { // There is still data in the buffer to drain
       char *data_ptr = NULL;
       int data_still_to_read = BIO_get_mem_data(SSL_get_rbio(this->ssl), &data_ptr);
       if (data_still_to_read >  0) {
         // Still data remaining in the current BIO block
       }
-      else { 
+      else {
         // reset the block
         char *start = this->handShakeReader->start();
         char *end = this->handShakeReader->end();
         // Sets up the buffer as a read only bio target
         // Must be reset on each read
         BIO *rbio = BIO_new_mem_buf(start, end - start);
-        BIO_set_mem_eof_return(rbio, -1); 
+        BIO_set_mem_eof_return(rbio, -1);
         // So assigning directly into the SSL structure
         // is dirty, but there is no openssl function that only
         // assigns the read bio.  Originally I was getting and
-        // resetting the same write bio, but that caused the 
+        // resetting the same write bio, but that caused the
         // inserted buffer bios to be freed and then reinserted.
-        this->ssl->rbio = rbio;
+        SSL_set_rbio(this, rbio);
         //BIO *wbio = SSL_get_wbio(this->ssl);
         //SSL_set_bio(this->ssl, rbio, wbio);
       }
@@ -537,7 +541,7 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
   }
   // Otherwise, we already replaced the buffer bio with a socket bio
 
-  // not sure if this do-while loop is really needed here, please replace 
+  // not sure if this do-while loop is really needed here, please replace
   // this comment if you know
   do {
     ret = ssl_read_from_net(this, lthread, r);
@@ -564,7 +568,7 @@ SSLNetVConnection::net_read_io(NetHandler *nh, EThread *lthread)
     break;
   case SSL_WRITE_WOULD_BLOCK:
   case SSL_READ_WOULD_BLOCK:
-    if (lock.m.m_ptr != s->vio.mutex.m_ptr) {
+    if (lock.get_mutex() != s->vio.mutex.m_ptr) {
       Debug("ssl", "ssl_read_from_net, mutex switched");
       if (ret == SSL_READ_WOULD_BLOCK)
         readReschedule(nh);
@@ -750,7 +754,7 @@ SSLNetVConnection::load_buffer_and_write(int64_t towrite, int64_t &wattempted, i
     case SSL_ERROR_SSL:
     default:
       r = -errno;
-      SSL_CLR_ERR_INCR_DYN_STAT(ssl_error_ssl, "SSL_write-SSL_ERROR_SSL errno=%d", errno);
+      SSL_CLR_ERR_INCR_DYN_STAT(this, ssl_error_ssl, "SSL_write-SSL_ERROR_SSL errno=%d", errno);
       break;
     }
     return (r);
@@ -813,7 +817,7 @@ SSLNetVConnection::free(EThread * t) {
   npnEndpoint= NULL;
 
   if (from_accept_thread) {
-    sslNetVCAllocator.free(this);  
+    sslNetVCAllocator.free(this);
   } else {
     THREAD_FREE(this, sslNetVCAllocator, t);
   }
@@ -835,7 +839,7 @@ SSLNetVConnection::sslStartHandShake(int event, int &err)
         IpEndpoint src, dst;
         ip_port_text_buffer ipb1, ipb2;
         int ip_len;
-        
+
         safe_getsockname(this->get_socket(), &dst.sa, &(ip_len = sizeof ip));
         safe_getpeername(this->get_socket(), &src.sa, &(ip_len = sizeof ip));
         ats_ip_nptop(&dst, ipb1, sizeof(ipb1));
@@ -853,7 +857,7 @@ SSLNetVConnection::sslStartHandShake(int event, int &err)
         this->ssl = NULL;
         return EVENT_DONE;
       }
- 
+
 
       // Attach the default SSL_CTX to this SSL session. The default context is never going to be able
       // to negotiate a SSL session, but it's enough to trampoline us into the SNI callback where we
@@ -919,7 +923,7 @@ SSLNetVConnection::sslServerHandShakeEvent(int &err)
     }
   }
 
-  // If a blind tunnel was requested in the pre-accept calls, convert. 
+  // If a blind tunnel was requested in the pre-accept calls, convert.
   // Again no data has been exchanged, so we can go directly
   // without data replay.
   // Note we can't arrive here if a hook is active.
@@ -939,7 +943,7 @@ SSLNetVConnection::sslServerHandShakeEvent(int &err)
   char *data_ptr = NULL;
   int data_to_read = BIO_get_mem_data(SSL_get_rbio(this->ssl), &data_ptr);
   if (data_to_read <= 0) { // If there is not already data in the buffer
-    // Read from socket to fill in the BIO buffer with the 
+    // Read from socket to fill in the BIO buffer with the
     // raw handshake data before calling the ssl accept calls.
     int64_t data_read;
     if ((data_read = this->read_raw_data()) > 0) {
@@ -1047,7 +1051,7 @@ SSLNetVConnection::sslServerHandShakeEvent(int &err)
     return EVENT_CONT;
 
   case SSL_ERROR_SSL:
-    SSL_CLR_ERR_INCR_DYN_STAT(ssl_error_ssl, "SSLNetVConnection::sslServerHandShakeEvent, SSL_ERROR_SSL errno=%d", errno);
+    SSL_CLR_ERR_INCR_DYN_STAT(this, ssl_error_ssl, "SSLNetVConnection::sslServerHandShakeEvent, SSL_ERROR_SSL errno=%d", errno);
     // fall through
   case SSL_ERROR_ZERO_RETURN:
   case SSL_ERROR_SYSCALL:
@@ -1071,7 +1075,7 @@ SSLNetVConnection::sslClientHandShakeEvent(int &err)
     }
   }
 #endif
-  
+
   ssl_error_t ssl_error = SSLConnect(ssl);
   switch (ssl_error) {
   case SSL_ERROR_NONE:
@@ -1129,7 +1133,7 @@ SSLNetVConnection::sslClientHandShakeEvent(int &err)
   case SSL_ERROR_SSL:
   default:
     err = errno;
-    SSL_CLR_ERR_INCR_DYN_STAT(ssl_error_ssl, "SSLNetVConnection::sslClientHandShakeEvent, SSL_ERROR_SSL errno=%d", errno);
+    SSL_CLR_ERR_INCR_DYN_STAT(this, ssl_error_ssl, "SSLNetVConnection::sslClientHandShakeEvent, SSL_ERROR_SSL errno=%d", errno);
     return EVENT_ERROR;
     break;
 
@@ -1218,8 +1222,8 @@ SSLNetVConnection::sslContextSet(void* ctx) {
   return zret;
 }
 
-bool 
-SSLNetVConnection::callHooks(TSHttpHookID eventId) 
+bool
+SSLNetVConnection::callHooks(TSHttpHookID eventId)
 {
   // Only dealing with the SNI hook so far
   ink_assert(eventId == TS_SSL_SNI_HOOK);
@@ -1233,7 +1237,7 @@ SSLNetVConnection::callHooks(TSHttpHookID eventId)
     // Invoke the hook
     hook->invoke(TS_SSL_SNI_HOOK, this);
 
-    // If it did not re-enable, return the code to 
+    // If it did not re-enable, return the code to
     // stop the accept processing
     if (this->sslSNIHookState == SNI_HOOKS_DONE) {
       reenabled = false;

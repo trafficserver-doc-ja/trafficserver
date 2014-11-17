@@ -189,6 +189,14 @@ TSMutexCreate()
   return (TSMutex)mutexp;
 }
 
+void
+TSMutexDestroy(TSMutex m) {
+  sdk_assert(sdk_sanity_check_mutex(m) == TS_SUCCESS);
+  ink_release_assert(((ProxyMutex*)m)->refcount() == 0);
+
+  ((ProxyMutex*)m)->free();
+}
+
 /* The following two APIs are for Into work, actually, APIs of Mutex
    should allow plugins to manually increase or decrease the refcount
    of the mutex pointer, plugins may want more control of the creation
@@ -354,14 +362,14 @@ INKBasedTimeGet()
 
 TSAction
 INKUDPBind(TSCont contp, unsigned int ip, int port)
-{  
+{
   sdk_assert(sdk_sanity_check_continuation(contp) == TS_SUCCESS);
-    
+
   FORCE_PLUGIN_MUTEX(contp);
 
   struct sockaddr_in addr;
   ats_ip4_set(&addr, ip, htons(port));
-  
+
   return reinterpret_cast<TSAction>(udpNet.UDPBind((Continuation *)contp, ats_ip_sa_cast(&addr), INK_ETHERNET_MTU_SIZE, INK_ETHERNET_MTU_SIZE));
 }
 
@@ -477,7 +485,7 @@ INKUDPPacketGet(INKUDPacketQueue queuep)
 
     packet = qp->pop();
     return (packet);
-  } 
+  }
 
   return NULL;
 }

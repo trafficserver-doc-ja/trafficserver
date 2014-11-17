@@ -26,6 +26,7 @@ SUBDIRS = \
  escalate \
  esi \
  geoip_acl \
+ header_normalize \
  healthchecks \
  hipes \
  metalink \

@@ -1,6 +1,7 @@
 /** @file
 
-  A brief file description
+  Functions that break the no internal pact with openssl.  We
+  explicitly undefine OPENSSL_NO_SSL_INTERN in this file.
 
   @section license License
 
@@ -20,34 +21,16 @@
   See the License for the specific language governing permissions and
   limitations under the License.
  */
+#ifdef OPENSSL_NO_SSL_INTERN
+#undef OPENSSL_NO_SSL_INTERN
+#endif
 
-/**************************************************************************
-  Signal functions and handlers.
+#include <openssl/ssl.h>
+#include "P_Net.h"
+#include "P_SSLNetVConnection.h"
 
-**************************************************************************/
-
-#ifndef _signals_h_
-#define _signals_h_
-
-/*
- *  Global data
- */
-
-extern int exited_children;
-typedef void (*sig_callback_fptr) (int signo);
-/*
-*  plugins use this to attach clean up handlers
-*  for SIGSEGV and SIGBUS
-*  Return value: 0 on success, -1 on failure
-*/
-int register_signal_callback(sig_callback_fptr f);
-
-/*
- *  Function prototypes
- */
-
-void init_signals(bool do_stackdump=true);
-void init_signals2();
-void init_daemon_signals();
-
-#endif /* _signals_h_ */
+void
+SSL_set_rbio(SSLNetVConnection *sslvc, BIO *rbio)
+{
+  sslvc->ssl->rbio = rbio;
+}

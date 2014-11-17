@@ -1,10 +1,45 @@
                                                          -*- coding: utf-8 -*-
 Changes with Apache Traffic Server 5.2.0
 
+  *) [TS-3196] Prevent crash due to de-allocated read VIO continuation.
+
+  *) [TS-3199] Do not wait for body for HEAD method
+
+  *) [TS-3192] Implement proxy.config.config_dir.
+
+  *) [TS-3195] Improved crash logging.
+
+  *) [TS-3194] Remove unused proxy.config.plugin.plugin_mgmt_dir configuration.
+
+  *) [TS-3185] Increase the default spdy initial_window_size_in setting to 1 mb
+
+  *) [TS-3178] ProxyAllocators Improvements
+
+  *) [TS-2812] Initial version of header_normalize plugin
+
+  *) [TS-2959] Fix compiler issue for MultiCache.
+
+  *) [TS-3155] Added value_get_index to MimeField.
+
+  *) [TS-3184] spdy window_update not triggered correctly
+
+  *) [TS-3024] Build with OPENSSL_NO_SSL_INTERN
+   Author: Susan Hinrichs <shinrich@network-geographics.com>
+
+  *) [TS-1175] Replace LogBuffer's new/delete buffer alloc with ioBufAllocator
+
+  *) [TS-1432] Adding TSMutexDestroy API
+
+  *) [TS-3171] Minor style updates to Tokenizer interface.
+
+  *) [TS-3156] Remove MutexLock bool operators.
+   Author: Powell Molleti <powellm@yahoo-inc.com>
+
   *) [TS-2682] Add per remap support for background fetch plugin
 
-  *) [TS-2683]: Enhance the bg fetch plugin to support specifyng various 
-     exclusion criteria
+  *) [TS-2683]: Enhance the bg fetch plugin to support configuration
+     control with inclusion/exclusion criteria based on client-ip
+     or any header
 
   *) [TS-3149] Move Via decode out of traffic_line and make a separate tool.
    Author: Meera Mosale Nataraja <mechins@gmail.com>

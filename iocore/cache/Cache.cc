@@ -463,11 +463,11 @@ CacheVC::set_http_info(CacheHTTPInfo *ainfo)
   }
   if (enable_cache_empty_http_doc) {
     MIMEField *field = ainfo->m_alt->m_response_hdr.field_find(MIME_FIELD_CONTENT_LENGTH, MIME_LEN_CONTENT_LENGTH);
-    if (field && !field->value_get_int64()) 
+    if (field && !field->value_get_int64())
       f.allow_empty_doc = 1;
     else
       f.allow_empty_doc = 0;
-  } else 
+  } else
     f.allow_empty_doc = 0;
   alternate.copy_shallow(ainfo);
   ainfo->clear();
@@ -2474,7 +2474,7 @@ CacheVC::handleReadDone(int event, Event *e)
       return EVENT_CONT;
   {
     MUTEX_TRY_LOCK(lock, vol->mutex, mutex->thread_holding);
-    if (!lock)
+    if (!lock.is_locked())
       VC_SCHED_LOCK_RETRY();
     if ((!dir_valid(vol, &dir)) || (!io.ok())) {
       if (!io.ok()) {
@@ -2823,7 +2823,7 @@ CacheVC::removeEvent(int /* event ATS_UNUSED */, Event * /* e ATS_UNUSED */)
   set_io_not_in_progress();
   {
     MUTEX_TRY_LOCK(lock, vol->mutex, mutex->thread_holding);
-    if (!lock)
+    if (!lock.is_locked())
       VC_SCHED_LOCK_RETRY();
     if (_action.cancelled) {
       if (od) {
@@ -2915,7 +2915,7 @@ Cache::remove(Continuation *cont, CacheKey *key, CacheFragType type, bool /* use
     cont = new_CacheRemoveCont();
 
   CACHE_TRY_LOCK(lock, cont->mutex, this_ethread());
-  ink_assert(lock);
+  ink_assert(lock.is_locked());
   Vol *vol = key_to_vol(key, hostname, host_len);
   // coverity[var_decl]
   Dir result;

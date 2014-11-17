@@ -27,10 +27,26 @@
 #include "libts.h"
 #include "HTTP.h"
 
-enum HEADER_INDEXING_TYPE {
-  INC_INDEXING,
-  WITHOUT_INDEXING,
-  NEVER_INDEXED,
+// Constant strings for pseudo headers of HPACK
+extern const char * HPACK_VALUE_SCHEME;
+extern const char * HPACK_VALUE_METHOD;
+extern const char * HPACK_VALUE_AUTHORITY;
+extern const char * HPACK_VALUE_PATH;
+extern const char * HPACK_VALUE_STATUS;
+
+extern const unsigned HPACK_LEN_SCHEME;
+extern const unsigned HPACK_LEN_METHOD;
+extern const unsigned HPACK_LEN_AUTHORITY;
+extern const unsigned HPACK_LEN_PATH;
+extern const unsigned HPACK_LEN_STATUS;
+
+enum HpackFieldType
+{
+  HPACK_FIELD_INDEX,              // HPACK 7.1 Indexed Header Field Representation
+  HPACK_FIELD_INDEXED_LITERAL,    // HPACK 7.2.1 Literal Header Field with Incremental Indexing
+  HPACK_FIELD_NOINDEX_LITERAL,    // HPACK 7.2.2 Literal Header Field without Indexing
+  HPACK_FIELD_NEVERINDEX_LITERAL, // HPACK 7.2.3 Literal Header Field never Indexed
+  HPACK_FIELD_TABLESIZE_UPDATE,   // HPACK 7.3 Header Table Size Update
 };
 
 class MIMEFieldWrapper
@@ -103,12 +119,32 @@ private:
   Vec<MIMEField *>  _headers;
 };
 
+HpackFieldType
+hpack_parse_field_type(uint8_t ftype);
+
+static inline bool
+hpack_field_is_literal(HpackFieldType ftype) {
+  return
+    ftype == HPACK_FIELD_INDEXED_LITERAL ||
+    ftype == HPACK_FIELD_NOINDEX_LITERAL ||
+    ftype == HPACK_FIELD_NEVERINDEX_LITERAL;
+}
+
+int64_t
+encode_integer(uint8_t *buf_start, const uint8_t *buf_end, uint32_t value, uint8_t n);
+int64_t
+decode_integer(uint32_t& dst, const uint8_t *buf_start, const uint8_t *buf_end, uint8_t n);
+int64_t
+encode_string(uint8_t *buf_start, const uint8_t *buf_end, const char* value, size_t value_len);
+int64_t
+decode_string(char **c_str, uint32_t& c_str_length, const uint8_t *buf_start, const uint8_t *buf_end);
+
 int64_t
 encode_indexed_header_field(uint8_t *buf_start, const uint8_t *buf_end, uint32_t index);
 int64_t
-encode_literal_header_field(uint8_t *buf_start, const uint8_t *buf_end, const MIMEFieldWrapper& header, uint32_t index, HEADER_INDEXING_TYPE type);
+encode_literal_header_field(uint8_t *buf_start, const uint8_t *buf_end, const MIMEFieldWrapper& header, uint32_t index, HpackFieldType type);
 int64_t
-encode_literal_header_field(uint8_t *buf_start, const uint8_t *buf_end, const MIMEFieldWrapper& header, HEADER_INDEXING_TYPE type);
+encode_literal_header_field(uint8_t *buf_start, const uint8_t *buf_end, const MIMEFieldWrapper& header, HpackFieldType type);
 
 int64_t
 decode_indexed_header_field(MIMEFieldWrapper& header, const uint8_t *buf_start, const uint8_t *buf_end, Http2HeaderTable& header_table);

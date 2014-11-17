@@ -24,13 +24,19 @@
 
 #include "ink_config.h"
 #include "RecordsConfig.h"
-#include "ParseRules.h"
+
+#if TS_USE_REMOTE_UNWINDING
+#define MGMT_CRASHLOG_HELPER "traffic_crashlog"
+#else
+#define MGMT_CRASHLOG_HELPER NULL
+#endif
 
 //-------------------------------------------------------------------------
 // RecordsConfig
 //-------------------------------------------------------------------------
 
-RecordElement RecordsConfig[] = {
+static const RecordElement RecordsConfig[] =
+{
   //##############################################################################
   //#
   //# records.config items
@@ -44,7 +50,7 @@ RecordElement RecordsConfig[] = {
   ,
   {RECT_CONFIG, "proxy.config.proxy_name", RECD_STRING, "<proxy_name>", RECU_DYNAMIC, RR_REQUIRED, RECC_STR, ".+", RECA_NULL}
   ,
-  {RECT_CONFIG, "proxy.config.bin_path", RECD_STRING, "bin", RECU_NULL, RR_REQUIRED, RECC_NULL, NULL, RECA_NULL}
+  {RECT_CONFIG, "proxy.config.bin_path", RECD_STRING, "bin", RECU_NULL, RR_REQUIRED, RECC_NULL, NULL, RECA_READ_ONLY}
   ,
   {RECT_CONFIG, "proxy.config.proxy_binary", RECD_STRING, "traffic_server", RECU_NULL, RR_REQUIRED, RECC_NULL, NULL, RECA_NULL}
   ,
@@ -54,10 +60,10 @@ RecordElement RecordsConfig[] = {
   ,
   {RECT_CONFIG, "proxy.config.env_prep", RECD_STRING, NULL, RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
   ,
-  {RECT_CONFIG, "proxy.config.config_dir", RECD_STRING, TS_BUILD_SYSCONFDIR, RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
+  {RECT_CONFIG, "proxy.config.config_dir", RECD_STRING, TS_BUILD_SYSCONFDIR, RECU_RESTART_TC, RR_NULL, RECC_NULL, NULL, RECA_READ_ONLY}
   ,
   // Jira TS-21
-  {RECT_CONFIG, "proxy.config.local_state_dir", RECD_STRING, TS_BUILD_RUNTIMEDIR, RECU_RESTART_TS, RR_NULL, RECC_NULL, NULL, RECA_NULL}
+  {RECT_CONFIG, "proxy.config.local_state_dir", RECD_STRING, TS_BUILD_RUNTIMEDIR, RECU_RESTART_TS, RR_NULL, RECC_NULL, NULL, RECA_READ_ONLY}
   ,
   {RECT_CONFIG, "proxy.config.alarm_email", RECD_STRING, TS_PKGSYSUSER, RECU_DYNAMIC, RR_NULL, RECC_STR, ".*", RECA_NULL}
   ,
@@ -66,7 +72,7 @@ RecordElement RecordsConfig[] = {
   //# Negative core limit means max out limit
   {RECT_CONFIG, "proxy.config.core_limit", RECD_INT, "-1", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
   ,
-  {RECT_CONFIG, "proxy.config.stack_dump_enabled", RECD_INT, "1", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
+  {RECT_CONFIG, "proxy.config.crash_log_helper", RECD_STRING, MGMT_CRASHLOG_HELPER, RECU_RESTART_TS, RR_NULL, RECC_NULL, NULL, RECA_NULL}
   ,
   // 0 - Disabled, 1 - enabled for important pages (e.g. cache directory), 2 - enabled for all pages
   {RECT_CONFIG, "proxy.config.mlock_enabled", RECD_INT, "0", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
@@ -89,9 +95,6 @@ RecordElement RecordsConfig[] = {
    RECA_NULL}
   ,
   {RECT_CONFIG, "proxy.config.snapshot_dir", RECD_STRING, "snapshots", RECU_NULL, RR_REQUIRED, RECC_NULL, NULL, RECA_NULL}
-  ,
-  {RECT_CONFIG, "proxy.config.net_snapshot_filename", RECD_STRING, "net.config.xml", RECU_NULL, RR_NULL, RECC_NULL, NULL,
-   RECA_NULL}
   ,
   //# 0 = disable
   {RECT_CONFIG, "proxy.config.res_track_memory", RECD_INT, "0", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
@@ -252,7 +255,7 @@ RecordElement RecordsConfig[] = {
   ,
   {RECT_CONFIG, "proxy.config.admin.number_config_bak", RECD_INT, "3", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
   ,
-  {RECT_CONFIG, "proxy.config.admin.user_id", RECD_STRING, TS_PKGSYSUSER, RECU_NULL, RR_REQUIRED, RECC_NULL, NULL, RECA_NULL}
+  {RECT_CONFIG, "proxy.config.admin.user_id", RECD_STRING, TS_PKGSYSUSER, RECU_NULL, RR_REQUIRED, RECC_NULL, NULL, RECA_READ_ONLY}
   ,
   {RECT_CONFIG, "proxy.config.admin.cli_path", RECD_STRING, "cli", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
   ,
@@ -1389,9 +1392,7 @@ RecordElement RecordsConfig[] = {
   //# Plug-in Configuration
   //##############################################################################
   //# Directory in which to find plugins
-  {RECT_CONFIG, "proxy.config.plugin.plugin_dir", RECD_STRING, TS_BUILD_LIBEXECDIR, RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
-  ,
-  {RECT_CONFIG, "proxy.config.plugin.plugin_mgmt_dir", RECD_STRING, TS_BUILD_SYSCONFDIR "/plugins_mgmt", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
+  {RECT_CONFIG, "proxy.config.plugin.plugin_dir", RECD_STRING, TS_BUILD_LIBEXECDIR, RECU_RESTART_TS, RR_NULL, RECC_NULL, NULL, RECA_READ_ONLY}
   ,
   {RECT_CONFIG, "proxy.config.plugin.load_elevated", RECD_INT, "0", RECU_RESTART_TS, RR_NULL, RECC_INT, "[0-1]", RECA_READ_ONLY}
   ,
@@ -1972,7 +1973,7 @@ RecordElement RecordsConfig[] = {
   ,
   {RECT_CONFIG, "proxy.config.spdy.no_activity_timeout_in", RECD_INT, "115", RECU_DYNAMIC, RR_NULL, RECC_STR, "^[0-9]+$", RECA_NULL}
   ,
-  {RECT_CONFIG, "proxy.config.spdy.initial_window_size_in", RECD_INT, "65536", RECU_DYNAMIC, RR_NULL, RECC_STR, "^[0-9]+$", RECA_NULL}
+  {RECT_CONFIG, "proxy.config.spdy.initial_window_size_in", RECD_INT, "1048576", RECU_DYNAMIC, RR_NULL, RECC_STR, "^[0-9]+$", RECA_NULL}
   ,
   {RECT_CONFIG, "proxy.config.spdy.accept_no_activity_timeout", RECD_INT, "120", RECU_DYNAMIC, RR_NULL, RECC_STR, "^[0-9]+$", RECA_NULL}
   ,
@@ -2033,7 +2034,10 @@ RecordElement RecordsConfig[] = {
   //# Per-thread freelist / allocator controls
   //#
   //############
+  /* this should be renamed in 6.0 */
   {RECT_CONFIG, "proxy.config.allocator.thread_freelist_size", RECD_INT, "512", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
+  ,
+  {RECT_CONFIG, "proxy.config.allocator.thread_freelist_low_watermark", RECD_INT, "32", RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
   ,
 
   //############
@@ -2050,137 +2054,12 @@ RecordElement RecordsConfig[] = {
   //#
   //###########
   {RECT_CONFIG, "proxy.config.cache.http.compatibility.4-2-0-fixup", RECD_INT, "1", RECU_DYNAMIC, RR_NULL, RECC_NULL, NULL, RECA_NULL}
-  ,
 
-  //##############################################################################
-  //#
-  //# The End
-  //#
-  //##############################################################################
-  {RECT_CONFIG, NULL, RECD_NULL, NULL, RECU_NULL, RR_NULL, RECC_NULL, NULL, RECA_NULL}
 };
 
-//-------------------------------------------------------------------------
-// RecordsConfigOverrideFromEnvironment
-//-------------------------------------------------------------------------
-
-// We process environment variable overrides when we parse the records.config configuration file, but the
-// operator might choose to override a variable that is not present in records.config so we have to post-
-// process the full set of configuration valriables as well.
-void
-RecordsConfigOverrideFromEnvironment()
+void RecordsConfigIterate(RecordElementCallback callback, void * data)
 {
-  ink_mutex_acquire(&g_rec_config_lock);
-
-  for (const RecordElement * record = RecordsConfig; record->value_type != RECD_NULL; ++record) {
-    const char * value;
-    RecData data = {0};
-
-    if (record->type != RECT_CONFIG && record->type != RECT_LOCAL) {
-      continue;
-    }
-
-    if ((value = RecConfigOverrideFromEnvironment(record->name, NULL))) {
-      if (RecDataSetFromString(record->value_type, &data, value)) {
-          RecSetRecord(record->type, record->name, record->value_type, &data, NULL, false);
-          RecDataClear(record->value_type, &data);
-      }
-    }
+  for (unsigned i = 0; i < countof(RecordsConfig); ++i) {
+    callback(&RecordsConfig[i], data);
   }
-
-  ink_mutex_release(&g_rec_config_lock);
 }
-
-
-//-------------------------------------------------------------------------
-// LibRecordsConfigInit
-//-------------------------------------------------------------------------
-void
-LibRecordsConfigInit()
-{
-  int r = 0;
-  RecInt tempInt = 0;
-  RecFloat tempFloat = 0.0;
-  RecCounter tempCounter = 0;
-
-  RecUpdateT update;
-  RecCheckT check;
-  RecAccessT access;
-  RecT type;
-
-  for (r = 0; RecordsConfig[r].value_type != RECD_NULL; r++) {
-    // Less typing ...
-    type = RecordsConfig[r].type;
-    update = RecordsConfig[r].update;
-    check = RecordsConfig[r].check;
-    access = RecordsConfig[r].access;
-
-    if (type == RECT_CONFIG || type == RECT_LOCAL) {
-      switch (RecordsConfig[r].value_type) {
-      case RECD_INT:
-        tempInt = (RecInt) ink_atoi64(RecordsConfig[r].value);
-        RecRegisterConfigInt(type, RecordsConfig[r].name, tempInt, update, check, RecordsConfig[r].regex, access);
-        break;
-
-      case RECD_FLOAT:
-        tempFloat = (RecFloat) atof(RecordsConfig[r].value);
-        RecRegisterConfigFloat(type, RecordsConfig[r].name, tempFloat, update, check, RecordsConfig[r].regex, access);
-        break;
-
-      case RECD_STRING:
-        RecRegisterConfigString(type, RecordsConfig[r].name, RecordsConfig[r].value, update, check,
-                                RecordsConfig[r].regex, access);
-        break;
-
-      case RECD_COUNTER:
-        tempCounter = (RecCounter) ink_atoi64(RecordsConfig[r].value);
-        RecRegisterConfigCounter(type, RecordsConfig[r].name, tempCounter, update, check,
-                                 RecordsConfig[r].regex, access);
-        break;
-
-      default:
-        ink_assert(true);
-        break;
-
-      }                         // switch
-    } else { // Everything else, except PROCESS, are stats. TODO: Should modularize this too like PROCESS was done.
-      switch (RecordsConfig[r].value_type) {
-
-      case RECD_INT:
-        tempInt = (RecInt) ink_atoi64(RecordsConfig[r].value);
-        RecRegisterStatInt(type, RecordsConfig[r].name, tempInt, RECP_NON_PERSISTENT);
-        break;
-
-      case RECD_FLOAT:
-        tempFloat = (RecFloat) atof(RecordsConfig[r].value);
-        RecRegisterStatFloat(type, RecordsConfig[r].name, tempFloat, RECP_NON_PERSISTENT);
-        break;
-
-      case RECD_STRING:
-        RecRegisterStatString(type, RecordsConfig[r].name, (RecString)RecordsConfig[r].value, RECP_NON_PERSISTENT);
-        break;
-
-      case RECD_COUNTER:
-        tempCounter = (RecCounter) ink_atoi64(RecordsConfig[r].value);
-        RecRegisterStatCounter(type, RecordsConfig[r].name, tempCounter, RECP_NON_PERSISTENT);
-        break;
-
-      default:
-        ink_assert(true);
-        break;
-      }                         // switch
-    }
-  }
-
-  // test_librecords();
-}
-
-void
-test_librecords()
-{
-  RecRegisterStatInt(RECT_PROCESS, "proxy.process.librecords.testing.int", (RecInt) 100, RECP_NON_PERSISTENT);
-  RecRegisterStatFloat(RECT_NODE, "proxy.node.librecords.testing.float", (RecFloat) 100.1, RECP_NON_PERSISTENT);
-  RecRegisterStatString(RECT_CLUSTER, "proxy.cluster.librecords.testing.string", (RecString) "Hello World\n", RECP_NON_PERSISTENT);
-  RecRegisterStatCounter(RECT_LOCAL, "proxy.local.librecords.testing.counter", (RecCounter) 99, RECP_NON_PERSISTENT);
-}
-

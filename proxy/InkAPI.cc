@@ -1730,7 +1730,14 @@ TSInstallDirGet(void)
 const char *
 TSConfigDirGet(void)
 {
-  return Layout::get()->sysconfdir;
+  static char * sysconfdir = NULL;
+
+  // This is not great, bit it's no worse than TSPluginDirGet :-/
+  if (sysconfdir == NULL) {
+    sysconfdir = RecConfigReadConfigDir();
+  }
+
+  return sysconfdir;
 }
 
 const char *
@@ -3932,7 +3939,7 @@ TSCacheKeyDigestSet(TSCacheKey key, const char *input, int length)
   sdk_assert(sdk_sanity_check_iocore_structure((void*) input) == TS_SUCCESS);
   sdk_assert(length > 0);
   CacheInfo* ci = reinterpret_cast<CacheInfo*>(key);
-  
+
   if (ci->magic != CACHE_INFO_MAGIC_ALIVE)
     return TS_ERROR;
 
@@ -4497,7 +4504,7 @@ TSHttpSsnReenable(TSHttpSsn ssnp, TSEvent event)
     eventProcessor.schedule_imm(new TSHttpSsnCallback(cs, event), ET_NET);
   } else {
     MUTEX_TRY_LOCK(trylock, cs->mutex, eth);
-    if (!trylock) {
+    if (!trylock.is_locked()) {
       eventProcessor.schedule_imm(new TSHttpSsnCallback(cs, event), ET_NET);
     } else {
       cs->handleEvent((int) event, 0);
@@ -5564,7 +5571,7 @@ TSHttpTxnReenable(TSHttpTxn txnp, TSEvent event)
     eventProcessor.schedule_imm(new TSHttpSMCallback(sm, event), ET_NET);
   } else {
     MUTEX_TRY_LOCK(trylock, sm->mutex, eth);
-    if (!trylock) {
+    if (!trylock.is_locked()) {
       eventProcessor.schedule_imm(new TSHttpSMCallback(sm, event), ET_NET);
     } else {
       sm->state_api_callback((int) event, 0);
@@ -7362,7 +7369,7 @@ TSFetchLaunch(TSFetchSM fetch_sm)
 {
   sdk_assert(sdk_sanity_check_fetch_sm(fetch_sm) == TS_SUCCESS);
 
-  ((FetchSM*)fetch_sm)->ext_lanuch();
+  ((FetchSM*)fetch_sm)->ext_launch();
 }
 
 void
@@ -8703,18 +8710,18 @@ TSVConnTunnel(TSVConn sslp)
 }
 
 TSSslConnection
-TSVConnSSLConnectionGet(TSVConn sslp) 
+TSVConnSSLConnectionGet(TSVConn sslp)
 {
   TSSslConnection ssl = NULL;
   NetVConnection *vc = reinterpret_cast<NetVConnection*>(sslp);
   SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection*>(vc);
   if (ssl_vc != NULL) {
     ssl = reinterpret_cast<TSSslConnection>(ssl_vc->ssl);
-  } 
+  }
   return ssl;
 }
 
-tsapi TSSslContext TSSslContextFindByName(const char *name) 
+tsapi TSSslContext TSSslContextFindByName(const char *name)
 {
   TSSslContext ret = NULL;
   SSLCertLookup *lookup = SSLCertificateConfig::acquire();
@@ -8743,7 +8750,7 @@ tsapi TSSslContext TSSslContextFindByAddr(struct sockaddr const* addr)
   return ret;
 }
 
-tsapi int TSVConnIsSsl(TSVConn sslp) 
+tsapi int TSVConnIsSsl(TSVConn sslp)
 {
   NetVConnection *vc = reinterpret_cast<NetVConnection*>(sslp);
   SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection*>(vc);
@@ -8764,7 +8771,7 @@ TSVConnReenable(TSVConn vconn)
     // callback on the VC thread or it doesn't work (not sure why -
     // deadlock or it ends up interacting with the wrong NetHandler).
     MUTEX_TRY_LOCK(trylock, ssl_vc->mutex, eth);
-    if (!trylock) {
+    if (!trylock.is_locked()) {
       ssl_vc->thread->schedule_imm(new TSSslCallback(ssl_vc));
     }   else {
       ssl_vc->reenable(ssl_vc->nh);

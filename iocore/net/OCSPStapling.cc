@@ -365,7 +365,7 @@ ocsp_update()
   for (unsigned i = 0; i < ctxCount; i++) {
     SSLCertContext *cc = certLookup->get(i);
     if (cc && cc->ctx) {
-      ctx = cc->ctx; 
+      ctx = cc->ctx;
       cinf = stapling_get_cert_info(ctx);
        if (cinf) {
          ink_mutex_acquire(&cinf->stapling_mutex);
@@ -392,7 +392,10 @@ ssl_callback_ocsp_stapling(SSL *ssl)
   certinfo *cinf = NULL;
   time_t current_time;
 
-  cinf = stapling_get_cert_info(ssl->ctx);
+  // Assume SSL_get_SSL_CTX() is the same as reaching into the ssl structure
+  // Using the official call, to avoid leaking internal openssl knowledge
+  // originally was, cinf = stapling_get_cert_info(ssl->ctx);
+  cinf = stapling_get_cert_info(SSL_get_SSL_CTX(ssl));
   if (cinf == NULL) {
     Debug("ssl", "ssl_callback_ocsp_stapling: fail to get certificate information");
     return SSL_TLSEXT_ERR_NOACK;

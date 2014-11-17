@@ -631,7 +631,6 @@ The Apache Traffic Server Administration Manual will explain what these strings 
  proxy.config.manager_binary
  proxy.config.net.connections_throttle
  proxy.config.net.listen_backlog
- proxy.config.net_snapshot_filename
  proxy.config.net.sock_mss_in
  proxy.config.net.sock_option_flag_in
  proxy.config.net.sock_option_flag_out
@@ -644,7 +643,6 @@ The Apache Traffic Server Administration Manual will explain what these strings 
  proxy.config.ping.npacks_to_trans
  proxy.config.ping.timeout_sec
  proxy.config.plugin.plugin_dir
- proxy.config.plugin.plugin_mgmt_dir
  proxy.config.prefetch.child_port
  proxy.config.prefetch.config_file
  proxy.config.prefetch.default_data_proto
@@ -710,7 +708,6 @@ The Apache Traffic Server Administration Manual will explain what these strings 
  proxy.config.ssl.server.multicert.filename
  proxy.config.ssl.server_port
  proxy.config.ssl.server.private_key.path
- proxy.config.stack_dump_enabled
  proxy.config.stat_collector.interval
  proxy.config.stat_collector.port
  proxy.config.stats.config_file

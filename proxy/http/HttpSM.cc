@@ -469,7 +469,7 @@ HttpSM::state_add_to_list(int event, void * /* data ATS_UNUSED */)
     // the client_vc`s timeout events can be triggered, so we should not
     // reschedule the http_sm when the lock is not acquired.
     // FIXME: the sm_list may miss some http_sms when the lock contention
-    if (lock)
+    if (lock.is_locked())
       HttpSMList[bucket].sm_list.push(this);
   }
 
@@ -493,7 +493,7 @@ HttpSM::state_remove_from_list(int event, void * /* data ATS_UNUSED */)
     int bucket = ((unsigned int) sm_id % HTTP_LIST_BUCKETS);
 
     MUTEX_TRY_LOCK(lock, HttpSMList[bucket].mutex, mutex->thread_holding);
-    if (!lock) {
+    if (!lock.is_locked()) {
       HTTP_SM_SET_DEFAULT_HANDLER(&HttpSM::state_remove_from_list);
       mutex->thread_holding->schedule_in(this, HTTP_LIST_RETRY);
       return EVENT_DONE;
@@ -2826,7 +2826,7 @@ HttpSM::is_http_server_eos_truncation(HttpTunnelProducer * p)
     // invalidates the current data being passed over to the client.
     // So changing it from return true to return false, so the partial data
     // is passed onto the client.
-    return false;	
+    return false;
   }
 
   //////////////////////////////////////////////////////////////

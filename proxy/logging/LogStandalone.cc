@@ -71,12 +71,20 @@ AppVersionInfo appVersionInfo;
   init_system
   -------------------------------------------------------------------------*/
 
+// Handle fatal signals by logging and core dumping ...
+static void
+logging_crash_handler(int signo, siginfo_t * info, void * ptr)
+{
+  signal_format_siginfo(signo, info, appVersionInfo.AppStr);
+  signal_crash_handler(signo, info, ptr);
+}
+
 static void
 init_system(bool notify_syslog)
 {
   fds_limit = ink_max_out_rlimit(RLIMIT_NOFILE, true, false);
 
-  init_signals();
+  signal_register_crash_handler(logging_crash_handler);
   if (notify_syslog) {
     syslog(LOG_NOTICE, "NOTE: --- %s Starting ---", appVersionInfo.AppStr);
     syslog(LOG_NOTICE, "NOTE: %s Version: %s", appVersionInfo.AppStr, appVersionInfo.FullVersionInfoStr);
@@ -101,13 +109,8 @@ initialize_process_manager()
   ink_assert(diags);
 
   RecProcessInit(remote_management_flag ? RECM_CLIENT : RECM_STAND_ALONE, diags);
+  LibRecordsConfigInit();
 
-  if (!remote_management_flag) {
-    LibRecordsConfigInit();
-    RecordsConfigOverrideFromEnvironment();
-  }
-
-  //
   // Start up manager
   pmgmt = new ProcessManager(remote_management_flag);
 
@@ -131,15 +134,6 @@ initialize_process_manager()
 //                         "proxy.process.version.server.build_compile_flags",
 //                         appVersionInfo.BldCompileFlagsStr,
 //                         RECP_NON_PERSISTENT);
-}
-
-/*-------------------------------------------------------------------------
-  shutdown_system
-  -------------------------------------------------------------------------*/
-
-void
-shutdown_system()
-{
 }
 
 

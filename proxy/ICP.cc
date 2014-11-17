@@ -526,7 +526,7 @@ ICPPeerReadCont::PeerReadStateMachine(PeerReadData * s, Event * e)
   // State machine to process ICP data received on UDP socket
   //-----------------------------------------------------------
   MUTEX_TRY_LOCK(lock, this->mutex, this_ethread());
-  if (!lock) {
+  if (!lock.is_locked()) {
     // we didn't get the lock, so we don't need to unlock it
     // coverity[missing_unlock]
     return EVENT_CONT;          // try again later
@@ -1889,7 +1889,7 @@ ICPProcessor::ICPQuery(Continuation * c, URL * url)
   ICPRequestCont *rc = new(ICPRequestCont_allocator.alloc()) ICPRequestCont(this, c, url);
 
   ICP_INCREMENT_DYN_STAT(icp_query_requests_stat);
-  
+
   rc->SetRequestStartTime();
   SET_CONTINUATION_HANDLER(rc, (ICPRequestContHandler) & ICPRequestCont::ICPRequestEvent);
   eventProcessor.schedule_imm(rc, ET_ICP);

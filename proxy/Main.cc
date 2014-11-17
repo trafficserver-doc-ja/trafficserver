@@ -154,6 +154,8 @@ static int accept_mss = 0;
 static int cmd_line_dprintf_level = 0;  // default debug output level from ink_dprintf function
 static int poll_timeout = -1; // No value set.
 
+static volatile bool sigusr1_received = false;
+
 // 1: delay listen, wait for cache.
 // 0: Do not delay, start listen ASAP.
 // -1: cache is already initialized, don't delay.
@@ -210,21 +212,153 @@ static const ArgumentDescription argument_descriptions[] = {
   VERSION_ARGUMENT_DESCRIPTION()
 };
 
+class SignalContinuation : public Continuation
+{
+public:
+  char *end;
+  char *snap;
+  int fastmemsnap;
+
+  SignalContinuation() : Continuation(new_ProxyMutex()) {
+    end = snap = 0;
+    fastmemsnap = 0;
+    SET_HANDLER(&SignalContinuation::periodic);
+  }
+
+  int periodic(int /* event ATS_UNUSED */, Event * /* e ATS_UNUSED */) {
+    if (sigusr1_received) {
+      sigusr1_received = false;
+
+      // TODO: TS-567 Integrate with debugging allocators "dump" features?
+      ink_freelists_dump(stderr);
+      ResourceTracker::dump(stderr);
+      if (!end)
+        end = (char *) sbrk(0);
+      if (!snap)
+        snap = (char *) sbrk(0);
+      char *now = (char *) sbrk(0);
+      // TODO: Use logging instead directly writing to stderr
+      //       This is not error condition at the first place
+      //       so why stderr?
+      //
+      fprintf(stderr, "sbrk 0x%" PRIu64 "x from first %" PRIu64 " from last %" PRIu64 "\n",
+              (uint64_t) ((ptrdiff_t) now), (uint64_t) ((ptrdiff_t) (now - end)),
+              (uint64_t) ((ptrdiff_t) (now - snap)));
+#ifdef DEBUG
+      int fmdelta = fastmemtotal - fastmemsnap;
+      fprintf(stderr, "fastmem %" PRId64 " from last %" PRId64 "\n", (int64_t) fastmemtotal, (int64_t) fmdelta);
+      fastmemsnap += fmdelta;
+#endif
+      snap = now;
+    }
+
+    return EVENT_CONT;
+  }
+};
+
+class TrackerContinuation : public Continuation {
+public:
+  int baseline_taken;
+  int use_baseline;
+
+  TrackerContinuation() : Continuation(new_ProxyMutex()) {
+    SET_HANDLER(&TrackerContinuation::periodic);
+    use_baseline = 0;
+    // TODO: ATS prefix all those environment stuff or
+    //       even better use config since env can be
+    //       different for parent and child process users.
+    //
+    if (getenv("MEMTRACK_BASELINE")) {
+      use_baseline = 1;
+    }
+
+    baseline_taken = 0;
+  }
+
+  int periodic(int /* event ATS_UNUSED */, Event * /* e ATS_UNUSED */) {
+    if (use_baseline) {
+      // TODO: TS-567 Integrate with debugging allocators "dump" features?
+      ink_freelists_dump_baselinerel(stderr);
+    } else {
+      // TODO: TS-567 Integrate with debugging allocators "dump" features?
+      ink_freelists_dump(stderr);
+      ResourceTracker::dump(stderr);
+    }
+    if (!baseline_taken && use_baseline) {
+      ink_freelists_snap_baseline();
+      // TODO: TS-567 Integrate with debugging allocators "dump" features?
+      baseline_taken = 1;
+    }
+    return EVENT_CONT;
+  }
+};
+
+static int
+init_memory_tracker(const char *config_var, RecDataT /* type ATS_UNUSED */, RecData data, void * /* cookie ATS_UNUSED */)
+{
+  static Event *tracker_event = NULL;
+  int dump_mem_info_frequency = 0;
+
+  if (config_var) {
+    dump_mem_info_frequency = data.rec_int;
+  } else {
+    dump_mem_info_frequency = REC_ConfigReadInteger("proxy.config.dump_mem_info_frequency");
+  }
+
+  Debug("tracker", "init_tracker called [%d]\n", dump_mem_info_frequency);
+
+  if (tracker_event) {
+    tracker_event->cancel();
+    tracker_event = NULL;
+  }
+
+  if (dump_mem_info_frequency > 0) {
+    tracker_event = eventProcessor.schedule_every(new TrackerContinuation,
+                                                  HRTIME_SECONDS(dump_mem_info_frequency), ET_CALL);
+  }
+
+  return 1;
+}
+
+static void
+proxy_signal_handler(int signo, siginfo_t * info, void *)
+{
+  switch (signo) {
+  case SIGUSR1:
+    sigusr1_received = true;
+    return;
+  case SIGHUP:
+    return;
+  }
+
+  signal_format_siginfo(signo, info, appVersionInfo.AppStr);
+
+#if TS_HAS_PROFILER
+  ProfilerStop();
+#endif
+
+  if (signal_is_crash(signo)) {
+    // The only call to abort(2) should be from ink_fatal, which has already logged a stack trace.
+    if (signo != SIGABRT) {
+      ink_stack_trace_dump();
+    }
+
+    // Make sure to drop a core for signals that normally would do so.
+    signal(signo, SIG_DFL);
+    return;
+  }
+
+  _exit(signo);
+}
+
 //
 // Initialize operating system related information/services
 //
 static void
 init_system()
 {
-  RecInt stackDump;
-  bool found = (RecGetRecordInt("proxy.config.stack_dump_enabled", &stackDump) == REC_ERR_OKAY);
-
-  if (found == false) {
-    Warning("Unable to determine stack_dump_enabled , assuming enabled");
-    stackDump = 1;
-  }
-
-  init_signals(stackDump == 1);
+  signal_register_default_handler(proxy_signal_handler);
+  signal_register_crash_handler(proxy_signal_handler);
 
   syslog(LOG_NOTICE, "NOTE: --- %s Starting ---", appVersionInfo.AppStr);
   syslog(LOG_NOTICE, "NOTE: %s Version: %s", appVersionInfo.AppStr, appVersionInfo.FullVersionInfoStr);
@@ -269,10 +403,10 @@ static void
 check_config_directories(void)
 {
   ats_scoped_str rundir(RecConfigReadRuntimeDir());
+  ats_scoped_str sysconfdir(RecConfigReadConfigDir());
 
-  if (access(Layout::get()->sysconfdir, R_OK) == -1) {
-    fprintf(stderr,"unable to access() config dir '%s': %d, %s\n",
-            Layout::get()->sysconfdir, errno, strerror(errno));
+  if (access(sysconfdir, R_OK) == -1) {
+    fprintf(stderr,"unable to access() config dir '%s': %d, %s\n", (const char *)sysconfdir, errno, strerror(errno));
     fprintf(stderr, "please set the 'TS_ROOT' environment variable\n");
     _exit(1);
   }
@@ -305,11 +439,7 @@ initialize_process_manager()
   }
 
   RecProcessInit(remote_management_flag ? RECM_CLIENT : RECM_STAND_ALONE, diags);
-
-  if (!remote_management_flag) {
-    LibRecordsConfigInit();
-    RecordsConfigOverrideFromEnvironment();
-  }
+  LibRecordsConfigInit();
 
   // Start up manager
   pmgmt = new ProcessManager(remote_management_flag);
@@ -329,14 +459,6 @@ initialize_process_manager()
   RecRegisterStatString(RECT_PROCESS, "proxy.process.version.server.build_date", appVersionInfo.BldDateStr, RECP_NON_PERSISTENT);
   RecRegisterStatString(RECT_PROCESS, "proxy.process.version.server.build_machine", appVersionInfo.BldMachineStr, RECP_NON_PERSISTENT);
   RecRegisterStatString(RECT_PROCESS, "proxy.process.version.server.build_person", appVersionInfo.BldPersonStr, RECP_NON_PERSISTENT);
-}
-
-//
-// Shutdown
-//
-void
-shutdown_system()
-{
 }
 
 #define CMD_ERROR    -2         // serious error, exit maintaince mode
@@ -1076,12 +1198,12 @@ chdir_root()
   const char * prefix = Layout::get()->prefix;
 
   if (chdir(prefix) < 0) {
-    fprintf(stderr,"unable to change to root directory \"%s\" [%d '%s']\n",
-            prefix, errno, strerror(errno));
-    fprintf(stderr," please set correct path in env variable TS_ROOT \n");
+    fprintf(stderr, "%s: unable to change to root directory \"%s\" [%d '%s']\n",
+            appVersionInfo.AppStr, prefix, errno, strerror(errno));
+    fprintf(stderr, "%s: please correct the path or set the TS_ROOT environment variable\n", appVersionInfo.AppStr);
     _exit(1);
   } else {
-    printf("[TrafficServer] using root directory '%s'\n", prefix);
+    printf("%s: using root directory '%s'\n", appVersionInfo.AppStr, prefix);
   }
 }
 
@@ -1241,6 +1363,7 @@ main(int /* argc ATS_UNUSED */, char **argv)
   chdir_root(); // change directory to the install root of traffic server.
 
   process_args(&appVersionInfo, argument_descriptions, countof(argument_descriptions), argv);
+  command_flag = command_flag || *command_string;
 
   // Set stdout/stdin to be unbuffered
   setbuf(stdout, NULL);
@@ -1290,6 +1413,14 @@ main(int /* argc ATS_UNUSED */, char **argv)
 
   if (!num_task_threads)
     REC_ReadConfigInteger(num_task_threads, "proxy.config.task_threads");
+
+  // Set up crash logging. We need to do this while we are still privileged so that the crash
+  // logging helper runs as root. Don't bother setting up a crash logger if we are going into
+  // command mode since that's not going to daemonize or run for a long time unattended.
+  if (!command_flag) {
+    crash_logger_init();
+    signal_register_crash_handler(crash_logger_invoke);
+  }
 
   ats_scoped_str user(MAX_LOGIN + 1);
 
@@ -1383,7 +1514,6 @@ main(int /* argc ATS_UNUSED */, char **argv)
 
   // Sanity checks
   check_fd_limit();
-  command_flag = command_flag || *command_string;
 
   // Alter the frequecies at which the update threads will trigger
 #define SET_INTERVAL(scope, name, var) do { \
@@ -1455,7 +1585,10 @@ main(int /* argc ATS_UNUSED */, char **argv)
     remapProcessor.setUseSeparateThread();
   }
 
-  init_signals2();
+  eventProcessor.schedule_every(new SignalContinuation, HRTIME_MSECOND * 500, ET_CALL);
+  REC_RegisterConfigUpdateFunc("proxy.config.dump_mem_info_frequency", init_memory_tracker, NULL);
+  init_memory_tracker(NULL, RECD_NULL, RecData(), NULL);
+
   // log initialization moved down
 
   if (command_flag) {

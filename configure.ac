@@ -1164,6 +1164,7 @@ fi
 AC_CHECK_FUNCS([clock_gettime kqueue epoll_ctl posix_memalign posix_fadvise posix_madvise posix_fallocate inotify_init])
 AC_CHECK_FUNCS([lrand48_r srand48_r port_create strlcpy strlcat sysconf getpagesize])
 AC_CHECK_FUNCS([getreuid getresuid getresgid setreuid setresuid])
+AC_CHECK_FUNCS([strsignal psignal psiginfo])
 
 # Check for eventfd() and sys/eventfd.h (both must exist ...)
 AC_CHECK_HEADERS([sys/eventfd.h], [
@@ -1852,6 +1853,7 @@ AC_CONFIG_FILES([
   Makefile
   cmd/Makefile
   cmd/traffic_cop/Makefile
+  cmd/traffic_crashlog/Makefile
   cmd/traffic_layout/Makefile
   cmd/traffic_line/Makefile
   cmd/traffic_manager/Makefile
@@ -1936,6 +1938,7 @@ AS_IF([test "x$enable_experimental_plugins" = xyes], [
     plugins/experimental/escalate/Makefile
     plugins/experimental/esi/Makefile
     plugins/experimental/geoip_acl/Makefile
+    plugins/experimental/header_normalize/Makefile
     plugins/experimental/healthchecks/Makefile
     plugins/experimental/hipes/Makefile
     plugins/experimental/metalink/Makefile
