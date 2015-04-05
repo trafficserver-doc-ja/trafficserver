@@ -48,8 +48,9 @@ struct InterceptPlugin::State {
     TSVIO vio_;
     TSIOBuffer buffer_;
     TSIOBufferReader reader_;
-    IoHandle() : vio_(NULL), buffer_(NULL), reader_(NULL) { };
-    ~IoHandle() {
+    IoHandle() : vio_(NULL), buffer_(NULL), reader_(NULL){};
+    ~IoHandle()
+    {
       if (reader_) {
         TSIOBufferReaderFree(reader_);
       }
@@ -81,15 +82,18 @@ struct InterceptPlugin::State {
   void *saved_edata_;
 
   TSAction timeout_action_;
+  bool plugin_io_done_;
 
   State(TSCont cont, InterceptPlugin *plugin)
-    : cont_(cont), net_vc_(NULL), expected_body_size_(0), num_body_bytes_read_(0), hdr_parsed_(false),
-      hdr_buf_(NULL), hdr_loc_(NULL), num_bytes_written_(0), plugin_(plugin), timeout_action_(NULL) {
+    : cont_(cont), net_vc_(NULL), expected_body_size_(0), num_body_bytes_read_(0), hdr_parsed_(false), hdr_buf_(NULL),
+      hdr_loc_(NULL), num_bytes_written_(0), plugin_(plugin), timeout_action_(NULL), plugin_io_done_(false)
+  {
     plugin_mutex_ = plugin->getMutex();
     http_parser_ = TSHttpParserCreate();
   }
 
-  ~State() {
+  ~State()
+  {
     TSHttpParserDestroy(http_parser_);
     if (hdr_loc_) {
       TSHandleMLocRelease(hdr_buf_, TS_NULL_MLOC, hdr_loc_);
@@ -100,39 +104,39 @@ struct InterceptPlugin::State {
   }
 };
 
-namespace {
-
+namespace
+{
 int handleEvents(TSCont cont, TSEvent event, void *edata);
 void destroyCont(InterceptPlugin::State *state);
-
 }
 
-InterceptPlugin::InterceptPlugin(Transaction &transaction, InterceptPlugin::Type type)
-  : TransactionPlugin(transaction) {
+InterceptPlugin::InterceptPlugin(Transaction &transaction, InterceptPlugin::Type type) : TransactionPlugin(transaction)
+{
   TSCont cont = TSContCreate(handleEvents, TSMutexCreate());
   state_ = new State(cont, this);
   TSContDataSet(cont, state_);
   TSHttpTxn txn = static_cast<TSHttpTxn>(transaction.getAtsHandle());
   if (type == SERVER_INTERCEPT) {
     TSHttpTxnServerIntercept(cont, txn);
-  }
-  else {
+  } else {
     TSHttpTxnIntercept(cont, txn);
   }
 }
 
-InterceptPlugin::~InterceptPlugin() {
+InterceptPlugin::~InterceptPlugin()
+{
   if (state_->cont_) {
     LOG_DEBUG("Relying on callback for cleanup");
     state_->plugin_ = NULL; // prevent callback from invoking plugin
-  }
-  else { // safe to cleanup
-    LOG_DEBUG("Normal shutdown");
+  } else {                  // safe to cleanup
+    LOG_DEBUG("Normal cleanup");
     delete state_;
   }
 }
 
-bool InterceptPlugin::produce(const void *data, int data_size) {
+bool
+InterceptPlugin::produce(const void *data, int data_size)
+{
   if (!state_->net_vc_) {
     LOG_ERROR("Intercept not operational");
     return false;
@@ -144,8 +148,7 @@ bool InterceptPlugin::produce(const void *data, int data_size) {
   }
   int num_bytes_written = TSIOBufferWrite(state_->output_.buffer_, data, data_size);
   if (num_bytes_written != data_size) {
-    LOG_ERROR("Error while writing to buffer! Attempted %d bytes but only wrote %d bytes", data_size,
-              num_bytes_written);
+    LOG_ERROR("Error while writing to buffer! Attempted %d bytes but only wrote %d bytes", data_size, num_bytes_written);
     return false;
   }
   TSVIOReenable(state_->output_.vio_);
@@ -154,7 +157,9 @@ bool InterceptPlugin::produce(const void *data, int data_size) {
   return true;
 }
 
-bool InterceptPlugin::setOutputComplete() {
+bool
+InterceptPlugin::setOutputComplete()
+{
   ScopedSharedMutexLock scopedLock(getMutex());
   if (!state_->net_vc_) {
     LOG_ERROR("Intercept not operational");
@@ -166,15 +171,20 @@ bool InterceptPlugin::setOutputComplete() {
   }
   TSVIONBytesSet(state_->output_.vio_, state_->num_bytes_written_);
   TSVIOReenable(state_->output_.vio_);
+  state_->plugin_io_done_ = true;
   LOG_DEBUG("Response complete");
   return true;
 }
 
-Headers &InterceptPlugin::getRequestHeaders() {
+Headers &
+InterceptPlugin::getRequestHeaders()
+{
   return state_->request_headers_;
 }
 
-bool InterceptPlugin::doRead() {
+bool
+InterceptPlugin::doRead()
+{
   int avail = TSIOBufferReaderAvail(state_->input_.reader_);
   if (avail == TS_ERROR) {
     LOG_ERROR("Error while getting number of bytes available");
@@ -192,8 +202,7 @@ bool InterceptPlugin::doRead() {
       num_body_bytes_in_block = 0;
       if (!state_->hdr_parsed_) {
         const char *endptr = data + data_len;
-        if (TSHttpHdrParseReq(state_->http_parser_, state_->hdr_buf_, state_->hdr_loc_, &data,
-                              endptr) == TS_PARSE_DONE) {
+        if (TSHttpHdrParseReq(state_->http_parser_, state_->hdr_buf_, state_->hdr_loc_, &data, endptr) == TS_PARSE_DONE) {
           LOG_DEBUG("Parsed header");
           string content_length_str = state_->request_headers_.value("Content-Length");
           if (!content_length_str.empty()) {
@@ -203,8 +212,7 @@ bool InterceptPlugin::doRead() {
             if ((errno != ERANGE) && (end_ptr != start_ptr) && (*end_ptr == '\0')) {
               LOG_DEBUG("Got content length: %d", content_length);
               state_->expected_body_size_ = content_length;
-            }
-            else {
+            } else {
               LOG_ERROR("Invalid content length header [%s]; Assuming no content", content_length_str.c_str());
             }
           }
@@ -219,8 +227,7 @@ bool InterceptPlugin::doRead() {
           num_body_bytes_in_block = endptr - data;
         }
         consume(string(startptr, data - startptr), InterceptPlugin::REQUEST_HEADER);
-      }
-      else {
+      } else {
         num_body_bytes_in_block = data_len;
       }
       if (num_body_bytes_in_block) {
@@ -244,21 +251,20 @@ bool InterceptPlugin::doRead() {
       // TODO: any further action required?
     }
     handleInputComplete();
-  }
-  else {
-    LOG_DEBUG("Reenabling input vio as %d bytes still need to be read",
-              state_->expected_body_size_ - state_->num_body_bytes_read_);
+  } else {
+    LOG_DEBUG("Reenabling input vio as %d bytes still need to be read", state_->expected_body_size_ - state_->num_body_bytes_read_);
     TSVIOReenable(state_->input_.vio_);
   }
   return true;
 }
 
-void InterceptPlugin::handleEvent(int abstract_event, void *edata) {
+void
+InterceptPlugin::handleEvent(int abstract_event, void *edata)
+{
   TSEvent event = static_cast<TSEvent>(abstract_event);
   LOG_DEBUG("Received event %d", event);
 
   switch (event) {
-
   case TS_EVENT_NET_ACCEPT:
     LOG_DEBUG("Handling net accept");
     state_->net_vc_ = static_cast<TSVConn>(edata);
@@ -287,17 +293,15 @@ void InterceptPlugin::handleEvent(int abstract_event, void *edata) {
   case TS_EVENT_VCONN_READ_COMPLETE: // fall throughs intentional
   case TS_EVENT_VCONN_WRITE_COMPLETE:
   case TS_EVENT_VCONN_EOS:
-  case TS_EVENT_ERROR: // erroring out, nothing more to do
+  case TS_EVENT_ERROR:             // erroring out, nothing more to do
   case TS_EVENT_NET_ACCEPT_FAILED: // somebody canceled the transaction
     if (event == TS_EVENT_ERROR) {
       LOG_ERROR("Unknown Error!");
-    }
-    else if (event == TS_EVENT_NET_ACCEPT_FAILED) {
+    } else if (event == TS_EVENT_NET_ACCEPT_FAILED) {
       LOG_ERROR("Got net_accept_failed!");
     }
     LOG_DEBUG("Shutting down intercept");
     destroyCont(state_);
-    state_->cont_ = NULL;
     break;
 
   default:
@@ -305,9 +309,15 @@ void InterceptPlugin::handleEvent(int abstract_event, void *edata) {
   }
 }
 
-namespace {
+namespace
+{
+int
+handleEvents(TSCont cont, TSEvent pristine_event, void *pristine_edata)
+{
+  // Separating pristine and mutable data helps debugging
+  TSEvent event = pristine_event;
+  void *edata = pristine_edata;
 
-int handleEvents(TSCont cont, TSEvent event, void *edata) {
   InterceptPlugin::State *state = static_cast<InterceptPlugin::State *>(TSContDataGet(cont));
   ScopedSharedMutexTryLock scopedTryLock(state->plugin_mutex_);
   if (!scopedTryLock.hasLock()) {
@@ -319,17 +329,20 @@ int handleEvents(TSCont cont, TSEvent event, void *edata) {
     state->timeout_action_ = TSContSchedule(cont, 1, TS_THREAD_POOL_DEFAULT);
     return 0;
   }
-  if (event == TS_EVENT_TIMEOUT) {
+  if (event == TS_EVENT_TIMEOUT) { // we have a saved event to restore
     state->timeout_action_ = NULL;
-    event = state->saved_event_; // restore saved event
-    edata = state->saved_edata_;
+    if (state->plugin_io_done_) { // plugin is done, so can't send it saved event
+      event = TS_EVENT_VCONN_EOS; // fake completion
+      edata = NULL;
+    } else {
+      event = state->saved_event_;
+      edata = state->saved_edata_;
+    }
   }
   if (state->plugin_) {
     utils::internal::dispatchInterceptEvent(state->plugin_, event, edata);
-  }
-  else if (state->timeout_action_) { // we had scheduled a timeout on ourselves; let's wait for it
-  }
-  else { // plugin was destroyed before intercept was completed; cleaning up here
+  } else if (state->timeout_action_) { // we had scheduled a timeout on ourselves; let's wait for it
+  } else {                             // plugin was destroyed before intercept was completed; cleaning up here
     LOG_DEBUG("Cleaning up as intercept plugin is already destroyed");
     destroyCont(state);
     delete state;
@@ -337,13 +350,17 @@ int handleEvents(TSCont cont, TSEvent event, void *edata) {
   return 0;
 }
 
-void destroyCont(InterceptPlugin::State *state) {
+void
+destroyCont(InterceptPlugin::State *state)
+{
   if (state->net_vc_) {
     TSVConnShutdown(state->net_vc_, 1, 1);
     TSVConnClose(state->net_vc_);
     state->net_vc_ = NULL;
   }
-  TSContDestroy(state->cont_);
+  if (!state->timeout_action_) {
+    TSContDestroy(state->cont_);
+    state->cont_ = NULL;
+  }
 }
-
 }

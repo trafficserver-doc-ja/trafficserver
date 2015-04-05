@@ -21,6 +21,11 @@
   See the License for the specific language governing permissions and
   limitations under the License.
  */
+#include <ink_config.h>
+#if TS_USE_SET_RBIO
+// No need to do anything, this version of openssl provides the SSL_set_rbio function
+#else
+
 #ifdef OPENSSL_NO_SSL_INTERN
 #undef OPENSSL_NO_SSL_INTERN
 #endif
@@ -32,5 +37,10 @@
 void
 SSL_set_rbio(SSLNetVConnection *sslvc, BIO *rbio)
 {
+  if (sslvc->ssl->rbio != NULL) {
+    BIO_free(sslvc->ssl->rbio);
+  }
   sslvc->ssl->rbio = rbio;
 }
+
+#endif

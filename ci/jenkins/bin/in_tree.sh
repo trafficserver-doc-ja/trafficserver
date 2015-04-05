@@ -29,11 +29,13 @@ autoreconf -fi
     --enable-ccache \
     --enable-werror \
     --enable-experimental-plugins \
-    ${enable_cppapi} \
     --enable-example-plugins \
     --enable-test-tools \
+    --enable-reclaimable-freelist \
+    --enable-wccp \
+    ${enable_cppapi} \
     CORES=2
 
 ${ATS_MAKE} -j5 V=1
-${ATS_MAKE} check VERBOSE=Y
+#${ATS_MAKE} check VERBOSE=Y
 ${ATS_MAKE} clean

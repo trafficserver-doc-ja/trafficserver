@@ -26,7 +26,7 @@ AM_CPPFLAGS = \
 #DEFS += $(WCCP_DEFS)
 
 noinst_LIBRARIES = libwccp.a
-#noinst_PROGRAMS = test-cache
+# noinst_PROGRAMS = test-cache 
 
 libwccp_a_SOURCES = \
   Wccp.h \
@@ -38,5 +38,7 @@ libwccp_a_SOURCES = \
   WccpStatic.cc \
   WccpUtil.h
 
-#test_cache_SOURCES = \
-#  wccp-test-cache.cc wccp-test-router.cc
+# test_cache_SOURCES = \
+#   wccp-test-cache.cc
+
+# test_cache_LDADD = $(LDADD) -L$(top_builddir)/lib/tsconfig -ltsconfig -L$(top_builddir)/lib/wccp -lwccp -L$(top_builddir)/lib/ts -ltsutil

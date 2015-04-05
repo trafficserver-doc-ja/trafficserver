@@ -41,10 +41,9 @@ int g_config_update_result = 0;
 int
 cb_test_1a(const char *name, RecDataT data_type, RecData data, void *cookie)
 {
-  if ((cookie == (void *) 0x12345678) && (strcmp(data.rec_string, "cb_test_1__changed") == 0)) {
+  if ((cookie == (void *)0x12345678) && (strcmp(data.rec_string, "cb_test_1__changed") == 0)) {
     g_config_update_result++;
-    printf("    - cb_test_1(%d) name: %s, data: %s, cookie: 0x%x\n",
-           g_config_update_result, name, data.rec_string, cookie);
+    printf("    - cb_test_1(%d) name: %s, data: %s, cookie: 0x%x\n", g_config_update_result, name, data.rec_string, cookie);
   } else {
     g_config_update_result = 0;
   }
@@ -58,8 +57,8 @@ cb_test_1b(const char *name, RecDataT data_type, RecData data, void *cookie)
 }
 
 int
-cb_test_2a(const char */* name ATS_UNUSED */, RecDataT /* data_type ATS_UNUSED */,
-           RecData /* data ATS_UNUSED */, void */* cookie ATS_UNUSED */)
+cb_test_2a(const char * /* name ATS_UNUSED */, RecDataT /* data_type ATS_UNUSED */, RecData /* data ATS_UNUSED */,
+           void * /* cookie ATS_UNUSED */)
 {
   g_config_update_result = -1;
   return REC_ERR_FAIL;
@@ -87,10 +86,10 @@ Test01()
   sleep(2 * REC_CONFIG_UPDATE_INTERVAL_SEC);
 
   // Register config update callbacks
-  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_1", cb_test_1a, (void *) 0x12345678);
-  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_1", cb_test_1b, (void *) 0x12345678);
-  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_2", cb_test_2a, (void *) 0x87654321);
-  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_2", cb_test_2b, (void *) 0x87654321);
+  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_1", cb_test_1a, (void *)0x12345678);
+  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_1", cb_test_1b, (void *)0x12345678);
+  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_2", cb_test_2a, (void *)0x87654321);
+  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_2", cb_test_2b, (void *)0x87654321);
 
   // Change proxy.config.cb_test_1
   RecSetRecordString("proxy.config.local.cb_test_1", "cb_test_1__changed");
@@ -103,7 +102,6 @@ Test01()
   } else {
     printf("    SUMMARY: FAIL (%d)\n", g_config_update_result);
   }
-
 }
 
 
@@ -121,9 +119,7 @@ cb_test_3a(const char *name, RecDataT data_type, RecData data, void *cookie)
   RecString rec_result;
   int rec_status = RecGetRecordString_Xmalloc(name, &rec_result);
 
-  if ((rec_status == REC_ERR_OKAY) &&
-      (cookie == (void *) 0x12344321) && (strcmp(rec_result, "cb_test_3__changed") == 0)) {
-
+  if ((rec_status == REC_ERR_OKAY) && (cookie == (void *)0x12344321) && (strcmp(rec_result, "cb_test_3__changed") == 0)) {
     ink_assert(strcmp(rec_result, data.rec_string) == 0);
 
     g_config_update_result++;
@@ -155,8 +151,8 @@ Test02()
   sleep(2 * REC_CONFIG_UPDATE_INTERVAL_SEC);
 
   // Register config update callbacks
-  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_3", cb_test_3a, (void *) 0x12344321);
-  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_3", cb_test_3b, (void *) 0x12344321);
+  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_3", cb_test_3a, (void *)0x12344321);
+  RecRegisterConfigUpdateCb("proxy.config.local.cb_test_3", cb_test_3b, (void *)0x12344321);
 
   // Change proxy.config.cb_test_1
   RecSetRecordString("proxy.config.local.cb_test_3", "cb_test_3__changed");
@@ -169,72 +165,6 @@ Test02()
   } else {
     printf("    SUMMARY: FAIL (%d)\n", g_config_update_result);
   }
-
-}
-
-
-//-------------------------------------------------------------------------
-// Test-3: RecTree
-//
-// Simply verifies the number of records in g_records is the same as the
-// number of "proxy" variable reference-able by the RecTree
-//-------------------------------------------------------------------------
-#define SIZE_COMPARE(_a, _b) \
-  RecGetRecordList("proxy."_a, &var_buf, &buf_len); \
-  if (buf_len != 0) {\
-    delete[] var_buf; \
-  } \
-  length = 0; \
-  for (r=0; r<g_num_records; r++) { \
-    if (g_records[r].rec_type == _b) { \
-       length++; \
-     } \
-  } \
-  if (buf_len == length) { \
-    printf("    - proxy.%s.*\t(rec_size:%d == tree_size:%d)\n", _a, length, buf_len); \
-  } else { \
-    printf("    - proxy.%s.*\t(rec_size:%d != tree_size:%d)\n", _a, length, buf_len); \
-    g_config_update_result++; \
-  }
-
-void
-Test03()
-{
-  printf("\n[Test03: RecTree Test]\n");
-
-  int num_proxy = 0;
-  char **var_buf = NULL;
-  int buf_len = 0;
-  int length = 0;
-  int r = 0;
-
-  g_config_update_result = 0;
-
-  // General
-  RecGetRecordList("proxy", &var_buf, &buf_len);
-  length = g_num_records;
-  if (buf_len > 0) {
-    delete[]var_buf;
-  }
-  if (buf_len == length) {
-    printf("    - proxy.*\t\t(rec_size:%d == tree_size:%d)\n", length, buf_len);
-  } else {
-    printf("    - proxy.*\t\t(rec_size:%d != tree_size:%d)\n", length, buf_len);
-    g_config_update_result++;
-  }
-
-  SIZE_COMPARE("plugin", RECT_PLUGIN);
-  SIZE_COMPARE("config", RECT_CONFIG);
-  SIZE_COMPARE("process", RECT_PROCESS);
-  SIZE_COMPARE("node", RECT_NODE);
-  SIZE_COMPARE("cluster", RECT_CLUSTER);
-  SIZE_COMPARE("local", RECT_LOCAL);
-  if (g_config_update_result == 0) {
-    printf("    SUMMARY: PASS\n");
-  } else {
-    printf("    SUMMARY: FAIL\n");
-  }
-
 }
 
 
@@ -265,9 +195,9 @@ main(int argc, char **argv)
   RecLocalStart();
 
   // test
-  Test01();                     // Local callbacks
-  Test02();                     // Local callbacks -- mulit-lock
-  Test03();                     // RecTree
+  Test01(); // Local callbacks
+  Test02(); // Local callbacks -- mulit-lock
+  Test03(); // RecTree
 
   while (true) {
     RecDumpRecordsHt(RECT_NULL);
@@ -275,5 +205,4 @@ main(int argc, char **argv)
   }
 
   return 0;
-
 }

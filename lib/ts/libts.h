@@ -34,8 +34,8 @@
 
  */
 
-#if !defined (_inktomiplus_h_)
-#define	_inktomiplus_h_
+#if !defined(_inktomiplus_h_)
+#define _inktomiplus_h_
 
 /* Removed for now, to fix build on Solaris
 #define std *** _FIXME_REMOVE_DEPENDENCY_ON_THE_STL_ ***
@@ -78,7 +78,6 @@
 #include "Allocator.h"
 #include "Arena.h"
 #include "Bitops.h"
-#include "Compatability.h"
 #include "ConsistentHash.h"
 #include "DynArray.h"
 #include "EventNotify.h"

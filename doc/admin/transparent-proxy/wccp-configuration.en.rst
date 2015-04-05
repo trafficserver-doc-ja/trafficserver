@@ -18,6 +18,7 @@ WCCP Configuration
   specific language governing permissions and limitations
   under the License.
 
+.. _wccp-configuration:
 
 .. toctree::
    :maxdepth: 2
@@ -80,7 +81,7 @@ are to be used.
    server traffic.
 -  Inside Shared -- Traffic Server and client traffic share an
    interface.
--  `Outside Shared <wccp-outside-shared.html>`_ -- Traffic Server and
+-  Outside Shared -- Traffic Server and
    origin server traffic share an interface.
 
 In general the dedicated topology is preferred. However, if the router

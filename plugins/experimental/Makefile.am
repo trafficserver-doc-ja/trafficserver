@@ -25,6 +25,7 @@ SUBDIRS = \
  epic \
  escalate \
  esi \
+ generator \
  geoip_acl \
  header_normalize \
  healthchecks \

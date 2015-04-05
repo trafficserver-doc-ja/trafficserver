@@ -16,58 +16,62 @@
   limitations under the License.
 */
 
-
-#include <arpa/inet.h>
+#include "ink_platform.h"
+#include <netinet/in.h>
 #include "ts_lua_util.h"
 
-#define TS_LUA_CHECK_SERVER_REQUEST_HDR(http_ctx)     \
-do {        \
-    if (!http_ctx->server_request_hdrp) {           \
-        if (TSHttpTxnServerReqGet(http_ctx->txnp,   \
-                    &http_ctx->server_request_bufp, \
-                    &http_ctx->server_request_hdrp) != TS_SUCCESS) {    \
-            return 0;   \
-        }   \
-    }   \
-} while(0)
+#define TS_LUA_CHECK_SERVER_REQUEST_HDR(http_ctx)                                                                                \
+  do {                                                                                                                           \
+    if (!http_ctx->server_request_hdrp) {                                                                                        \
+      if (TSHttpTxnServerReqGet(http_ctx->txnp, &http_ctx->server_request_bufp, &http_ctx->server_request_hdrp) != TS_SUCCESS) { \
+        return 0;                                                                                                                \
+      }                                                                                                                          \
+    }                                                                                                                            \
+  } while (0)
 
 
-#define TS_LUA_CHECK_SERVER_REQUEST_URL(http_ctx)   \
-do {        \
-    if (!http_ctx->server_request_url) {            \
-        TS_LUA_CHECK_SERVER_REQUEST_HDR(http_ctx);  \
-        if (TSHttpHdrUrlGet(http_ctx->server_request_bufp,   \
-                    http_ctx->server_request_hdrp, \
-                    &http_ctx->server_request_url) != TS_SUCCESS) {    \
-            return 0;   \
-        }   \
-    }   \
-} while(0)
+#define TS_LUA_CHECK_SERVER_REQUEST_URL(http_ctx)                                                                         \
+  do {                                                                                                                    \
+    if (!http_ctx->server_request_url) {                                                                                  \
+      TS_LUA_CHECK_SERVER_REQUEST_HDR(http_ctx);                                                                          \
+      if (TSHttpHdrUrlGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, &http_ctx->server_request_url) != \
+          TS_SUCCESS) {                                                                                                   \
+        return 0;                                                                                                         \
+      }                                                                                                                   \
+    }                                                                                                                     \
+  } while (0)
 
+static void ts_lua_inject_server_request_server_addr_api(lua_State *L);
 
-static void ts_lua_inject_server_request_header_api(lua_State * L);
-static void ts_lua_inject_server_request_headers_api(lua_State * L);
-static void ts_lua_inject_server_request_get_header_size_api(lua_State * L);
-static void ts_lua_inject_server_request_get_body_size_api(lua_State * L);
-static void ts_lua_inject_server_request_uri_api(lua_State * L);
-static void ts_lua_inject_server_request_uri_args_api(lua_State * L);
+static void ts_lua_inject_server_request_socket_api(lua_State *L);
+static void ts_lua_inject_server_request_header_api(lua_State *L);
+static void ts_lua_inject_server_request_headers_api(lua_State *L);
+static void ts_lua_inject_server_request_get_header_size_api(lua_State *L);
+static void ts_lua_inject_server_request_get_body_size_api(lua_State *L);
+static void ts_lua_inject_server_request_uri_api(lua_State *L);
+static void ts_lua_inject_server_request_uri_args_api(lua_State *L);
 
-static int ts_lua_server_request_header_get(lua_State * L);
-static int ts_lua_server_request_header_set(lua_State * L);
-static int ts_lua_server_request_get_headers(lua_State * L);
-static int ts_lua_server_request_get_header_size(lua_State * L);
-static int ts_lua_server_request_get_body_size(lua_State * L);
-static int ts_lua_server_request_get_uri(lua_State * L);
-static int ts_lua_server_request_set_uri(lua_State * L);
-static int ts_lua_server_request_set_uri_args(lua_State * L);
-static int ts_lua_server_request_get_uri_args(lua_State * L);
+static int ts_lua_server_request_header_get(lua_State *L);
+static int ts_lua_server_request_header_set(lua_State *L);
+static int ts_lua_server_request_get_headers(lua_State *L);
+static int ts_lua_server_request_get_header_size(lua_State *L);
+static int ts_lua_server_request_get_body_size(lua_State *L);
+static int ts_lua_server_request_get_uri(lua_State *L);
+static int ts_lua_server_request_set_uri(lua_State *L);
+static int ts_lua_server_request_set_uri_args(lua_State *L);
+static int ts_lua_server_request_get_uri_args(lua_State *L);
 
+static int ts_lua_server_request_server_addr_get_ip(lua_State *L);
+static int ts_lua_server_request_server_addr_get_port(lua_State *L);
+static int ts_lua_server_request_server_addr_get_addr(lua_State *L);
+static int ts_lua_server_request_server_addr_get_outgoing_port(lua_State *L);
 
 void
-ts_lua_inject_server_request_api(lua_State * L)
+ts_lua_inject_server_request_api(lua_State *L)
 {
   lua_newtable(L);
 
+  ts_lua_inject_server_request_socket_api(L);
   ts_lua_inject_server_request_header_api(L);
   ts_lua_inject_server_request_headers_api(L);
   ts_lua_inject_server_request_get_header_size_api(L);
@@ -79,13 +83,38 @@ ts_lua_inject_server_request_api(lua_State * L)
   lua_setfield(L, -2, "server_request");
 }
 
+static void
+ts_lua_inject_server_request_socket_api(lua_State *L)
+{
+  ts_lua_inject_server_request_server_addr_api(L);
+}
 
 static void
-ts_lua_inject_server_request_header_api(lua_State * L)
+ts_lua_inject_server_request_server_addr_api(lua_State *L)
 {
-  lua_newtable(L);              /* .header */
+  lua_newtable(L);
 
-  lua_createtable(L, 0, 2);     /* metatable for .header */
+  lua_pushcfunction(L, ts_lua_server_request_server_addr_get_ip);
+  lua_setfield(L, -2, "get_ip");
+
+  lua_pushcfunction(L, ts_lua_server_request_server_addr_get_port);
+  lua_setfield(L, -2, "get_port");
+
+  lua_pushcfunction(L, ts_lua_server_request_server_addr_get_addr);
+  lua_setfield(L, -2, "get_addr");
+
+  lua_pushcfunction(L, ts_lua_server_request_server_addr_get_outgoing_port);
+  lua_setfield(L, -2, "get_outgoing_port");
+
+  lua_setfield(L, -2, "server_addr");
+}
+
+static void
+ts_lua_inject_server_request_header_api(lua_State *L)
+{
+  lua_newtable(L); /* .header */
+
+  lua_createtable(L, 0, 2); /* metatable for .header */
 
   lua_pushcfunction(L, ts_lua_server_request_header_get);
   lua_setfield(L, -2, "__index");
@@ -98,7 +127,7 @@ ts_lua_inject_server_request_header_api(lua_State * L)
 }
 
 static int
-ts_lua_server_request_header_get(lua_State * L)
+ts_lua_server_request_header_get(lua_State *L)
 {
   const char *key;
   const char *val;
@@ -114,21 +143,16 @@ ts_lua_server_request_header_get(lua_State * L)
   key = luaL_checklstring(L, 2, &key_len);
 
   if (!http_ctx->server_request_hdrp) {
-    if (TSHttpTxnServerReqGet(http_ctx->txnp,
-                              &http_ctx->server_request_bufp, &http_ctx->server_request_hdrp) != TS_SUCCESS) {
-
+    if (TSHttpTxnServerReqGet(http_ctx->txnp, &http_ctx->server_request_bufp, &http_ctx->server_request_hdrp) != TS_SUCCESS) {
       lua_pushnil(L);
       return 1;
     }
   }
 
   if (key && key_len) {
-
     field_loc = TSMimeHdrFieldFind(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, key, key_len);
     if (field_loc) {
-      val =
-        TSMimeHdrFieldValueStringGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1,
-                                     &val_len);
+      val = TSMimeHdrFieldValueStringGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1, &val_len);
       lua_pushlstring(L, val, val_len);
       TSHandleMLocRelease(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc);
 
@@ -144,7 +168,7 @@ ts_lua_server_request_header_get(lua_State * L)
 }
 
 static int
-ts_lua_server_request_header_set(lua_State * L)
+ts_lua_server_request_header_set(lua_State *L)
 {
   const char *key;
   const char *val;
@@ -170,8 +194,7 @@ ts_lua_server_request_header_set(lua_State * L)
   }
 
   if (!http_ctx->server_request_hdrp) {
-    if (TSHttpTxnServerReqGet(http_ctx->txnp,
-                              &http_ctx->server_request_bufp, &http_ctx->server_request_hdrp) != TS_SUCCESS) {
+    if (TSHttpTxnServerReqGet(http_ctx->txnp, &http_ctx->server_request_bufp, &http_ctx->server_request_hdrp) != TS_SUCCESS) {
       return 0;
     }
   }
@@ -184,17 +207,15 @@ ts_lua_server_request_header_set(lua_State * L)
     }
 
   } else if (field_loc) {
-    TSMimeHdrFieldValueStringSet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, 0, val,
-                                 val_len);
+    TSMimeHdrFieldValueStringSet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1, val, val_len);
 
-  } else if (TSMimeHdrFieldCreateNamed(http_ctx->server_request_bufp, http_ctx->server_request_hdrp,
-                                       key, key_len, &field_loc) != TS_SUCCESS) {
+  } else if (TSMimeHdrFieldCreateNamed(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, key, key_len, &field_loc) !=
+             TS_SUCCESS) {
     TSError("[%s] TSMimeHdrFieldCreateNamed error", __FUNCTION__);
     return 0;
 
   } else {
-    TSMimeHdrFieldValueStringSet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1, val,
-                                 val_len);
+    TSMimeHdrFieldValueStringSet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1, val, val_len);
     TSMimeHdrFieldAppend(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc);
   }
 
@@ -205,14 +226,14 @@ ts_lua_server_request_header_set(lua_State * L)
 }
 
 static void
-ts_lua_inject_server_request_headers_api(lua_State * L)
+ts_lua_inject_server_request_headers_api(lua_State *L)
 {
   lua_pushcfunction(L, ts_lua_server_request_get_headers);
   lua_setfield(L, -2, "get_headers");
 }
 
 static int
-ts_lua_server_request_get_headers(lua_State * L)
+ts_lua_server_request_get_headers(lua_State *L)
 {
   const char *name;
   const char *value;
@@ -232,13 +253,9 @@ ts_lua_server_request_get_headers(lua_State * L)
   field_loc = TSMimeHdrFieldGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, 0);
 
   while (field_loc) {
-
     name = TSMimeHdrFieldNameGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, &name_len);
     if (name && name_len) {
-
-      value =
-        TSMimeHdrFieldValueStringGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1,
-                                     &value_len);
+      value = TSMimeHdrFieldValueStringGet(http_ctx->server_request_bufp, http_ctx->server_request_hdrp, field_loc, -1, &value_len);
       lua_pushlstring(L, name, name_len);
       lua_pushlstring(L, value, value_len);
       lua_rawset(L, -3);
@@ -253,14 +270,14 @@ ts_lua_server_request_get_headers(lua_State * L)
 }
 
 static void
-ts_lua_inject_server_request_get_header_size_api(lua_State * L)
+ts_lua_inject_server_request_get_header_size_api(lua_State *L)
 {
   lua_pushcfunction(L, ts_lua_server_request_get_header_size);
   lua_setfield(L, -2, "get_header_size");
 }
 
 static int
-ts_lua_server_request_get_header_size(lua_State * L)
+ts_lua_server_request_get_header_size(lua_State *L)
 {
   int header_size;
   ts_lua_http_ctx *http_ctx;
@@ -274,14 +291,14 @@ ts_lua_server_request_get_header_size(lua_State * L)
 }
 
 static void
-ts_lua_inject_server_request_get_body_size_api(lua_State * L)
+ts_lua_inject_server_request_get_body_size_api(lua_State *L)
 {
   lua_pushcfunction(L, ts_lua_server_request_get_body_size);
   lua_setfield(L, -2, "get_body_size");
 }
 
 static int
-ts_lua_server_request_get_body_size(lua_State * L)
+ts_lua_server_request_get_body_size(lua_State *L)
 {
   int64_t body_size;
   ts_lua_http_ctx *http_ctx;
@@ -295,7 +312,7 @@ ts_lua_server_request_get_body_size(lua_State * L)
 }
 
 static void
-ts_lua_inject_server_request_uri_api(lua_State * L)
+ts_lua_inject_server_request_uri_api(lua_State *L)
 {
   lua_pushcfunction(L, ts_lua_server_request_set_uri);
   lua_setfield(L, -2, "set_uri");
@@ -305,7 +322,7 @@ ts_lua_inject_server_request_uri_api(lua_State * L)
 }
 
 static int
-ts_lua_server_request_get_uri(lua_State * L)
+ts_lua_server_request_get_uri(lua_State *L)
 {
   char uri[TS_LUA_MAX_URL_LENGTH];
   const char *path;
@@ -322,13 +339,17 @@ ts_lua_server_request_get_uri(lua_State * L)
 
   uri_len = snprintf(uri, TS_LUA_MAX_URL_LENGTH, "/%.*s", path_len, path);
 
-  lua_pushlstring(L, uri, uri_len);
+  if (uri_len >= TS_LUA_MAX_URL_LENGTH) {
+    lua_pushlstring(L, uri, TS_LUA_MAX_URL_LENGTH - 1);
+  } else {
+    lua_pushlstring(L, uri, uri_len);
+  }
 
   return 1;
 }
 
 static int
-ts_lua_server_request_set_uri(lua_State * L)
+ts_lua_server_request_set_uri(lua_State *L)
 {
   const char *path;
   size_t path_len;
@@ -352,7 +373,7 @@ ts_lua_server_request_set_uri(lua_State * L)
 }
 
 static void
-ts_lua_inject_server_request_uri_args_api(lua_State * L)
+ts_lua_inject_server_request_uri_args_api(lua_State *L)
 {
   lua_pushcfunction(L, ts_lua_server_request_set_uri_args);
   lua_setfield(L, -2, "set_uri_args");
@@ -362,7 +383,7 @@ ts_lua_inject_server_request_uri_args_api(lua_State * L)
 }
 
 static int
-ts_lua_server_request_set_uri_args(lua_State * L)
+ts_lua_server_request_set_uri_args(lua_State *L)
 {
   const char *param;
   size_t param_len;
@@ -380,7 +401,7 @@ ts_lua_server_request_set_uri_args(lua_State * L)
 }
 
 static int
-ts_lua_server_request_get_uri_args(lua_State * L)
+ts_lua_server_request_get_uri_args(lua_State *L)
 {
   const char *param;
   int param_len;
@@ -401,4 +422,122 @@ ts_lua_server_request_get_uri_args(lua_State * L)
   }
 
   return 1;
+}
+
+static int
+ts_lua_server_request_server_addr_get_ip(lua_State *L)
+{
+  struct sockaddr const *server_ip;
+  char sip[128];
+  ts_lua_http_ctx *http_ctx;
+
+  http_ctx = ts_lua_get_http_ctx(L);
+
+  server_ip = TSHttpTxnServerAddrGet(http_ctx->txnp);
+
+  if (server_ip == NULL) {
+    lua_pushnil(L);
+
+  } else {
+    if (server_ip->sa_family == AF_INET) {
+      inet_ntop(AF_INET, (const void *)&((struct sockaddr_in *)server_ip)->sin_addr, sip, sizeof(sip));
+    } else {
+      inet_ntop(AF_INET6, (const void *)&((struct sockaddr_in6 *)server_ip)->sin6_addr, sip, sizeof(sip));
+    }
+
+    lua_pushstring(L, sip);
+  }
+
+  return 1;
+}
+
+static int
+ts_lua_server_request_server_addr_get_port(lua_State *L)
+{
+  struct sockaddr const *server_ip;
+  ts_lua_http_ctx *http_ctx;
+  int port;
+
+  http_ctx = ts_lua_get_http_ctx(L);
+
+  server_ip = TSHttpTxnServerAddrGet(http_ctx->txnp);
+
+  if (server_ip == NULL) {
+    lua_pushnil(L);
+
+  } else {
+    if (server_ip->sa_family == AF_INET) {
+      port = ((struct sockaddr_in *)server_ip)->sin_port;
+    } else {
+      port = ((struct sockaddr_in6 *)server_ip)->sin6_port;
+    }
+
+    lua_pushnumber(L, ntohs(port));
+  }
+
+  return 1;
+}
+
+static int
+ts_lua_server_request_server_addr_get_outgoing_port(lua_State *L)
+{
+  struct sockaddr const *outgoing_addr;
+  ts_lua_http_ctx *http_ctx;
+  int port;
+
+  http_ctx = ts_lua_get_http_ctx(L);
+
+  outgoing_addr = TSHttpTxnOutgoingAddrGet(http_ctx->txnp);
+
+  if (outgoing_addr == NULL) {
+    lua_pushnil(L);
+
+  } else {
+    if (outgoing_addr->sa_family == AF_INET) {
+      port = ((struct sockaddr_in *)outgoing_addr)->sin_port;
+    } else {
+      port = ((struct sockaddr_in6 *)outgoing_addr)->sin6_port;
+    }
+
+    lua_pushnumber(L, ntohs(port));
+  }
+
+  return 1;
+}
+
+static int
+ts_lua_server_request_server_addr_get_addr(lua_State *L)
+{
+  struct sockaddr const *server_ip;
+  ts_lua_http_ctx *http_ctx;
+  int port;
+  int family;
+  char sip[128];
+
+  http_ctx = ts_lua_get_http_ctx(L);
+
+  server_ip = TSHttpTxnServerAddrGet(http_ctx->txnp);
+
+  if (server_ip == NULL) {
+    lua_pushnil(L);
+    lua_pushnil(L);
+    lua_pushnil(L);
+
+  } else {
+    if (server_ip->sa_family == AF_INET) {
+      port = ntohs(((struct sockaddr_in *)server_ip)->sin_port);
+      inet_ntop(AF_INET, (const void *)&((struct sockaddr_in *)server_ip)->sin_addr, sip, sizeof(sip));
+      family = AF_INET;
+    } else {
+      port = ntohs(((struct sockaddr_in6 *)server_ip)->sin6_port);
+      inet_ntop(AF_INET6, (const void *)&((struct sockaddr_in6 *)server_ip)->sin6_addr, sip, sizeof(sip));
+      family = AF_INET6;
+    }
+
+    lua_pushstring(L, sip);
+    lua_pushnumber(L, port);
+    lua_pushnumber(L, family);
+  }
+
+  return 3;
 }

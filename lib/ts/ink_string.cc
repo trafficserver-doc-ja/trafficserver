@@ -21,7 +21,7 @@
   limitations under the License.
  */
 
-#include "libts.h"   /* MAGIC_EDITING_TAG */
+#include "libts.h" /* MAGIC_EDITING_TAG */
 
 #include <assert.h>
 #include <stdarg.h>
@@ -36,58 +36,10 @@ char *
 ink_memcpy_until_char(char *dst, char *src, unsigned int n, unsigned char c)
 {
   unsigned int i = 0;
-  for (; ((i < n) && (((unsigned char) src[i]) != c)); i++)
+  for (; ((i < n) && (((unsigned char)src[i]) != c)); i++)
     dst[i] = src[i];
   return &src[i];
 }
-
-/*---------------------------------------------------------------------------*
-
-  char *ink_strncpy(char *dest, char *src, int n)
-
-  This routine is a safer version of strncpy which always NUL terminates
-  the destination string.  Note that this routine has the SAME semantics
-  as strncpy, such as copying exactly n bytes, padding dest with NULs
-  is necessary.  Use ink_string_copy for a non-padding version.
-
- *---------------------------------------------------------------------------*/
-
-char *
-ink_strncpy(char *dest, const char *src, int n)
-{
-  if (likely(src && dest)) {
-    if (n > 1)
-      strncpy(dest, src, (n - 1));
-    if (n > 0)
-      dest[n - 1] = '\0';
-  }
-
-  return (dest);
-}                               /* End ink_strncpy */
-
-/*---------------------------------------------------------------------------*
-
-  char *ink_strncat(char *dest, char *src, int n)
-
-  This routine is a safer version of strncat which always NUL terminates
-  the destination string.  Note that this routine has the SAME semantics
-  as strncat, such as concatinating exactly n bytes, padding dest with NULs
-  is necessary.  Use ink_string_copy for a non-padding version.
-
- *---------------------------------------------------------------------------*/
-
-char *
-ink_strncat(char *dest, const char *src, int n)
-{
-  if (likely(src && dest)) {
-    if (n > 1)
-      strncat(dest, src, (n - 1));
-    if (n > 0)
-      dest[n - 1] = '\0';
-  }
-
-  return (dest);
-}                               /* End ink_strncat */
 
 /*---------------------------------------------------------------------------*
 
@@ -120,7 +72,7 @@ ink_string_concatenate_strings(char *dest, ...)
   *d++ = '\0';
   va_end(ap);
   return (dest);
-}                               /* End ink_string_concatenate_strings */
+} /* End ink_string_concatenate_strings */
 
 
 /*---------------------------------------------------------------------------*
@@ -157,7 +109,7 @@ ink_string_concatenate_strings_n(char *dest, int n, ...)
     *d = '\0';
   va_end(ap);
   return (dest);
-}                               /* End ink_string_concatenate_strings_n */
+} /* End ink_string_concatenate_strings_n */
 
 
 /*---------------------------------------------------------------------------*
@@ -186,7 +138,8 @@ ink_string_append(char *dest, char *src, int n)
 
   /* Scan For End Of Dest */
 
-  for (d = dest; (d <= last_valid_char) && (*d != '\0'); d++);
+  for (d = dest; (d <= last_valid_char) && (*d != '\0'); d++)
+    ;
 
   /* If At End Of String, NUL Terminate & Exit */
 
@@ -209,7 +162,7 @@ ink_string_append(char *dest, char *src, int n)
     *d = '\0';
 
   return (dest);
-}                               /* End ink_string_append */
+} /* End ink_string_append */
 
 
 #if !HAVE_STRLCPY
@@ -231,12 +184,12 @@ ink_strlcpy(char *dst, const char *src, size_t siz)
   /* Not enough room in dst, add NUL and traverse rest of src */
   if (n == 0) {
     if (siz != 0)
-      *d = '\0';      /* NUL-terminate dst */
+      *d = '\0'; /* NUL-terminate dst */
     while (*s++)
       ;
   }
 
-  return (s - src - 1);   /* count does not include NUL */
+  return (s - src - 1); /* count does not include NUL */
 }
 #endif
 
@@ -266,7 +219,6 @@ ink_strlcat(char *dst, const char *src, size_t siz)
   }
   *d = '\0';
 
-  return (dlen + (s - src));  /* count does not include NUL */
+  return (dlen + (s - src)); /* count does not include NUL */
 }
 #endif
-

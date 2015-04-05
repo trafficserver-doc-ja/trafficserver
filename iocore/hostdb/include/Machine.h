@@ -41,7 +41,7 @@
 // Timeout the Machine * this amount of time after they
 // fall out of the current configuration that are deleted.
 //
-#define MACHINE_TIMEOUT            (HRTIME_DAY*2)
+#define MACHINE_TIMEOUT (HRTIME_DAY * 2)
 
 
 //
@@ -53,14 +53,13 @@
 //
 //  Long running operations should use more sophisticated synchronization.
 //
-#define NO_RACE_DELAY                  HRTIME_HOUR      // a long long time
+#define NO_RACE_DELAY HRTIME_HOUR // a long long time
 
 //#include "Connection.h"
 
-class ClusterHandler;           // Leave this a class - VC++ gets very anal  ~SR
+class ClusterHandler; // Leave this a class - VC++ gets very anal  ~SR
 
-struct Machine: Server
-{
+struct Machine : Server {
   bool dead;
   char *hostname;
   int hostname_len;
@@ -71,11 +70,11 @@ struct Machine: Server
   unsigned int ip;
   int cluster_port;
 
-    Link<Machine> link;
+  Link<Machine> link;
 
   // default for localhost
-    Machine(char *hostname = NULL, unsigned int ip = 0, int acluster_port = 0);
-   ~Machine();
+  Machine(char *hostname = NULL, unsigned int ip = 0, int acluster_port = 0);
+  ~Machine();
 
   // Cluster message protocol version
   uint16_t msg_proto_major;
@@ -86,17 +85,17 @@ struct Machine: Server
   ClusterHandler *clusterHandler;
 };
 
-struct MachineListElement
-{
+struct MachineListElement {
   unsigned int ip;
   int port;
 };
 
-struct MachineList
-{
+struct MachineList {
   int n;
   MachineListElement machine[1];
-  MachineListElement *find(unsigned int ip, int port = 0) {
+  MachineListElement *
+  find(unsigned int ip, int port = 0)
+  {
     for (int i = 0; i < n; i++)
       if (machine[i].ip == ip && (!port || machine[i].port == port))
         return &machine[i];
@@ -104,37 +103,11 @@ struct MachineList
   }
 };
 
-MachineList *read_MachineList(char *filename, int test_fd = -1);
-void free_MachineList(MachineList * l);
+void free_Machine(Machine *m);
 
-#ifdef FIXME_CONFIG
-struct clusterConfigFile: configFile
-{
-  char *parseFile(int fd)
-  {
-    return (char *) read_MachineList(NULL, fd);
-  }
-};
-#endif
-
-inkcoreapi Machine *this_machine();
-void create_this_machine();
-
-void free_Machine(Machine * m);
-
-MachineList *the_machines_config();
 MachineList *the_cluster_config();
 extern ProxyMutex *the_cluster_config_mutex;
 
-#define INK_GETHOSTBYNAME_R_DATA_SIZE 10000
-struct ink_gethostbyname_r_data
-{
-  int herrno;
-  struct hostent ent;
-  char buf[INK_GETHOSTBYNAME_R_DATA_SIZE];
-};
-
-struct hostent *ink_gethostbyname_r(char *hostname, ink_gethostbyname_r_data * data);
 //
 // Private
 //

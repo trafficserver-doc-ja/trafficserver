@@ -43,12 +43,18 @@ The following list describes Traffic Server custom logging fields.
     HTTP header. For example, ``%<{Accept-Language}cqh>`` logs the
     ``Accept-Language:`` field in client request headers.
 
+    .. note::
+        ecqh is the escaped version of this map
+
 .. _pqh:
 
 ``{HTTP header field name}pqh``
     Logs the information in the requested field of the proxy request
     HTTP header. For example, ``%<{Authorization}pqh>`` logs
     the ``Authorization:`` field in proxy request headers.
+
+    .. note::
+        epqh is the escaped version of this map
 
 .. _psh:
 
@@ -57,12 +63,28 @@ The following list describes Traffic Server custom logging fields.
     HTTP header. For example, ``%<{Retry-After}psh>`` logs the
     ``Retry-After:`` field in proxy response headers.
 
+    .. note::
+        epsh is the escaped version of this map
+
 .. _ssh:
 
 ``{HTTP header field name}ssh``
     Logs the information in the requested field of the server response
     HTTP header. For example, ``%<{Age}ssh>`` logs the ``Age:`` field in
     server response headers.
+
+    .. note::
+        essh is the escaped version of this map
+
+.. _cssh:
+
+``{HTTP header field name}cssh``
+    Logs the information in the requested field of the cached server response
+    HTTP header. For example, ``%<{Age}cssh>`` logs the ``Age:`` field in
+    the cached server response headers.
+
+    .. note::
+        ecssh is the escaped version of this map
 
 .. _caun:
 
@@ -91,12 +113,6 @@ The following list describes Traffic Server custom logging fields.
 
 ``chp``
     The port number of the client's host machine.
-
-.. _cps:
-
-``cps``
-    Client Protocol Stack, the output would be the conjunction of
-    protocol names in the stack spliced with '+', such as "TLS+SPDY".
 
 .. _cqbl:
 
@@ -229,6 +245,15 @@ The following list describes Traffic Server custom logging fields.
 ``crc``
     The cache result code; specifies how the cache responded to the
     request (``HIT``, ``MISS``, and so on).
+
+.. _chm:
+
+``chm``
+    The cache hit-miss status, specifying which level of the cache this
+    was served out of. This is useful for example to show whether it was a
+    RAM cache vs disk cache hit. Future versions of the cache will support
+    more levels, but right now it only supports RAM (``HIT_RAM``) vs
+    rotational disk (``HIT_DISK``).
 
 .. _csscl:
 
@@ -561,3 +586,41 @@ Netscape Extended-2 Field Symbols
 ``ss``              ``pfsc``
 ``crc``             ``crc``
 =================== =============
+
+.. _log-field-slicing:
+
+Log Field Slicing
+=================
+
+It is sometimes desirable to slice a log field to limit the length of a given
+log field's output.
+
+Log Field slicing can be specified as below:
+
+``%<field[start:end]>``
+``%<{field}container[start:end]>``
+
+Omitting the slice notation defaults to the entire log field.
+
+Slice notation only applies to a log field that is of type string
+and can not be applied to ip/timestamp which are converted to
+string from integer.
+
+The below slice specifiers are allowed.
+
+``[start:end]``
+          Log field value from start through end-1
+``[start:]``
+          Log field value from start through the rest of the string
+``[:end]``
+          Log field value from the beginning through end-1
+``[:]``
+          Default - entire Log field
+
+Some examples below ::
+
+  '%<cqup>'       //the whole characters of <cqup>.
+  '%<cqup>[:]'    //the whole characters of <cqup>.
+  '%<cqup[0:30]>' //the first 30 characters of <cqup>.
+  '%<cqup[-10:]>' //the last 10 characters of <cqup>.
+  '%<cqup[:-5]>'  //everything except the last 5 characters of <cqup>.

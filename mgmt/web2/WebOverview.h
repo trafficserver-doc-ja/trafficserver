@@ -70,36 +70,30 @@
 //    should be returned as a copy (or a const ptr)
 //    through an accessor function
 
-enum PowerLampState
-{ LAMP_ON, LAMP_OFF, LAMP_WARNING };
-
 // information about a specific node in the cluster
 class overviewRecord
 {
 public:
-  overviewRecord(unsigned long inet_addr, bool local, ClusterPeerInfo * cpi = NULL);
-   ~overviewRecord();
-  void updateStatus(time_t currentTime, ClusterPeerInfo * cpi);
-  void getStatus(char **hotsname, bool * up, bool * alarms, PowerLampState * proxyUp);
-  bool ipMatch(char *ipStr);    // is this the ip address of this node
+  overviewRecord(unsigned long inet_addr, bool local, ClusterPeerInfo *cpi = NULL);
+
+  ~overviewRecord();
+
+  void updateStatus(time_t currentTime, ClusterPeerInfo *cpi);
+
   bool up;
   bool localNode;
-  char *hostname;               // FQ hostname of the node
-  unsigned long inetAddr;       // IP address of the node
-  bool varStrFromName(const char *varName, char *bufVal, int bufLen);
-  RecCounter readCounter(const char *name, bool * found);
-  RecInt readInteger(const char *name, bool * found);
-  RecFloat readFloat(const char *name, bool * found);
-  RecString readString(const char *name, bool * found);
-  RecData readData(RecDataT varType, const char *name, bool * found);
-  bool varIntFromName(const char *varName, RecInt * value);
-  bool varFloatFromName(const char *varName, RecFloat * value);
-  bool varCounterFromName(const char *varName, RecCounter * value);
+  char *hostname;         // FQ hostname of the node
+  unsigned long inetAddr; // IP address of the node
+  RecInt readInteger(const char *name, bool *found);
+  RecFloat readFloat(const char *name, bool *found);
+  RecString readString(const char *name, bool *found);
+  RecData readData(RecDataT varType, const char *name, bool *found);
+  bool varFloatFromName(const char *varName, RecFloat *value);
 
 private:
-  RecRecords node_rec_data;   // a copy from ClusterPeerInfo
-  int recordArraySize;          // the size of node_data.recs
-  int node_rec_first_ix; // Kludge, but store the first order ix for later use
+  RecRecords node_rec_data; // a copy from ClusterPeerInfo
+  int recordArraySize;      // the size of node_data.recs
+  int node_rec_first_ix;    // Kludge, but store the first order ix for later use
   overviewRecord(const overviewRecord &);
 };
 
@@ -113,10 +107,10 @@ public:
   void checkForUpdates();
   char *resolvePeerHostname(const char *peerIP);
   char *resolvePeerHostname_ml(const char *peerIP);
-  int getClusterHosts(ExpandingArray * hosts);
-  MgmtInt readInteger(const char *nodeName, const char *name, bool * found = NULL);
-  MgmtFloat readFloat(const char *nodeName, const char *name, bool * found = NULL);
-  MgmtString readString(const char *nodeName, const char *name, bool * found = NULL);
+  int getClusterHosts(ExpandingArray *hosts);
+  MgmtInt readInteger(const char *nodeName, const char *name, bool *found = NULL);
+  MgmtFloat readFloat(const char *nodeName, const char *name, bool *found = NULL);
+  MgmtString readString(const char *nodeName, const char *name, bool *found = NULL);
   void addSelfRecord();
 
   int varClusterDataFromName(RecDataT varType, char *nodeVar, RecData *sum);
@@ -125,20 +119,20 @@ private:
   ink_mutex accessLock;
 
   // Private fcns
-    overviewPage(const overviewPage &);
-  void addRecord(ClusterPeerInfo * cpi);
+  overviewPage(const overviewPage &);
+  void addRecord(ClusterPeerInfo *cpi);
   overviewRecord *findNodeByName(const char *nodeName);
-  void addReading(MgmtInt reading, textBuffer * output, int nDigits, const char **gifs, const char **alts);
-  void addLoadBar(textBuffer * output, MgmtInt load);
+  void addReading(MgmtInt reading, textBuffer *output, int nDigits, const char **gifs, const char **alts);
+  void addLoadBar(textBuffer *output, MgmtInt load);
   void sortHosts();
-  bool moreInfoButton(const char *submission, textBuffer * output);
-  void addHostPanel(WebHttpContext * whc, overviewRecord * host);
+  bool moreInfoButton(const char *submission, textBuffer *output);
+  void addHostPanel(WebHttpContext *whc, overviewRecord *host);
 
   // Private variables
-  InkHashTable *nodeRecords;    // container for overviewRecords
-  unsigned long ourAddr;        // the IP address of this node
-  ExpandingArray sortRecords;   // A second, sorted container for nodeRecords
-  int numHosts;                 // number of peers we know about including ourself
+  InkHashTable *nodeRecords;  // container for overviewRecords
+  unsigned long ourAddr;      // the IP address of this node
+  ExpandingArray sortRecords; // A second, sorted container for nodeRecords
+  int numHosts;               // number of peers we know about including ourself
 
   int clusterSumData(RecDataT varType, const char *nodeVar, RecData *sum);
 };

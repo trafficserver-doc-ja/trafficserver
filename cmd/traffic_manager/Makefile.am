@@ -25,12 +25,19 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/proxy/hdrs \
   -I$(top_srcdir)/proxy/shared \
   -I$(top_srcdir)/mgmt \
+  -I$(top_srcdir)/mgmt/api \
   -I$(top_srcdir)/mgmt/api/include \
   -I$(top_srcdir)/mgmt/cluster \
   -I$(top_srcdir)/mgmt/utils \
   -I$(top_srcdir)/mgmt/web2 \
   -I$(top_srcdir)/lib \
   -I$(top_builddir)/lib
+
+AM_LDFLAGS = \
+  @EXTRA_CXX_LDFLAGS@ \
+  @LIBTOOL_LINK_FLAGS@ \
+  @EXPAT_LDFLAGS@ \
+  @OPENSSL_LDFLAGS@
 
 traffic_manager_SOURCES = \
   AddConfigFilesHere.cc \
@@ -42,7 +49,6 @@ traffic_manager_SOURCES = \
   StatXML.cc \
   StatXML.h
 
-traffic_manager_LDFLAGS = @EXTRA_CXX_LDFLAGS@ @EXPAT_LDFLAGS@ @LIBTOOL_LINK_FLAGS@
 traffic_manager_LDADD = \
   $(top_builddir)/mgmt/web2/libweb.a \
   $(top_builddir)/mgmt/api/libmgmtapilocal.la \
@@ -54,7 +60,7 @@ traffic_manager_LDADD = \
   $(top_builddir)/proxy/shared/liberror.a \
   $(top_builddir)/proxy/shared/libdiagsconfig.a \
   $(LIBUNWIND_LIBS) \
-  @LIBRESOLV@ @LIBEXPAT@ @LIBPCRE@ @LIBTCL@ @LIBCAP@ @HWLOC_LIBS@ \
+  @LIBRESOLV@ @LIBEXPAT@ @LIBPCRE@ @LIBTCL@ @LIBCAP@ @HWLOC_LIBS@ @LIBPTHREAD@ \
   -lm
 
 # Must do it this way or the dependencies aren't detected.
@@ -63,6 +69,3 @@ traffic_manager_LDADD += \
   $(top_builddir)/lib/wccp/libwccp.a \
   $(top_builddir)/lib/tsconfig/libtsconfig.la
 endif
-
-traffic_manager_LDADD += @OPENSSL_LIBS@
-

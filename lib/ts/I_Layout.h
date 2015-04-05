@@ -35,8 +35,7 @@
   The Layout is a simple place holder for the distribution layout.
 
  */
-struct Layout
-{
+struct Layout {
   char *prefix;
   char *exec_prefix;
   char *bindir;
@@ -55,7 +54,7 @@ struct Layout
   char *cachedir;
 
   Layout(const char *prefix = 0);
-   ~Layout();
+  ~Layout();
 
   /**
    Return file path relative to Layout->prefix
@@ -63,6 +62,11 @@ struct Layout
 
   */
   char *relative(const char *file);
+
+  /**
+   update the sysconfdir to a test conf dir
+   */
+  void update_sysconfdir(const char *dir);
 
   /**
    Return file path relative to Layout->prefix

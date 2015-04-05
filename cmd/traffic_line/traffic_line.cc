@@ -51,23 +51,26 @@ static char StorageCmdOffline[1024];
 static int ShowAlarms;
 static int ShowStatus;
 static int ShowBacktrace;
+static int DrainTraffic;
 static char ClearAlarms[1024];
 
 static TSMgmtError
 handleArgInvocation()
 {
+  unsigned restart = DrainTraffic ? TS_RESTART_OPT_DRAIN : TS_RESTART_OPT_NONE;
+
   if (ReRead == 1) {
     return TSReconfigure();
   } else if (ShutdownMgmtCluster == 1) {
-    return TSRestart(true);
+    return TSRestart(restart | TS_RESTART_OPT_CLUSTER);
   } else if (ShutdownMgmtLocal == 1) {
-    return TSRestart(false);
+    return TSRestart(restart);
   } else if (Shutdown == 1) {
     return TSProxyStateSet(TS_PROXY_OFF, TS_CACHE_CLEAR_OFF);
   } else if (BounceCluster == 1) {
-    return TSBounce(true);
+    return TSBounce(restart | TS_RESTART_OPT_CLUSTER);
   } else if (BounceLocal == 1) {
-    return TSBounce(false);
+    return TSBounce(restart);
   } else if (Startup == 1) {
     return TSProxyStateSet(TS_PROXY_ON, TS_CACHE_CLEAR_OFF);
   } else if (ClearCluster == 1) {
@@ -107,7 +110,7 @@ handleArgInvocation()
     if (count > 0) {
       printf("Active Alarms\n");
       for (int i = 0; i < count; i++) {
-        char* name = static_cast<char *>(TSListDequeue(events));
+        char *name = static_cast<char *>(TSListDequeue(events));
         printf("  %d. %s\n", i + 1, name);
       }
     } else {
@@ -140,14 +143,14 @@ handleArgInvocation()
 
     if ((3 == len) && (0 == strncasecmp(ClearAlarms, "all", len))) {
       all = true;
-    } else  {
+    } else {
       num = strtol(ClearAlarms, NULL, 10) - 1;
       if (num <= 0)
         num = -1;
     }
 
     for (int i = 0; i < count; i++) {
-      char* name = static_cast<char*>(TSListDequeue(events));
+      char *name = static_cast<char *>(TSListDequeue(events));
 
       if (all || ((num > -1) && (num == i)) || ((strlen(name) == len) && (0 == strncasecmp(ClearAlarms, name, len)))) {
         if (TS_ERR_OKAY != TSEventResolve(name)) {
@@ -159,7 +162,7 @@ handleArgInvocation()
       }
     }
     TSListDestroy(events);
-    return (errors > 0 ? TS_ERR_FAIL: TS_ERR_OKAY);
+    return (errors > 0 ? TS_ERR_FAIL : TS_ERR_OKAY);
   } else if (ShowStatus == 1) {
     switch (TSProxyStateGet()) {
     case TS_PROXY_ON:
@@ -184,7 +187,7 @@ handleArgInvocation()
     }
 
     return err;
-  } else if (*ReadVar != '\0') {        // Handle a value read
+  } else if (*ReadVar != '\0') { // Handle a value read
     if (*SetVar != '\0' || *VarValue != '\0') {
       fprintf(stderr, "%s: Invalid Argument Combination: Can not read and set values at the same time\n", program_name);
       return TS_ERR_FAIL;
@@ -217,7 +220,7 @@ handleArgInvocation()
       TSRecordEleDestroy(rec_ele);
       return err;
     }
-  } else if (*MatchVar != '\0') {        // Handle a value read
+  } else if (*MatchVar != '\0') { // Handle a value read
     if (*SetVar != '\0' || *VarValue != '\0') {
       fprintf(stderr, "%s: Invalid Argument Combination: Can not read and set values at the same time\n", program_name);
       return TS_ERR_FAIL;
@@ -226,15 +229,14 @@ handleArgInvocation()
       TSList list = TSListCreate();
 
       if ((err = TSRecordGetMatchMlt(MatchVar, list)) != TS_ERR_OKAY) {
-        char* msg = TSGetErrorMessage(err);
+        char *msg = TSGetErrorMessage(err);
         fprintf(stderr, "%s: %s\n", program_name, msg);
         ats_free(msg);
       }
 
       // If the RPC call failed, the list will be empty, so we won't print anything. Otherwise,
       // print all the results, freeing them as we go.
-      for (TSRecordEle * rec_ele = (TSRecordEle *) TSListDequeue(list); rec_ele;
-          rec_ele = (TSRecordEle *) TSListDequeue(list)) {
+      for (TSRecordEle *rec_ele = (TSRecordEle *)TSListDequeue(list); rec_ele; rec_ele = (TSRecordEle *)TSListDequeue(list)) {
         switch (rec_ele->rec_type) {
         case TS_REC_INT:
           printf("%s %" PRId64 "\n", rec_ele->rec_name, rec_ele->valueT.int_val);
@@ -290,7 +292,7 @@ handleArgInvocation()
 
       return err;
     }
-  } else if (*VarValue != '\0') {       // We have a value but no variable to set
+  } else if (*VarValue != '\0') { // We have a value but no variable to set
     fprintf(stderr, "%s: Must specify variable to set with -s when using -v\n", program_name);
     return TS_ERR_FAIL;
   }
@@ -300,7 +302,7 @@ handleArgInvocation()
 }
 
 int
-main(int /* argc ATS_UNUSED */, char **argv)
+main(int /* argc ATS_UNUSED */, const char **argv)
 {
   AppVersionInfo appVersionInfo;
   TSMgmtError status;
@@ -331,8 +333,8 @@ main(int /* argc ATS_UNUSED */, char **argv)
   ShowStatus = 0;
   ClearAlarms[0] = '\0';
 
-/* Argument description table used to describe how to parse command line args, */
-/* see 'ink_args.h' for meanings of the various fields */
+  /* Argument description table used to describe how to parse command line args, */
+  /* see 'ink_args.h' for meanings of the various fields */
   ArgumentDescription argument_descriptions[] = {
     {"query_deadhosts", 'q', "Query congested sites", "F", &QueryDeadhosts, NULL, NULL},
     {"read_var", 'r', "Read Variable", "S1024", &ReadVar, NULL, NULL},
@@ -355,9 +357,9 @@ main(int /* argc ATS_UNUSED */, char **argv)
     {"clear_alarms", '-', "Clear specified, or all,  alarms", "S1024", &ClearAlarms, NULL, NULL},
     {"status", '-', "Show proxy server status", "F", &ShowStatus, NULL, NULL},
     {"backtrace", '-', "Show proxy stack backtrace", "F", &ShowBacktrace, NULL, NULL},
+    {"drain", '-', "Wait for client connections to drain before restarting", "F", &DrainTraffic, NULL, NULL},
     HELP_ARGUMENT_DESCRIPTION(),
-    VERSION_ARGUMENT_DESCRIPTION()
-  };
+    VERSION_ARGUMENT_DESCRIPTION()};
 
   // Process command line arguments and dump into variables
   process_args(&appVersionInfo, argument_descriptions, countof(argument_descriptions), argv);
@@ -374,8 +376,11 @@ main(int /* argc ATS_UNUSED */, char **argv)
   TSTerminate();
 
   if (TS_ERR_OKAY != status) {
+    char *msg = TSGetErrorMessage(status);
     if (ReadVar[0] == '\0' && SetVar[0] == '\0')
-      fprintf(stderr, "error: the requested command failed\n");
+      fprintf(stderr, "error: the requested command failed: %s\n", msg);
+
+    TSfree(msg);
     exit(1);
   }
 

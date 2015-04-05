@@ -32,20 +32,21 @@
 #include <ts/experimental.h>
 #include <ts/remap.h>
 #include "ink_defs.h"
+#include "ts_lua_coroutine.h"
 
-#define TS_LUA_FUNCTION_REMAP                   "do_remap"
-#define TS_LUA_FUNCTION_CACHE_LOOKUP_COMPLETE   "do_cache_lookup_complete"
-#define TS_LUA_FUNCTION_SEND_REQUEST            "do_send_request"
-#define TS_LUA_FUNCTION_READ_RESPONSE           "do_read_response"
-#define TS_LUA_FUNCTION_SEND_RESPONSE           "do_send_response"
-#define TS_LUA_FUNCTION_READ_REQUEST            "do_read_request"
-#define TS_LUA_FUNCTION_TXN_START               "do_txn_start"
-#define TS_LUA_FUNCTION_PRE_REMAP               "do_pre_remap"
-#define TS_LUA_FUNCTION_POST_REMAP              "do_post_remap"
-#define TS_LUA_FUNCTION_OS_DNS                  "do_os_dns"
-#define TS_LUA_FUNCTION_SELECT_ALT              "do_select_alt"
-#define TS_LUA_FUNCTION_READ_CACHE              "do_read_cache"
-#define TS_LUA_FUNCTION_TXN_CLOSE               "do_txn_close"
+#define TS_LUA_FUNCTION_REMAP "do_remap"
+#define TS_LUA_FUNCTION_CACHE_LOOKUP_COMPLETE "do_cache_lookup_complete"
+#define TS_LUA_FUNCTION_SEND_REQUEST "do_send_request"
+#define TS_LUA_FUNCTION_READ_RESPONSE "do_read_response"
+#define TS_LUA_FUNCTION_SEND_RESPONSE "do_send_response"
+#define TS_LUA_FUNCTION_READ_REQUEST "do_read_request"
+#define TS_LUA_FUNCTION_TXN_START "do_txn_start"
+#define TS_LUA_FUNCTION_PRE_REMAP "do_pre_remap"
+#define TS_LUA_FUNCTION_POST_REMAP "do_post_remap"
+#define TS_LUA_FUNCTION_OS_DNS "do_os_dns"
+#define TS_LUA_FUNCTION_SELECT_ALT "do_select_alt"
+#define TS_LUA_FUNCTION_READ_CACHE "do_read_cache"
+#define TS_LUA_FUNCTION_TXN_CLOSE "do_txn_close"
 
 #define TS_LUA_FUNCTION_G_SEND_REQUEST "do_global_send_request"
 #define TS_LUA_FUNCTION_G_READ_REQUEST "do_global_read_request"
@@ -61,55 +62,49 @@
 #define TS_LUA_FUNCTION_G_TXN_CLOSE "do_global_txn_close"
 
 
-#define TS_LUA_DEBUG_TAG                        "ts_lua"
+#define TS_LUA_DEBUG_TAG "ts_lua"
 
-#define TS_LUA_MAX_SCRIPT_FNAME_LENGTH          1024
-#define TS_LUA_MAX_CONFIG_VARS_COUNT            256
-#define TS_LUA_MAX_SHARED_DICT_NAME_LENGTH      128
-#define TS_LUA_MAX_SHARED_DICT_COUNT            32
-#define TS_LUA_MAX_URL_LENGTH                   2048
-#define TS_LUA_MAX_OVEC_SIZE                    (3 * 32)
-#define TS_LUA_MAX_RESIDENT_PCRE                64
+#define TS_LUA_EVENT_COROUTINE_CONT 20000
 
-#define TS_LUA_MIN_ALIGN                        sizeof(void*)
-#define TS_LUA_MEM_ALIGN(size)                  (((size) + ((TS_LUA_MIN_ALIGN) - 1)) & ~((TS_LUA_MIN_ALIGN) - 1))
-#define TS_LUA_ALIGN_COUNT(size)                (size / TS_LUA_MIN_ALIGN)
+#define TS_LUA_MAX_SCRIPT_FNAME_LENGTH 1024
+#define TS_LUA_MAX_CONFIG_VARS_COUNT 256
+#define TS_LUA_MAX_SHARED_DICT_NAME_LENGTH 128
+#define TS_LUA_MAX_SHARED_DICT_COUNT 32
+#define TS_LUA_MAX_URL_LENGTH 2048
+#define TS_LUA_MAX_OVEC_SIZE (3 * 32)
+#define TS_LUA_MAX_RESIDENT_PCRE 64
+#define TS_LUA_MAX_STR_LENGTH 2048
 
-#define TS_LUA_MAKE_VAR_ITEM(X)                 {X, #X}
+#define TS_LUA_MIN_ALIGN sizeof(void *)
+#define TS_LUA_MEM_ALIGN(size) (((size) + ((TS_LUA_MIN_ALIGN)-1)) & ~((TS_LUA_MIN_ALIGN)-1))
+#define TS_LUA_ALIGN_COUNT(size) (size / TS_LUA_MIN_ALIGN)
+
+#define TS_LUA_MAKE_VAR_ITEM(X) \
+  {                             \
+    X, #X                       \
+  }
 
 /* for http config or cntl var */
-typedef struct
-{
+typedef struct {
   int nvar;
   char *svar;
 } ts_lua_var_item;
 
-typedef struct
-{
+typedef struct {
   char *content;
   char script[TS_LUA_MAX_SCRIPT_FNAME_LENGTH];
   void *conf_vars[TS_LUA_MAX_CONFIG_VARS_COUNT];
 
-  int _first:1;                 // create current instance for 1st ts_lua_main_ctx
-  int _last:1;                  // create current instance for the last ts_lua_main_ctx
+  int _first : 1; // create current instance for 1st ts_lua_main_ctx
+  int _last : 1;  // create current instance for the last ts_lua_main_ctx
 } ts_lua_instance_conf;
 
 
-/* global lua state struct */
-typedef struct
-{
-  lua_State *lua;
-  TSMutex mutexp;
-  int gref;
-} ts_lua_main_ctx;
-
 /* lua state for http request */
-typedef struct
-{
-  lua_State *lua;
-  TSHttpTxn txnp;
-  TSCont main_contp;
+typedef struct {
+  ts_lua_cont_info cinfo;
 
+  TSHttpTxn txnp;
   TSMBuffer client_request_bufp;
   TSMLoc client_request_hdrp;
   TSMLoc client_request_url;
@@ -117,7 +112,6 @@ typedef struct
   TSMBuffer server_request_bufp;
   TSMLoc server_request_hdrp;
   TSMLoc server_request_url;
-
 
   TSMBuffer server_response_bufp;
   TSMLoc server_response_hdrp;
@@ -128,12 +122,7 @@ typedef struct
   TSMBuffer cached_response_bufp;
   TSMLoc cached_response_hdrp;
 
-  ts_lua_main_ctx *mctx;
-
   ts_lua_instance_conf *instance_conf;
-
-  int intercept_type;
-  int ref;
 
   int remap;
   int has_hook;
@@ -141,80 +130,51 @@ typedef struct
 } ts_lua_http_ctx;
 
 
-typedef struct
-{
+typedef struct {
   TSVIO vio;
   TSIOBuffer buffer;
   TSIOBufferReader reader;
 } ts_lua_io_handle;
 
-typedef struct
-{
-  TSVIO output_vio;
-  TSIOBuffer output_buffer;
-  TSIOBufferReader output_reader;
+typedef struct {
+  ts_lua_cont_info cinfo;
 
-  int64_t total;
+  ts_lua_io_handle output;
+  ts_lua_io_handle reserved;
+
   ts_lua_http_ctx *hctx;
-  int eos;
+  int64_t upstream_bytes;
+  int64_t downstream_bytes;
+  int64_t total;
 
-} ts_lua_transform_ctx;
+} ts_lua_http_transform_ctx;
 
-/* for intercept */
-struct ict_item;
-struct ict_ctx;
-typedef int (*ict_clean) (struct ict_item * item);
+typedef struct {
+  ts_lua_cont_info cinfo;
 
-typedef struct ict_item
-{
-  struct ict_item *next;
-  struct ict_ctx *ictx;
-
-  TSCont contp;
-  ict_clean cleanup;
-  void *data;
-  int deleted:1;
-} ts_lua_http_intercept_item;
-
-typedef struct ict_ctx
-{
-  lua_State *lua;
-  TSCont contp;
   ts_lua_io_handle input;
   ts_lua_io_handle output;
-  TSVConn net_vc;
 
-  ts_lua_main_ctx *mctx;
+  TSVConn net_vc;
   ts_lua_http_ctx *hctx;
 
-  struct ict_item *ict_chain;
-
   int64_t to_flush;
-  int ref;
-
-  int recv_complete:1;
-  int send_complete:1;
-  int all_ready:1;
+  int reuse : 1;
+  int recv_complete : 1;
+  int send_complete : 1;
+  int all_ready : 1;
 } ts_lua_http_intercept_ctx;
 
-#define TS_LUA_RELEASE_IO_HANDLE(ih) do {   \
-    if (ih->reader) {                       \
-        TSIOBufferReaderFree(ih->reader);   \
-        ih->reader = NULL;                  \
-    }                                       \
-    if (ih->buffer) {                       \
-        TSIOBufferDestroy(ih->buffer);      \
-        ih->buffer = NULL;                  \
-    }                                       \
-} while (0)
-
-#define TS_LUA_ADD_INTERCEPT_ITEM(ictx, item, contp, func, d)   \
-            {   item->cleanup = func;  \
-                item->data = d;  \
-                item->ictx = ictx;  \
-                item->contp = contp;  \
-                item->deleted = 0;  \
-                item->next = ictx->ict_chain;   \
-                ictx->ict_chain = item;}
+#define TS_LUA_RELEASE_IO_HANDLE(ih)    \
+  do {                                  \
+    if (ih->reader) {                   \
+      TSIOBufferReaderFree(ih->reader); \
+      ih->reader = NULL;                \
+    }                                   \
+    if (ih->buffer) {                   \
+      TSIOBufferDestroy(ih->buffer);    \
+      ih->buffer = NULL;                \
+    }                                   \
+  } while (0)
 
 #endif

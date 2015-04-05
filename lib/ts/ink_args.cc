@@ -32,51 +32,43 @@ Process arguments
 //  Global variables
 //
 
-const char *file_arguments[MAX_FILE_ARGUMENTS] = { 0 };
-const char *program_name = (char *) "Traffic Server";
+const char *file_arguments[MAX_FILE_ARGUMENTS] = {0};
+const char *program_name = (char *)"Traffic Server";
 unsigned n_file_arguments = 0;
 
 //
 //  Local variables
 //
 
-static const char *argument_types_keys = (char *) "ISDfFTL";
-static const char *argument_types_descriptions[] = {
-  (char *) "int  ",
-  (char *) "str  ",
-  (char *) "dbl  ",
-  (char *) "off  ",
-  (char *) "on   ",
-  (char *) "tog  ",
-  (char *) "i64  ",
-  (char *) "     "
-};
+static const char *argument_types_keys = (char *)"ISDfFTL";
+static const char *argument_types_descriptions[] = {(char *)"int  ",  (char *) "str  ", (char *) "dbl  ", (char *) "off  ",
+                                                    (char *) "on   ", (char *) "tog  ", (char *) "i64  ", (char *) "     "};
 
 //
 // Functions
 //
 
 static bool
-arg_is_version_flag(const ArgumentDescription * arg)
+arg_is_version_flag(const ArgumentDescription *arg)
 {
   return strcmp(arg->name, "version") == 0 && arg->key == 'V';
 }
 
 static void
-append_file_argument(const char * arg)
+append_file_argument(const char *arg)
 {
-    if (n_file_arguments >= countof(file_arguments)) {
-      ink_fatal(1, "too many files");
-    }
-    file_arguments[n_file_arguments++] = arg;
-    file_arguments[n_file_arguments] = NULL;
+  if (n_file_arguments >= countof(file_arguments)) {
+    ink_fatal("too many files");
+  }
+
+  file_arguments[n_file_arguments++] = arg;
 }
 
-static void
-process_arg(const AppVersionInfo * appinfo, const ArgumentDescription * argument_descriptions,
-            unsigned n_argument_descriptions, int i, char ***argv, const char *usage_string)
+static bool
+process_arg(const AppVersionInfo *appinfo, const ArgumentDescription *argument_descriptions, unsigned n_argument_descriptions,
+            int i, const char ***argv)
 {
-  char *arg = NULL;
+  const char *arg = NULL;
 
   if (arg_is_version_flag(&argument_descriptions[i])) {
     ink_fputln(stdout, appinfo->FullVersionInfoStr);
@@ -85,46 +77,51 @@ process_arg(const AppVersionInfo * appinfo, const ArgumentDescription * argument
 
   if (argument_descriptions[i].type) {
     char type = argument_descriptions[i].type[0];
-    if (type == 'F' || type == 'f')
-      *(int *) argument_descriptions[i].location = type == 'F' ? 1 : 0;
-    else if (type == 'T')
-      *(int *) argument_descriptions[i].location = !*(int *) argument_descriptions[i].location;
-    else {
+    if (type == 'F' || type == 'f') {
+      *(int *)argument_descriptions[i].location = type == 'F' ? 1 : 0;
+    } else if (type == 'T') {
+      *(int *)argument_descriptions[i].location = !*(int *)argument_descriptions[i].location;
+    } else {
       arg = *++(**argv) ? **argv : *++(*argv);
-      if (!arg)
-        usage(argument_descriptions, n_argument_descriptions, usage_string);
+      if (!arg) {
+        return false;
+      }
       switch (type) {
       case 'I':
-        *(int *) argument_descriptions[i].location = atoi(arg);
+        *(int *)argument_descriptions[i].location = atoi(arg);
         break;
       case 'D':
-        *(double *) argument_descriptions[i].location = atof(arg);
+        *(double *)argument_descriptions[i].location = atof(arg);
         break;
       case 'L':
-        *(int64_t *) argument_descriptions[i].location = ink_atoi64(arg);
+        *(int64_t *)argument_descriptions[i].location = ink_atoi64(arg);
         break;
       case 'S':
         if (argument_descriptions[i].type[1] == '*') {
-          char ** out = (char **)argument_descriptions[i].location;
+          char **out = (char **)argument_descriptions[i].location;
           *out = ats_strdup(arg);
         } else {
-          ink_strlcpy((char *) argument_descriptions[i].location, arg, atoi(argument_descriptions[i].type + 1));
+          ink_strlcpy((char *)argument_descriptions[i].location, arg, atoi(argument_descriptions[i].type + 1));
         }
         break;
       default:
-        ink_fatal(1, (char *) "bad argument description");
+        ink_fatal("bad argument description");
         break;
       }
       **argv += strlen(**argv) - 1;
     }
   }
-  if (argument_descriptions[i].pfn)
+
+  if (argument_descriptions[i].pfn) {
     argument_descriptions[i].pfn(argument_descriptions, n_argument_descriptions, arg);
+  }
+
+  return true;
 }
 
 
 void
-show_argument_configuration(const ArgumentDescription * argument_descriptions, unsigned n_argument_descriptions)
+show_argument_configuration(const ArgumentDescription *argument_descriptions, unsigned n_argument_descriptions)
 {
   printf("Argument Configuration\n");
   for (unsigned i = 0; i < n_argument_descriptions; i++) {
@@ -134,22 +131,22 @@ show_argument_configuration(const ArgumentDescription * argument_descriptions, u
       case 'F':
       case 'f':
       case 'T':
-        printf(*(int *) argument_descriptions[i].location ? "TRUE" : "FALSE");
+        printf(*(int *)argument_descriptions[i].location ? "TRUE" : "FALSE");
         break;
       case 'I':
-        printf("%d", *(int *) argument_descriptions[i].location);
+        printf("%d", *(int *)argument_descriptions[i].location);
         break;
       case 'D':
-        printf("%f", *(double *) argument_descriptions[i].location);
+        printf("%f", *(double *)argument_descriptions[i].location);
         break;
       case 'L':
-        printf("%" PRId64 "", *(int64_t *) argument_descriptions[i].location);
+        printf("%" PRId64 "", *(int64_t *)argument_descriptions[i].location);
         break;
       case 'S':
-        printf("%s", (char *) argument_descriptions[i].location);
+        printf("%s", (char *)argument_descriptions[i].location);
         break;
       default:
-        ink_fatal(1, (char *) "bad argument description");
+        ink_fatal("bad argument description");
         break;
       }
       printf("\n");
@@ -158,7 +155,17 @@ show_argument_configuration(const ArgumentDescription * argument_descriptions, u
 }
 
 void
-process_args(const AppVersionInfo * appinfo, const ArgumentDescription * argument_descriptions, unsigned n_argument_descriptions, char **argv, const char *usage_string)
+process_args(const AppVersionInfo *appinfo, const ArgumentDescription *argument_descriptions, unsigned n_argument_descriptions,
+             const char **argv, const char *usage_string)
+{
+  if (!process_args_ex(appinfo, argument_descriptions, n_argument_descriptions, argv)) {
+    usage(argument_descriptions, n_argument_descriptions, usage_string);
+  }
+}
+
+bool
+process_args_ex(const AppVersionInfo *appinfo, const ArgumentDescription *argument_descriptions, unsigned n_argument_descriptions,
+                const char **argv)
 {
   unsigned i = 0;
   //
@@ -174,16 +181,16 @@ process_args(const AppVersionInfo * appinfo, const ArgumentDescription * argumen
       case 'f':
       case 'F':
       case 'I':
-        *(int *) argument_descriptions[i].location = atoi(env);
+        *(int *)argument_descriptions[i].location = atoi(env);
         break;
       case 'D':
-        *(double *) argument_descriptions[i].location = atof(env);
+        *(double *)argument_descriptions[i].location = atof(env);
         break;
       case 'L':
-        *(int64_t *) argument_descriptions[i].location = atoll(env);
+        *(int64_t *)argument_descriptions[i].location = atoll(env);
         break;
       case 'S':
-        ink_strlcpy((char *) argument_descriptions[i].location, env, atoi(argument_descriptions[i].type + 1));
+        ink_strlcpy((char *)argument_descriptions[i].location, env, atoi(argument_descriptions[i].type + 1));
         break;
       }
     }
@@ -192,47 +199,66 @@ process_args(const AppVersionInfo * appinfo, const ArgumentDescription * argumen
   //
   program_name = appinfo->AppStr;
   while (*++argv) {
-    if (**argv == '-') {
-      if ((*argv)[1] == '-') {
-        for (i = 0; i < n_argument_descriptions; i++)
-          if (!strcmp(argument_descriptions[i].name, (*argv) + 2)) {
-            *argv += strlen(*argv) - 1;
-            process_arg(appinfo, argument_descriptions, n_argument_descriptions, i, &argv, usage_string);
-            break;
-          }
-        if (i >= n_argument_descriptions)
-          usage(argument_descriptions, n_argument_descriptions, usage_string);
-      } else {
-        // Hack for supporting '-' as a file argument.
-        if (strcmp(*argv, "-") == 0) {
-          append_file_argument(*argv);
-        }
+    // Hack for supporting '-' as a file argument.
+    if (strcmp(*argv, "-") == 0) {
+      append_file_argument(*argv);
+      break;
+    }
 
-        while (*++(*argv)) {
-          for (i = 0; i < n_argument_descriptions; i++) {
-            if (argument_descriptions[i].key == **argv) {
-              process_arg(appinfo, argument_descriptions, n_argument_descriptions, i, &argv, usage_string);
-              break;
-            }
-          }
+    // No leading '-', this is the start of the file arguments.
+    if ((*argv)[0] != '-') {
+      append_file_argument(*argv);
+      break;
+    }
 
-          if (i >= n_argument_descriptions) {
-            usage(argument_descriptions, n_argument_descriptions, usage_string);
+    if ((*argv)[1] == '-') {
+      // Deal with long options ...
+      for (i = 0; i < n_argument_descriptions; i++)
+        if (!strcmp(argument_descriptions[i].name, (*argv) + 2)) {
+          *argv += strlen(*argv) - 1;
+          if (!process_arg(appinfo, argument_descriptions, n_argument_descriptions, i, &argv)) {
+            return false;
           }
+          break;
         }
+      if (i >= n_argument_descriptions) {
+        return false;
       }
     } else {
+      // Deal with (possibly combined) short options ...
+      while (*++(*argv)) {
+        for (i = 0; i < n_argument_descriptions; i++) {
+          if (argument_descriptions[i].key == **argv) {
+            if (!process_arg(appinfo, argument_descriptions, n_argument_descriptions, i, &argv)) {
+              return false;
+            }
+            break;
+          }
+        }
+
+        if (i >= n_argument_descriptions) {
+          return false;
+        }
+      }
+    }
+  }
+
+  // If we have any arguments left, slurp them up into file_arguments.
+  if (*argv) {
+    while (*++argv) {
       append_file_argument(*argv);
     }
   }
+
+  return true;
 }
 
 void
-usage(const ArgumentDescription * argument_descriptions, unsigned n_argument_descriptions, const char *usage_string)
+usage(const ArgumentDescription *argument_descriptions, unsigned n_argument_descriptions, const char *usage_string)
 {
-  (void) argument_descriptions;
-  (void) n_argument_descriptions;
-  (void) usage_string;
+  (void)argument_descriptions;
+  (void)n_argument_descriptions;
+  (void)usage_string;
   if (usage_string)
     fprintf(stderr, "%s\n", usage_string);
   else
@@ -244,25 +270,24 @@ usage(const ArgumentDescription * argument_descriptions, unsigned n_argument_des
 
     fprintf(stderr, "  ");
 
-    if ('-' == argument_descriptions[i].key) fprintf(stderr, "   ");
-    else fprintf(stderr, "-%c,", argument_descriptions[i].key);
+    if ('-' == argument_descriptions[i].key)
+      fprintf(stderr, "   ");
+    else
+      fprintf(stderr, "-%c,", argument_descriptions[i].key);
 
-    fprintf(stderr, " --%-17s %s",
-            argument_descriptions[i].name,
+    fprintf(stderr, " --%-17s %s", argument_descriptions[i].name,
             argument_types_descriptions[argument_descriptions[i].type ?
-                                        strchr(argument_types_keys,
-                                               argument_descriptions[i].type[0]) -
-                                        argument_types_keys : strlen(argument_types_keys)
-            ]);
+                                          strchr(argument_types_keys, argument_descriptions[i].type[0]) - argument_types_keys :
+                                          strlen(argument_types_keys)]);
     switch (argument_descriptions[i].type ? argument_descriptions[i].type[0] : 0) {
     case 0:
       fprintf(stderr, "          ");
       break;
     case 'L':
-      fprintf(stderr, " %-9" PRId64 "", *(int64_t *) argument_descriptions[i].location);
+      fprintf(stderr, " %-9" PRId64 "", *(int64_t *)argument_descriptions[i].location);
       break;
     case 'S': {
-      char * location;
+      char *location;
       if (argument_descriptions[i].type[1] == '*') {
         location = *(char **)argument_descriptions[i].location;
       } else {
@@ -281,16 +306,16 @@ usage(const ArgumentDescription * argument_descriptions, unsigned n_argument_des
       break;
     }
     case 'D':
-      fprintf(stderr, " %-9.3f", *(double *) argument_descriptions[i].location);
+      fprintf(stderr, " %-9.3f", *(double *)argument_descriptions[i].location);
       break;
     case 'I':
-      fprintf(stderr, " %-9d", *(int *) argument_descriptions[i].location);
+      fprintf(stderr, " %-9d", *(int *)argument_descriptions[i].location);
       break;
     case 'T':
     case 'f':
     case 'F':
       if (argument_descriptions[i].location) {
-        fprintf(stderr, " %-9s", *(int *) argument_descriptions[i].location ? "true " : "false");
+        fprintf(stderr, " %-9s", *(int *)argument_descriptions[i].location ? "true " : "false");
       } else {
         fprintf(stderr, " %-9s", "false");
       }
@@ -298,5 +323,5 @@ usage(const ArgumentDescription * argument_descriptions, unsigned n_argument_des
     }
     fprintf(stderr, " %s\n", argument_descriptions[i].description);
   }
-  _exit(1);
+  _exit(EX_USAGE);
 }

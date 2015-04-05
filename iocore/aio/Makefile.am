@@ -34,10 +34,16 @@ libinkaio_a_SOURCES = \
   Inline.cc \
   P_AIO.h
 
+test_AIO_LDFLAGS = \
+  @EXTRA_CXX_LDFLAGS@ \
+  @LIBTOOL_LINK_FLAGS@ \
+  @OPENSSL_LDFLAGS@
+
 test_AIO_SOURCES = \
   test_AIO.cc
 
-test_AIO_CXXFLAGS = \
+test_AIO_CPPFLAGS = \
+  $(AM_CPPFLAGS) \
   $(iocore_include_dirs) \
   -I$(top_srcdir)/proxy/api/ts \
   -I$(top_srcdir)/proxy/api \
@@ -46,7 +52,8 @@ test_AIO_CXXFLAGS = \
   -I$(top_srcdir)/proxy/http \
   -I$(top_srcdir)/proxy/logging \
   -I$(top_srcdir)/mgmt \
-  -I$(top_srcdir)/mgmt/utils
+  -I$(top_srcdir)/mgmt/utils \
+  @OPENSSL_INCLUDES@
 
 test_AIO_LDADD = \
   libinkaio.a \

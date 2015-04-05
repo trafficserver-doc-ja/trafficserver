@@ -51,20 +51,18 @@ typedef int WebHandle;
 //-------------------------------------------------------------------------
 
 #if defined(freebsd)
-//extern "C" struct hostent *gethostbyaddr_r(const char *addr, int length, int type,
+// extern "C" struct hostent *gethostbyaddr_r(const char *addr, int length, int type,
 //                                  struct hostent *result, char *buffer, int buflen, int *h_errnop);
 #endif
 
 #if defined(solaris)
-extern "C"
-{
-  struct hostent *gethostbyaddr_r(const char *addr,
-                                  int length, int type, struct hostent *result,
-                                  char *buffer, int buflen, int *h_errnop);
+extern "C" {
+struct hostent *gethostbyaddr_r(const char *addr, int length, int type, struct hostent *result, char *buffer, int buflen,
+                                int *h_errnop);
 }
 #endif
 
-char *WebGetHostname_Xmalloc(sockaddr_in * client_info);
+char *WebGetHostname_Xmalloc(sockaddr_in *client_info);
 
 //-------------------------------------------------------------------------
 // WebFile
@@ -78,12 +76,5 @@ int WebFileWrite(WebHandle h_file, char *buf, int size, int *bytes_written);
 int WebFileImport_Xmalloc(const char *file, char **file_buf, int *file_size);
 int WebFileGetSize(WebHandle h_file);
 time_t WebFileGetDateGmt(WebHandle h_file);
-
-//-------------------------------------------------------------------------
-// Random Numbers
-//-------------------------------------------------------------------------
-
-void WebSeedRand(long seed);
-long WebRand();
 
 #endif // _WEB_COMPATIBILITY_H_

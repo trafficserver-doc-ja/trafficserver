@@ -28,12 +28,18 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/mgmt \
   -I$(top_srcdir)/mgmt/utils \
   -I$(top_srcdir)/proxy/api/ts \
-  -I$(top_srcdir)/proxy/http
+  -I$(top_srcdir)/proxy/http \
+  @OPENSSL_INCLUDES@
 
 TESTS = $(check_PROGRAMS)
 
 check_PROGRAMS = test_certlookup
 noinst_LIBRARIES = libinknet.a
+
+test_certlookup_LDFLAGS = \
+  @EXTRA_CXX_LDFLAGS@ \
+  @LIBTOOL_LINK_FLAGS@ \
+  @OPENSSL_LDFLAGS@
 
 test_certlookup_SOURCES = \
   test_certlookup.cc \
@@ -41,8 +47,7 @@ test_certlookup_SOURCES = \
 
 test_certlookup_LDADD = \
   $(top_builddir)/lib/ts/libtsutil.la \
-  $(top_builddir)/iocore/eventsystem/libinkevent.a \
-  @OPENSSL_LIBS@
+  $(top_builddir)/iocore/eventsystem/libinkevent.a
 
 libinknet_a_SOURCES = \
   Connection.cc \

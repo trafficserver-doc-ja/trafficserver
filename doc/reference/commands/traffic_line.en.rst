@@ -57,6 +57,15 @@ Options
 
     Clears accumulated statistics on the local node.
 
+.. option:: --drain
+
+    This option modifies the behavior of :option:`traffic_line -b`
+    and :option:`traffic_line -L` such that :program:`traffic_server`
+    is not shut down until the number of active client connections
+    drops to the number given by the
+    :ts:cv:`proxy.config.restart.active_client_threshold` configuration
+    variable.
+
 .. option:: -h, --help
 
     Print usage information and exit.
@@ -109,6 +118,10 @@ Options
     Initiate a Traffic Server configuration file reread. Use this
     command to update the running configuration after any configuration
     file modification.
+
+    The timestamp of the last reconfiguration event (in seconds
+    since epoch) is published in the `proxy.node.config.reconfigure_time`
+    metric.
 
 .. option:: -Z, --zero_cluster
 
@@ -242,6 +255,27 @@ proxy.process.ssl.cipher.user_agent.{CIPHERNAME}
     proxy.process.ssl.cipher.user_agent.ECDHE-RSA-AES256-SHA384 0
     proxy.process.ssl.cipher.user_agent.ECDHE-ECDSA-AES256-SHA384 0
     ...
+
+Cache Statistics
+======================
+
+Cache statistics come in two varieties, global and per cache volume. These will be listed here in the global form. To get a
+cache volume statistic add `.volume_#` to the name after `cache` where `#` is 1-based index of the volume in :file:`storage.config`.
+For example the statistic `proxy.process.cache.sync.bytes` is a global statistic. The value for the third cache volume is
+`proxy.process.cache.volume_3.sync.bytes`.
+
+proxy.process.cache.sync.bytes
+   The total number of bytes written to disk to synchronize the cache directory.
+
+proxy.process.cache.sync.time
+   The total time, in nanoseconds, during which the cache directory was being written to disk.
+
+proxy.process.cache.sync.count
+   The number of times a cache directory sync has been done.
+
+proxy.process.cache.wrap_count
+   The number of times a cache stripe has cycled. Each stripe is a circular buffer and this is incremented each time the
+   write cursor is reset to the start of the stripe.
 
 Examples
 ========

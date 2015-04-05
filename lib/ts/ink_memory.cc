@@ -49,11 +49,11 @@ ats_malloc(size_t size)
   if (likely(size > 0)) {
     if (unlikely((ptr = malloc(size)) == NULL)) {
       ink_stack_trace_dump();
-      ink_fatal(1, "ats_malloc: couldn't allocate %zu bytes", size);
+      ink_fatal("ats_malloc: couldn't allocate %zu bytes", size);
     }
   }
   return ptr;
-}                               /* End ats_malloc */
+} /* End ats_malloc */
 
 void *
 ats_calloc(size_t nelem, size_t elsize)
@@ -61,10 +61,10 @@ ats_calloc(size_t nelem, size_t elsize)
   void *ptr = calloc(nelem, elsize);
   if (unlikely(ptr == NULL)) {
     ink_stack_trace_dump();
-    ink_fatal(1, "ats_calloc: couldn't allocate %zu %zu byte elements", nelem, elsize);
+    ink_fatal("ats_calloc: couldn't allocate %zu %zu byte elements", nelem, elsize);
   }
   return ptr;
-}                               /* End ats_calloc */
+} /* End ats_calloc */
 
 void *
 ats_realloc(void *ptr, size_t size)
@@ -72,10 +72,10 @@ ats_realloc(void *ptr, size_t size)
   void *newptr = realloc(ptr, size);
   if (unlikely(newptr == NULL)) {
     ink_stack_trace_dump();
-    ink_fatal(1, "ats_realloc: couldn't reallocate %zu bytes", size);
+    ink_fatal("ats_realloc: couldn't reallocate %zu bytes", size);
   }
   return newptr;
-}                               /* End ats_realloc */
+} /* End ats_realloc */
 
 // TODO: For Win32 platforms, we need to figure out what to do with memalign.
 // The older code had ifdef's around such calls, turning them into ats_malloc().
@@ -90,46 +90,43 @@ ats_memalign(size_t alignment, size_t size)
 
 #if defined(openbsd)
   if (alignment > PAGE_SIZE)
-      alignment = PAGE_SIZE;
+    alignment = PAGE_SIZE;
 #endif
 
   int retcode = posix_memalign(&ptr, alignment, size);
 
   if (unlikely(retcode)) {
     if (retcode == EINVAL) {
-      ink_fatal(1, "ats_memalign: couldn't allocate %zu bytes at alignment %zu - invalid alignment parameter",
-                size, alignment);
+      ink_fatal("ats_memalign: couldn't allocate %zu bytes at alignment %zu - invalid alignment parameter", size, alignment);
     } else if (retcode == ENOMEM) {
-      ink_fatal(1, "ats_memalign: couldn't allocate %zu bytes at alignment %zu - insufficient memory",
-                size, alignment);
+      ink_fatal("ats_memalign: couldn't allocate %zu bytes at alignment %zu - insufficient memory", size, alignment);
     } else {
-      ink_fatal(1, "ats_memalign: couldn't allocate %zu bytes at alignment %zu - unknown error %d",
-                size, alignment, retcode);
+      ink_fatal("ats_memalign: couldn't allocate %zu bytes at alignment %zu - unknown error %d", size, alignment, retcode);
     }
   }
 #else
   ptr = memalign(alignment, size);
   if (unlikely(ptr == NULL)) {
-    ink_fatal(1, "ats_memalign: couldn't allocate %zu bytes at alignment %zu",  size,  alignment);
+    ink_fatal("ats_memalign: couldn't allocate %zu bytes at alignment %zu", size, alignment);
   }
 #endif
   return ptr;
-}                               /* End ats_memalign */
+} /* End ats_memalign */
 
 void
 ats_free(void *ptr)
 {
   if (likely(ptr != NULL))
     free(ptr);
-}                               /* End ats_free */
+} /* End ats_free */
 
-void*
+void *
 ats_free_null(void *ptr)
 {
   if (likely(ptr != NULL))
     free(ptr);
   return NULL;
-}                               /* End ats_free_null */
+} /* End ats_free_null */
 
 void
 ats_memalign_free(void *ptr)
@@ -166,11 +163,11 @@ ats_msync(caddr_t addr, size_t len, caddr_t end, int flags)
   size_t pagesize = ats_pagesize();
 
   // align start back to page boundary
-  caddr_t a = (caddr_t) (((uintptr_t) addr) & ~(pagesize - 1));
+  caddr_t a = (caddr_t)(((uintptr_t)addr) & ~(pagesize - 1));
   // align length to page boundry covering region
   size_t l = (len + (addr - a) + (pagesize - 1)) & ~(pagesize - 1);
   if ((a + l) > end)
-    l = end - a;                // strict limit
+    l = end - a; // strict limit
 #if defined(linux)
 /* Fix INKqa06500
    Under Linux, msync(..., MS_SYNC) calls are painfully slow, even on
@@ -191,13 +188,13 @@ int
 ats_madvise(caddr_t addr, size_t len, int flags)
 {
 #if defined(linux)
-  (void) addr;
-  (void) len;
-  (void) flags;
+  (void)addr;
+  (void)len;
+  (void)flags;
   return 0;
 #else
   size_t pagesize = ats_pagesize();
-  caddr_t a = (caddr_t) (((uintptr_t) addr) & ~(pagesize - 1));
+  caddr_t a = (caddr_t)(((uintptr_t)addr) & ~(pagesize - 1));
   size_t l = (len + (addr - a) + pagesize - 1) & ~(pagesize - 1);
   int res = 0;
 #if HAVE_POSIX_MADVISE
@@ -214,7 +211,7 @@ ats_mlock(caddr_t addr, size_t len)
 {
   size_t pagesize = ats_pagesize();
 
-  caddr_t a = (caddr_t) (((uintptr_t) addr) & ~(pagesize - 1));
+  caddr_t a = (caddr_t)(((uintptr_t)addr) & ~(pagesize - 1));
   size_t l = (len + (addr - a) + pagesize - 1) & ~(pagesize - 1);
   int res = mlock(a, l);
   return res;
@@ -225,7 +222,7 @@ ats_mlock(caddr_t addr, size_t len)
   Moved from old ink_resource.h
   -------------------------------------------------------------------------*/
 char *
-_xstrdup(const char *str, int length, const char* /* path ATS_UNUSED */)
+_xstrdup(const char *str, int length, const char * /* path ATS_UNUSED */)
 {
   char *newstr;
 
@@ -234,7 +231,13 @@ _xstrdup(const char *str, int length, const char* /* path ATS_UNUSED */)
       length = strlen(str);
 
     newstr = (char *)ats_malloc(length + 1);
-    ink_strlcpy(newstr, str, length + 1);
+    // If this is a zero length string just null terminate and return.
+    if (unlikely(length == 0)) {
+      *newstr = '\0';
+    } else {
+      strncpy(newstr, str, length); // we cannot do length + 1 because the string isn't
+      newstr[length] = '\0';        // guaranteeed to be null terminated!
+    }
     return newstr;
   }
   return NULL;

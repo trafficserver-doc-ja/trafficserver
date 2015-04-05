@@ -24,42 +24,42 @@
 #include "Http2ClientSession.h"
 #include "HttpDebugNames.h"
 
-#define STATE_ENTER(state_name, event) do { \
-  DebugSsn(this, "http2_cs", "[%" PRId64 "] [%s, %s]", this->connection_id(), \
-    #state_name, HttpDebugNames::get_event_name(event)); \
-} while (0)
+#define STATE_ENTER(state_name, event)                                                       \
+  do {                                                                                       \
+    DebugSsn(this, "http2_cs", "[%" PRId64 "] [%s, %s]", this->connection_id(), #state_name, \
+             HttpDebugNames::get_event_name(event));                                         \
+  } while (0)
 
-#define DebugHttp2Ssn(fmt, ...) \
-  DebugSsn(this, "http2_cs",  "[%" PRId64 "] " fmt, this->connection_id(), __VA_ARGS__)
+#define DebugHttp2Ssn(fmt, ...) DebugSsn(this, "http2_cs", "[%" PRId64 "] " fmt, this->connection_id(), __VA_ARGS__)
 
-#define DebugHttp2Ssn0(msg) \
-  DebugSsn(this, "http2_cs",  "[%" PRId64 "] " msg, this->connection_id())
+#define DebugHttp2Ssn0(msg) DebugSsn(this, "http2_cs", "[%" PRId64 "] " msg, this->connection_id())
 
-#define HTTP2_SET_SESSION_HANDLER(handler) do { \
-  this->session_handler = (handler); \
-} while (0)
+#define HTTP2_SET_SESSION_HANDLER(handler) \
+  do {                                     \
+    this->session_handler = (handler);     \
+  } while (0)
 
 ClassAllocator<Http2ClientSession> http2ClientSessionAllocator("http2ClientSessionAllocator");
 
 // memcpy the requested bytes from the IOBufferReader, returning how many were actually copied.
 static inline unsigned
-copy_from_buffer_reader(void * dst, IOBufferReader * reader, unsigned nbytes)
+copy_from_buffer_reader(void *dst, IOBufferReader *reader, unsigned nbytes)
 {
-    char * end;
+  char *end;
 
-    end = reader->memcpy(dst, nbytes, 0 /* offset */);
-    return end - (char *)dst;
+  end = reader->memcpy(dst, nbytes, 0 /* offset */);
+  return end - (char *)dst;
 }
 
 static int
-send_connection_event(Continuation * cont, int event, void * edata)
+send_connection_event(Continuation *cont, int event, void *edata)
 {
   MUTEX_LOCK(lock, cont->mutex, this_ethread());
   return cont->handleEvent(event, edata);
 }
 
 Http2ClientSession::Http2ClientSession()
-  : con_id(0), client_vc(NULL), read_buffer(NULL), sm_reader(NULL), write_buffer(NULL), sm_writer(NULL)
+  : con_id(0), client_vc(NULL), read_buffer(NULL), sm_reader(NULL), write_buffer(NULL), sm_writer(NULL), upgrade_context()
 {
 }
 
@@ -70,6 +70,8 @@ Http2ClientSession::destroy()
 
   ink_release_assert(this->client_vc == NULL);
 
+  this->connection_state.destroy();
+
   free_MIOBuffer(this->read_buffer);
   ProxyClientSession::cleanup();
   http2ClientSessionAllocator.free(this);
@@ -78,7 +80,7 @@ Http2ClientSession::destroy()
 void
 Http2ClientSession::start()
 {
-  VIO * read_vio;
+  VIO *read_vio;
 
   MUTEX_LOCK(lock, this->mutex, this_ethread());
 
@@ -86,14 +88,20 @@ Http2ClientSession::start()
   HTTP2_SET_SESSION_HANDLER(&Http2ClientSession::state_read_connection_preface);
 
   read_vio = this->do_io_read(this, INT64_MAX, this->read_buffer);
-  this->do_io_write(this, INT64_MAX, this->sm_writer);
+  write_vio = this->do_io_write(this, INT64_MAX, this->sm_writer);
 
+  // 3.5 HTTP/2 Connection Preface. Upon establishment of a TCP connection and
+  // determination that HTTP/2 will be used by both peers, each endpoint MUST
+  // send a connection preface as a final confirmation ...
+  // this->write_buffer->write(HTTP2_CONNECTION_PREFACE, HTTP2_CONNECTION_PREFACE_LEN);
+
+  this->connection_state.init();
   send_connection_event(&this->connection_state, HTTP2_SESSION_EVENT_INIT, this);
   this->handleEvent(VC_EVENT_READ_READY, read_vio);
 }
 
 void
-Http2ClientSession::new_connection(NetVConnection * new_vc, MIOBuffer * iobuf, IOBufferReader * reader, bool backdoor)
+Http2ClientSession::new_connection(NetVConnection *new_vc, MIOBuffer *iobuf, IOBufferReader *reader, bool backdoor)
 {
   // HTTP/2 for the backdoor connections? Let's not deal woth that yet.
   ink_release_assert(backdoor == false);
@@ -108,6 +116,7 @@ Http2ClientSession::new_connection(NetVConnection * new_vc, MIOBuffer * iobuf, I
   DebugHttp2Ssn("session born, netvc %p", this->client_vc);
 
   this->read_buffer = iobuf ? iobuf : new_MIOBuffer(HTTP2_HEADER_BUFFER_SIZE_INDEX);
+  this->read_buffer->water_mark = connection_state.server_settings.get(HTTP2_SETTINGS_MAX_FRAME_SIZE);
   this->sm_reader = reader ? reader : this->read_buffer->alloc_reader();
 
   this->write_buffer = new_MIOBuffer(HTTP2_HEADER_BUFFER_SIZE_INDEX);
@@ -116,14 +125,51 @@ Http2ClientSession::new_connection(NetVConnection * new_vc, MIOBuffer * iobuf, I
   do_api_callout(TS_HTTP_SSN_START_HOOK);
 }
 
+void
+Http2ClientSession::set_upgrade_context(HTTPHdr *h)
+{
+  upgrade_context.req_header = new HTTPHdr();
+  upgrade_context.req_header->copy(h);
+
+  MIMEField *settings = upgrade_context.req_header->field_find(MIME_FIELD_HTTP2_SETTINGS, MIME_LEN_HTTP2_SETTINGS);
+  int svlen;
+  const char *sv = settings->value_get(&svlen);
+
+  // Maybe size of data decoded by Base64URL is lower than size of encoded data.
+  unsigned char out_buf[svlen];
+  if (sv && svlen > 0) {
+    size_t decoded_len;
+    ats_base64_decode(sv, svlen, out_buf, svlen, &decoded_len);
+    for (size_t nbytes = 0; nbytes < decoded_len; nbytes += HTTP2_SETTINGS_PARAMETER_LEN) {
+      Http2SettingsParameter param;
+      if (!http2_parse_settings_parameter(make_iovec(out_buf + nbytes, HTTP2_SETTINGS_PARAMETER_LEN), param) ||
+          !http2_settings_parameter_is_valid(param)) {
+        // TODO ignore incoming invalid parameters and send suitable SETTINGS frame.
+      }
+      upgrade_context.client_settings.set((Http2SettingsIdentifier)param.id, param.value);
+    }
+  }
+
+  // Such intermediaries SHOULD also remove other connection-
+  // specific header fields, such as Keep-Alive, Proxy-Connection,
+  // Transfer-Encoding and Upgrade, even if they are not nominated by
+  // Connection.
+  upgrade_context.req_header->field_delete(MIME_FIELD_CONNECTION, MIME_LEN_CONNECTION);
+  upgrade_context.req_header->field_delete(MIME_FIELD_KEEP_ALIVE, MIME_LEN_KEEP_ALIVE);
+  upgrade_context.req_header->field_delete(MIME_FIELD_PROXY_CONNECTION, MIME_LEN_PROXY_CONNECTION);
+  upgrade_context.req_header->field_delete(MIME_FIELD_TRANSFER_ENCODING, MIME_LEN_TRANSFER_ENCODING);
+  upgrade_context.req_header->field_delete(MIME_FIELD_UPGRADE, MIME_LEN_UPGRADE);
+  upgrade_context.req_header->field_delete(MIME_FIELD_HTTP2_SETTINGS, MIME_LEN_HTTP2_SETTINGS);
+}
+
 VIO *
-Http2ClientSession::do_io_read(Continuation * c, int64_t nbytes, MIOBuffer * buf)
+Http2ClientSession::do_io_read(Continuation *c, int64_t nbytes, MIOBuffer *buf)
 {
   return this->client_vc->do_io_read(c, nbytes, buf);
 }
 
 VIO *
-Http2ClientSession::do_io_write(Continuation * c, int64_t nbytes, IOBufferReader * buf, bool owner)
+Http2ClientSession::do_io_write(Continuation *c, int64_t nbytes, IOBufferReader *buf, bool owner)
 {
   return this->client_vc->do_io_write(c, nbytes, buf, owner);
 }
@@ -151,13 +197,13 @@ Http2ClientSession::do_io_close(int alerrno)
 }
 
 void
-Http2ClientSession::reenable(VIO * vio)
+Http2ClientSession::reenable(VIO *vio)
 {
   this->client_vc->reenable(vio);
 }
 
 int
-Http2ClientSession::main_event_handler(int event, void * edata)
+Http2ClientSession::main_event_handler(int event, void *edata)
 {
   ink_assert(this->mutex->thread_holding == this_ethread());
 
@@ -167,8 +213,9 @@ Http2ClientSession::main_event_handler(int event, void * edata)
     return (this->*session_handler)(event, edata);
 
   case HTTP2_SESSION_EVENT_XMIT: {
-    Http2Frame * frame = (Http2Frame *)edata;
+    Http2Frame *frame = (Http2Frame *)edata;
     frame->xmit(this->write_buffer);
+    write_reenable();
     return 0;
   }
 
@@ -181,6 +228,17 @@ Http2ClientSession::main_event_handler(int event, void * edata)
 
   case VC_EVENT_WRITE_COMPLETE:
   case VC_EVENT_WRITE_READY:
+    // After sending GOAWAY, close the connection
+    if (this->connection_state.is_state_closed() && write_vio->ntodo() <= 0) {
+      this->do_io_close();
+    }
+    return 0;
+
+  case TS_FETCH_EVENT_EXT_HEAD_DONE:
+  case TS_FETCH_EVENT_EXT_BODY_READY:
+  case TS_FETCH_EVENT_EXT_BODY_DONE:
+    // Process responses from origin server
+    send_connection_event(&this->connection_state, event, edata);
     return 0;
 
   default:
@@ -188,13 +246,12 @@ Http2ClientSession::main_event_handler(int event, void * edata)
     ink_release_assert(0);
     return 0;
   }
-
 }
 
 int
-Http2ClientSession::state_read_connection_preface(int event, void * edata)
+Http2ClientSession::state_read_connection_preface(int event, void *edata)
 {
-  VIO * vio = (VIO *)edata;
+  VIO *vio = (VIO *)edata;
 
   STATE_ENTER(&Http2ClientSession::state_read_connection_preface, event);
   ink_assert(event == VC_EVENT_READ_COMPLETE || event == VC_EVENT_READ_READY);
@@ -234,9 +291,9 @@ Http2ClientSession::state_read_connection_preface(int event, void * edata)
 }
 
 int
-Http2ClientSession::state_start_frame_read(int event, void * edata)
+Http2ClientSession::state_start_frame_read(int event, void *edata)
 {
-  VIO * vio = (VIO *)edata;
+  VIO *vio = (VIO *)edata;
 
   STATE_ENTER(&Http2ClientSession::state_start_frame_read, event);
   ink_assert(event == VC_EVENT_READ_COMPLETE || event == VC_EVENT_READ_READY);
@@ -254,23 +311,41 @@ Http2ClientSession::state_start_frame_read(int event, void * edata)
       return 0;
     }
 
-    DebugHttp2Ssn("frame header length=%u, type=%u, flags=0x%x, streamid=%u",
-        (unsigned)this->current_hdr.length, (unsigned)this->current_hdr.type,
-        (unsigned)this->current_hdr.flags, this->current_hdr.streamid);
+    DebugHttp2Ssn("frame header length=%u, type=%u, flags=0x%x, streamid=%u", (unsigned)this->current_hdr.length,
+                  (unsigned)this->current_hdr.type, (unsigned)this->current_hdr.flags, this->current_hdr.streamid);
 
     this->sm_reader->consume(nbytes);
 
-    if (!http2_frame_header_is_valid(this->current_hdr)) {
+    if (!http2_frame_header_is_valid(this->current_hdr,
+                                     this->connection_state.server_settings.get(HTTP2_SETTINGS_MAX_FRAME_SIZE))) {
       // XXX nuke it with HTTP2_ERROR_PROTOCOL_ERROR!
     }
 
     // If we know up front that the payload is too long, nuke this connection.
-    if (this->current_hdr.length > HTTP2_MAX_FRAME_PAYLOAD) {
-      // XXX nuke it with HTTP2_ERROR_FRAME_SIZE_ERROR!
+    if (this->current_hdr.length > this->connection_state.server_settings.get(HTTP2_SETTINGS_MAX_FRAME_SIZE)) {
+      MUTEX_LOCK(lock, this->connection_state.mutex, this_ethread());
+      if (!this->connection_state.is_state_closed()) {
+        this->connection_state.send_goaway_frame(this->current_hdr.streamid, HTTP2_ERROR_FRAME_SIZE_ERROR);
+      }
+      return 0;
     }
 
-    if (!http2_is_client_streamid(this->current_hdr.streamid)) {
-      // XXX nuke it with HTTP2_ERROR_PROTOCOL_ERROR!
+    // Allow only stream id = 0 or streams started by client.
+    if (this->current_hdr.streamid != 0 && !http2_is_client_streamid(this->current_hdr.streamid)) {
+      MUTEX_LOCK(lock, this->connection_state.mutex, this_ethread());
+      if (!this->connection_state.is_state_closed()) {
+        this->connection_state.send_goaway_frame(this->current_hdr.streamid, HTTP2_ERROR_PROTOCOL_ERROR);
+      }
+      return 0;
+    }
+
+    // CONTINUATIONs MUST follow behind HEADERS which doesn't have END_HEADERS
+    if (this->connection_state.get_continued_id() != 0 && this->current_hdr.type != HTTP2_FRAME_TYPE_CONTINUATION) {
+      MUTEX_LOCK(lock, this->connection_state.mutex, this_ethread());
+      if (!this->connection_state.is_state_closed()) {
+        this->connection_state.send_goaway_frame(this->current_hdr.streamid, HTTP2_ERROR_PROTOCOL_ERROR);
+      }
+      return 0;
     }
 
     HTTP2_SET_SESSION_HANDLER(&Http2ClientSession::state_complete_frame_read);
@@ -284,9 +359,9 @@ Http2ClientSession::state_start_frame_read(int event, void * edata)
 }
 
 int
-Http2ClientSession::state_complete_frame_read(int event, void * edata)
+Http2ClientSession::state_complete_frame_read(int event, void *edata)
 {
-  VIO * vio = (VIO *)edata;
+  VIO *vio = (VIO *)edata;
 
   STATE_ENTER(&Http2ClientSession::state_complete_frame_read, event);
   ink_assert(event == VC_EVENT_READ_COMPLETE || event == VC_EVENT_READ_READY);

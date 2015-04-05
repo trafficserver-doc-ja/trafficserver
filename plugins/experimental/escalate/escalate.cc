@@ -40,20 +40,18 @@ static int EscalateResponse(TSCont, TSEvent, void *);
 //////////////////////////////////////////////////////////////////////////////////////////
 // Hold information about the escalation / retry states for a remap rule.
 //
-struct EscalationState
-{
+struct EscalationState {
   enum RetryType {
     RETRY_URL,
-    RETRY_HOST
+    RETRY_HOST,
   };
 
-  struct RetryInfo
-  {
+  struct RetryInfo {
     RetryType type;
     std::string target;
   };
 
-  typedef std::map<unsigned, RetryInfo*> StatusMapType;
+  typedef std::map<unsigned, RetryInfo> StatusMapType;
 
   EscalationState()
   {
@@ -61,13 +59,7 @@ struct EscalationState
     TSContDataSet(cont, this);
   }
 
-  ~EscalationState()
-  {
-    for (StatusMapType::iterator iter = status_map.begin(); iter != status_map.end(); ++iter) {
-      delete(iter->second);
-    }
-    TSContDestroy(cont);
-  }
+  ~EscalationState() { TSContDestroy(cont); }
 
   TSCont cont;
   StatusMapType status_map;
@@ -78,15 +70,15 @@ struct EscalationState
 // Main continuation for the plugin, examining an origin response for a potential retry.
 //
 static int
-EscalateResponse(TSCont cont, TSEvent event, void* edata)
+EscalateResponse(TSCont cont, TSEvent event, void *edata)
 {
   TSHttpTxn txn = (TSHttpTxn)edata;
-  EscalationState* es = static_cast<EscalationState*>(TSContDataGet(cont));
-  EscalationState::StatusMapType::iterator entry;
+  EscalationState *es = static_cast<EscalationState *>(TSContDataGet(cont));
+  EscalationState::StatusMapType::const_iterator entry;
   TSMBuffer mbuf;
   TSMLoc hdrp, url;
   TSHttpStatus status;
-  char* url_str = NULL;
+  char *url_str = NULL;
   int url_len, tries;
 
   TSAssert(event == TS_EVENT_HTTP_READ_RESPONSE_HDR);
@@ -104,24 +96,24 @@ EscalateResponse(TSCont cont, TSEvent event, void* edata)
 
   // Next, the response status ...
   status = TSHttpHdrStatusGet(mbuf, hdrp);
-  TSHandleMLocRelease(mbuf, TS_NULL_MLOC, hdrp);  // Don't need this any more
+  TSHandleMLocRelease(mbuf, TS_NULL_MLOC, hdrp); // Don't need this any more
 
   // See if we have an escalation retry config for this response code
-  entry  = es->status_map.find((unsigned)status);
+  entry = es->status_map.find((unsigned)status);
   if (entry == es->status_map.end()) {
     goto no_action;
   }
 
   TSDebug(PLUGIN_NAME, "Found an entry for HTTP status %u", (unsigned)status);
-  if (EscalationState::RETRY_URL == entry->second->type) {
-    url_str = TSstrdup(entry->second->target.c_str());
-    url_len = entry->second->target.size();
+  if (EscalationState::RETRY_URL == entry->second.type) {
+    url_str = TSstrdup(entry->second.target.c_str());
+    url_len = entry->second.target.size();
     TSDebug(PLUGIN_NAME, "Setting new URL to %.*s", url_len, url_str);
-  } else if (EscalationState::RETRY_HOST == entry->second->type) {
+  } else if (EscalationState::RETRY_HOST == entry->second.type) {
     if (TS_SUCCESS == TSHttpTxnClientReqGet(txn, &mbuf, &hdrp)) {
       if (TS_SUCCESS == TSHttpHdrUrlGet(mbuf, hdrp, &url)) {
         // Update the request URL with the new Host to try.
-        TSUrlHostSet(mbuf, url, entry->second->target.c_str(), entry->second->target.size());
+        TSUrlHostSet(mbuf, url, entry->second.target.c_str(), entry->second.target.size());
         url_str = TSUrlStringGet(mbuf, url, &url_len);
         TSDebug(PLUGIN_NAME, "Setting new Host: to %.*s", url_len, url_str);
       }
@@ -135,24 +127,24 @@ EscalateResponse(TSCont cont, TSEvent event, void* edata)
     TSHttpTxnRedirectUrlSet(txn, url_str, url_len); // Transfers ownership
   }
 
-  // Set the transaction free ...
- no_action:
+// Set the transaction free ...
+no_action:
   TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
   return TS_EVENT_NONE;
 }
 
 
 TSReturnCode
-TSRemapInit(TSRemapInterface* /* api */, char* /* errbuf */, int /* bufsz */)
+TSRemapInit(TSRemapInterface * /* api */, char * /* errbuf */, int /* bufsz */)
 {
   return TS_SUCCESS;
 }
 
 
 TSReturnCode
-TSRemapNewInstance(int argc, char* argv[], void** instance, char* errbuf, int errbuf_size)
+TSRemapNewInstance(int argc, char *argv[], void **instance, char *errbuf, int errbuf_size)
 {
-  EscalationState* es = new EscalationState();
+  EscalationState *es = new EscalationState();
 
   // The first two arguments are the "from" and "to" URL string. We can just
   // skip those, since we only ever remap on the error path.
@@ -170,14 +162,14 @@ TSRemapNewInstance(int argc, char* argv[], void** instance, char* errbuf, int er
     ++sep; // Skip over the ':' (which is now \0)
 
     // OK, we have a valid status/URL pair.
-    EscalationState::RetryInfo* info = new EscalationState::RetryInfo();
+    EscalationState::RetryInfo info;
 
-    info->target = sep;
-    if (std::string::npos != info->target.find('/')) {
-      info->type = EscalationState::RETRY_URL;
+    info.target = sep;
+    if (std::string::npos != info.target.find('/')) {
+      info.type = EscalationState::RETRY_URL;
       TSDebug(PLUGIN_NAME, "Creating Redirect rule with URL = %s", sep);
     } else {
-      info->type = EscalationState::RETRY_HOST;
+      info.type = EscalationState::RETRY_HOST;
       TSDebug(PLUGIN_NAME, "Creating Redirect rule with Host = %s", sep);
     }
 
@@ -186,7 +178,6 @@ TSRemapNewInstance(int argc, char* argv[], void** instance, char* errbuf, int er
 
       if (status < 100 || status > 599) {
         snprintf(errbuf, errbuf_size, "invalid status code: %.*s", (int)std::distance(argv[i], sep), argv[i]);
-        delete info;
         goto fail;
       }
 
@@ -205,16 +196,16 @@ fail:
 
 
 void
-TSRemapDeleteInstance(void* instance)
+TSRemapDeleteInstance(void *instance)
 {
-  delete static_cast<EscalationState*>(instance);
+  delete static_cast<EscalationState *>(instance);
 }
 
 
 TSRemapStatus
-TSRemapDoRemap(void* instance, TSHttpTxn txn, TSRemapRequestInfo* /* rri */)
+TSRemapDoRemap(void *instance, TSHttpTxn txn, TSRemapRequestInfo * /* rri */)
 {
-  EscalationState* es = static_cast<EscalationState*>(instance);
+  EscalationState *es = static_cast<EscalationState *>(instance);
 
   TSHttpTxnHookAdd(txn, TS_HTTP_READ_RESPONSE_HDR_HOOK, es->cont);
   return TSREMAP_NO_REMAP;

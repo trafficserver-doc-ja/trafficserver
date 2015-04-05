@@ -10,9 +10,9 @@ Header Rewrite Plugin
   to you under the Apache License, Version 2.0 (the
   "License"); you may not use this file except in compliance
   with the License.  You may obtain a copy of the License at
- 
+
    http://www.apache.org/licenses/LICENSE-2.0
- 
+
   Unless required by applicable law or agreed to in writing,
   software distributed under the License is distributed on an
   "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -41,6 +41,11 @@ In the second example, hooks which are not to be executed during the remap
 phase (the default) causes a transaction hook to be instantiated and used
 at a later time. This allows you to setup e.g. a rule that gets executed
 during the origin response header parsing, using READ_RESPONSE_HDR_HOOK.
+Note that inorder to setup the plugin with rules that are not to be executed
+during the remap phase (e.g. SEND_REQUEST_HDR_HOOK, READ_RESPONSE_HDR_HOOK etc),
+global hooks must be setup via the below entry in plugin.config ::
+
+  header_rewrite.so
 
 Configuration filenames without an absolute paths are searched for in the
 default configuration directory. This is typically where your main
@@ -71,6 +76,8 @@ Where qual is one of the support URL qualifiers::
   PORT
   PATH
   QUERY
+  SCHEME
+  URL
 
 For example (as a remap rule)::
 
@@ -119,6 +126,8 @@ only be evaluated if the condition(s) are met::
   cond %{QUERY} operand                         [condition_flags]
   cond %{INTERNAL-TRANSACTION}                  [condition_flags]
   cond %{CLIENT-IP}                             [condition_flags]
+  cond %{INCOMING-PORT}                         [condition_flags]
+  cond %{METHOD}                                [condition_flags]
 
 The difference between HEADER and CLIENT-HEADER is that HEADER adapts to the
 hook it's running in, whereas CLIENT-HEADER always applies to the client

@@ -26,6 +26,11 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/mgmt \
   -I$(top_srcdir)/mgmt/utils
 
+AM_LDFLAGS = \
+  @EXTRA_CXX_LDFLAGS@ \
+  @LIBTOOL_LINK_FLAGS@ \
+  @OPENSSL_LDFLAGS@
+
 traffic_layout_SOURCES = \
   traffic_layout.cc
 
@@ -35,4 +40,4 @@ traffic_layout_LDADD = \
   $(top_builddir)/iocore/eventsystem/libinkevent.a \
   $(top_builddir)/proxy/shared/libUglyLogStubs.a \
   $(top_builddir)/lib/ts/libtsutil.la \
-  @LIBTCL@ @HWLOC_LIBS@
+  @LIBTCL@ @HWLOC_LIBS@ @LIBPTHREAD@

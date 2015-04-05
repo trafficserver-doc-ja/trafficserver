@@ -64,22 +64,24 @@ TSMgmtError reconnect_loop(int num_attempts);
 void *socket_test_thread(void *arg);
 void *event_poll_thread_main(void *arg);
 
-struct mgmtapi_sender : public mgmt_message_sender
-{
+struct mgmtapi_sender : public mgmt_message_sender {
   explicit mgmtapi_sender(int _fd) : fd(_fd) {}
-  virtual TSMgmtError send(void * msg, size_t msglen) const;
+  virtual TSMgmtError send(void *msg, size_t msglen) const;
 
   int fd;
 };
 
 #define MGMTAPI_SEND_MESSAGE(fd, optype, ...) send_mgmt_request(mgmtapi_sender(fd), (optype), __VA_ARGS__)
 
+#define MGMTAPI_MGMT_SOCKET_NAME "mgmtapi.sock"
+#define MGMTAPI_EVENT_SOCKET_NAME "eventapi.sock"
+
 /*****************************************************************************
  * Marshalling (create requests)
  *****************************************************************************/
 
-TSMgmtError send_register_all_callbacks(int fd, CallbackTable * cb_table);
-TSMgmtError send_unregister_all_callbacks(int fd, CallbackTable * cb_table);
+TSMgmtError send_register_all_callbacks(int fd, CallbackTable *cb_table);
+TSMgmtError send_unregister_all_callbacks(int fd, CallbackTable *cb_table);
 
 /*****************************************************************************
  * Un-marshalling (parse responses)

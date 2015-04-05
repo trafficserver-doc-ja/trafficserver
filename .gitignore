@@ -2,7 +2,7 @@
 *.a
 *.so
 *.pyc
-*.in
+Makefile.in
 *~
 *.tar.gz
 *.lo
@@ -48,13 +48,16 @@ pm_to_blib
 cmd/traffic_line/traffic_line
 cmd/traffic_shell/traffic_shell
 cmd/traffic_cop/traffic_cop
+cmd/traffic_ctl/traffic_ctl
 cmd/traffic_crashlog/traffic_crashlog
 cmd/traffic_top/traffic_top
 cmd/traffic_manager/traffic_manager
 cmd/traffic_layout/traffic_layout
 cmd/traffic_via/traffic_via
+cmd/traffic_wccp/traffic_wccp
 
 lib/ts/ink_autoconf.h
+lib/ts/ink_autoconf.h.in
 lib/ts/ink_config.h
 lib/ts/apidefs.h
 lib/ts/stamp-h1
@@ -81,6 +84,7 @@ proxy/config/records.config.default
 proxy/config/storage.config.default
 plugins/experimental/esi/*_test
 plugins/experimental/spdy/zstream_test
+plugins/experimental/sslheaders/test_sslheaders
 
 mgmt/api/traffic_api_cli_remote
 mgmt/tools/traffic_mcast_snoop
@@ -128,9 +132,11 @@ CTAGS
 
 lib/tsconfig/TsConfigGrammar.hpp
 lib/tsconfig/test-tsconfig
+lib/tsconfig/TsConfigSyntax.c
 
 tools/http_load/http_load
 tools/jtest/jtest
+tools/trafficserver.pc
 
 BUILDS
 DEBUG

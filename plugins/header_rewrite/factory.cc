@@ -28,10 +28,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 // "Factory" functions, processing the parsed lines
 //
-Operator*
-operator_factory(const std::string& op)
+Operator *
+operator_factory(const std::string &op)
 {
-  Operator* o = NULL;
+  Operator *o = NULL;
 
   if (op == "rm-header") {
     o = new OperatorRMHeader();
@@ -68,10 +68,10 @@ operator_factory(const std::string& op)
 }
 
 
-Condition*
-condition_factory(const std::string& cond)
+Condition *
+condition_factory(const std::string &cond)
 {
-  Condition* c = NULL;
+  Condition *c = NULL;
   std::string c_name, c_qual;
   std::string::size_type pos = cond.find_first_of(':');
 
@@ -115,6 +115,8 @@ condition_factory(const std::string& cond)
     c = new ConditionClientIp();
   } else if (c_name == "INCOMING-PORT") {
     c = new ConditionIncomingPort();
+  } else if (c_name == "METHOD") {
+    c = new ConditionMethod();
   } else {
     TSError("%s: unknown condition: %s", PLUGIN_NAME, c_name.c_str());
     return NULL;

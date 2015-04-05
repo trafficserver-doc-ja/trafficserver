@@ -19,10 +19,14 @@
 
 bin_SCRIPTS = tsxs tspush
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = trafficserver.pc
+
 AM_LDFLAGS = @EXTRA_CXX_LDFLAGS@ @LIBTOOL_LINK_FLAGS@
 AM_CPPFLAGS = $(iocore_include_dirs) \
   -I$(top_srcdir)/lib -I$(top_builddir)/lib \
-  -I$(top_srcdir)/lib/ts -I$(top_builddir)/lib/ts
+  -I$(top_srcdir)/lib/ts -I$(top_builddir)/lib/ts \
+  -I$(top_srcdir)/lib/wccp
 
 if BUILD_TEST_TOOLS
 bin_PROGRAMS = jtest/jtest
@@ -49,3 +53,4 @@ http_load_http_load_SOURCES =  \
   http_load/timers.h
 
 endif
+

@@ -28,8 +28,10 @@ mkdir -p BUILDS && cd BUILDS
     --enable-experimental-plugins \
     --enable-example-plugins \
     --enable-test-tools \
+    --enable-reclaimable-freelist \
+    --enable-wccp \
     CORES=2
 
 ${ATS_MAKE} -j5 V=1
-${ATS_MAKE} check VERBOSE=Y
+#${ATS_MAKE} check VERBOSE=Y
 ${ATS_MAKE} clean

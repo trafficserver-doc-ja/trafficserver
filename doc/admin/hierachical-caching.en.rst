@@ -74,6 +74,41 @@ content from the origin server (or from another cache, depending on the parentâ€
 configuration). The parent caches the content and then sends a copy to Traffic
 Server (its child), where it is cached and served to the client.
 
+Interaction with Remap.config
+-----------------------------
+
+If remap rules are required (:ts:cv:`proxy.config.reverse_proxy.enabled`), 
+when a request comes in to a child node, its :file:`remap.config` is evaluated before 
+parent selection. This means that the client request is translated according to the 
+remap rule, and therefore, any parent selection should be made against the remapped 
+host name. This is true regardless of pristine host headers 
+(:ts:cv:`proxy.config.url_remap.pristine_host_hdr`) being enabled or not. The parent node
+will receive the translated request (and thus needs to be configured to accept it).
+
+
+Example
+~~~~~~~
+The client makes a request to Traffic Server for http://example.com. The origin server 
+for the request is http://origin.example.com; the parent node is ``parent1.example.com``, 
+and the child node is configured as a reverse proxy.
+
+If the child's :file:`remap.config` contains
+
+``map http://example.com http://origin.example.com``
+
+with the child's :file:`parent.config` containing
+
+``dest_domain=origin.example.com method=get parent="parent1.example.com:80`` )
+
+and parent cache (parent1.example.com) would need to have a :file:`remap.config`
+line similar to
+
+``map http://origin.example.com http://origin.example.com``
+
+With this example, if parent1.example.com is down, the child node would automatically 
+directly contact the ``origin.example.com`` on a cache miss.
+
+
 Parent Failover
 ---------------
 
@@ -85,7 +120,7 @@ When you configure your Traffic Server to use more than one parent
 cache, Traffic Server detects when a parent is not available and sends
 missed requests to another parent cache. If you specify more than two
 parent caches, then the order in which the parent caches are queried
-depends upon the parent proxy rules configured in the file:`parent.config`
+depends upon the parent proxy rules configured in the :file:`parent.config`
 configuration file. By default, the parent caches are queried in the
 order they are listed in the configuration file.
 
@@ -99,8 +134,9 @@ the configuration adjustments detailed below.
 
 .. note::
 
-    You need to configure the child cache only. No additional configuration is
-    needed for the nodes acting as Traffic Server parent caches.
+    You need to configure the child cache only. Assuming the parent nodes are
+    configured to serve the child's origin server, no additional configuration is
+    needed for the nodes acting as Traffic Server parent caches. 
 
 #. Enable the parent caching option by adjusting
    :ts:cv:`proxy.config.http.parent_proxy_routing_enable` in
@@ -134,50 +170,50 @@ address.::
 
 Run the command :option:`traffic_line -x` to apply the configuration changes.
 
-.. XXX As of yet, this is unsupported.
+.. _admin-icp-peering:
 
-.. # ICP Peering # {#ICPPeering}
+ICP Peering
+===========
 
-.. The Internet Cache Protocol (ICP) is used by proxy caches to exchange information
-   about their content. ICP query messages ask other caches if they are storing 
-   a particular URL; ICP response messages reply with a hit or miss answer. A
-   cache exchanges ICP messages only with specific **ICP peers**, which are neighboring
-   caches that can receive ICP messages. An ICP peer can be a **sibling cache
-   **(which is at the same level in the hierarchy) or a **parent cache** (which 
-   is one level up in the hierarchy).
+The Internet Cache Protocol (ICP) is used by proxy caches to exchange information
+about their content. ICP query messages ask other caches if they are storing 
+a particular URL; ICP response messages reply with a hit or miss answer. A
+cache exchanges ICP messages only with specific ICP peers, which are neighboring
+caches that can receive ICP messages. An ICP peer can be a sibling cache
+(which is at the same level in the hierarchy) or a parent cache (which 
+is one level up in the hierarchy).
 
-.. If Traffic Server has ICP caching enabled, then it sends ICP queries to its
-   ICP peers when the HTTP request is a cache miss. If there are no hits but parents
-   exist, then a parent is selected using a round-robin policy. If no ICP parents
-   exist, then Traffic Server forwards the request to its HTTP parents. If there
-   are no HTTP parent caches established, then Traffic Server forwards the request
-   to the origin server.
+If Traffic Server has ICP caching enabled, then it sends ICP queries to its
+ICP peers when the HTTP request is a cache miss. If there are no hits but parents
+exist, then a parent is selected using a round-robin policy. If no ICP parents
+exist, then Traffic Server forwards the request to its HTTP parents. If there
+are no HTTP parent caches established, then Traffic Server forwards the request
+to the origin server.
 
-.. If Traffic Server receives a hit message from an ICP peer, then Traffic Server
-   sends the HTTP request to that peer. However, it might turn out to be a cache
-   miss because the original HTTP request contains header information that is
-   not communicated by the ICP query. For example, the hit might not be the requested
-   alternate. If an ICP hit turns out to be a miss, then Traffic Server forwards
-   the request to either its HTTP parent caches or to the origin server.
+If Traffic Server receives a hit message from an ICP peer, then Traffic Server
+sends the HTTP request to that peer. However, it might turn out to be a cache
+miss because the original HTTP request contains header information that is
+not communicated by the ICP query. For example, the hit might not be the requested
+alternate. If an ICP hit turns out to be a miss, then Traffic Server forwards
+the request to either its HTTP parent caches or to the origin server.
 
-.. To configure a Traffic Server node to be part of an ICP cache hierarchy, you 
-   must perform the following tasks:
+To configure a Traffic Server node to be part of an ICP cache hierarchy, you 
+must perform the following tasks:
 
-.. * Determine if the Traffic Server can receive ICP messages only, or if it can send _and_ receive ICP messages.
-   * Determine if Traffic Server can send messages directly to each ICP peer or send a single message on a specified multicast channel.
-   * Specify the port used for ICP messages.
-   * Set the ICP query timeout.
-   * Identify the ICP peers (siblings and parents) with which Traffic Server can communicate.
+* Determine if the Traffic Server can receive ICP messages only, or if it can send *and* receive ICP messages.
+* Determine if Traffic Server can send messages directly to each ICP peer or send a single message on a specified multicast channel.
+* Specify the port used for ICP messages.
+* Set the ICP query timeout.
+* Identify the ICP peers (siblings and parents) with which Traffic Server can communicate.
 
-.. To configure Traffic Server to use an ICP cache hierarchy edit the following variables in :file:`records.config` file:
+To configure Traffic Server to use an ICP cache hierarchy edit the following variables in :file:`records.config` file:
 
-.. * :ts:cv:`proxy.config.icp.enabled`
-   * :ts:cv:`proxy.config.icp.icp_port`
-   * :ts:cv:`proxy.config.icp.multicast_enabled`
-   * :ts:cv:`proxy.config.icp.query_timeout`
+* :ts:cv:`proxy.config.icp.enabled`
+* :ts:cv:`proxy.config.icp.icp_port`
+* :ts:cv:`proxy.config.icp.multicast_enabled`
+* :ts:cv:`proxy.config.icp.query_timeout`
 
-.. Edit :file:`icp.config` file located in the Traffic Server `config` directory:
-   For each ICP peer you want to identify, enter a separate rule in the :file:`icp.config` file.
+Edit :file:`icp.config` file located in the Traffic Server `config` directory:
+For each ICP peer you want to identify, enter a separate rule in the :file:`icp.config` file.
 
-.. Run the command :option:`traffic_line -x` to apply the configuration changes.
-
+Run the command :option:`traffic_line -x` to apply the configuration changes.

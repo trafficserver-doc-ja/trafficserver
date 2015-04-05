@@ -31,9 +31,9 @@ ink_max_out_rlimit(int which, bool max_it, bool unlim_it)
   struct rlimit rl;
 
 #if defined(linux)
-#  define MAGIC_CAST(x) (enum __rlimit_resource)(x)
+#define MAGIC_CAST(x) (enum __rlimit_resource)(x)
 #else
-#  define MAGIC_CAST(x) x
+#define MAGIC_CAST(x) x
 #endif
 
   if (max_it) {
@@ -51,7 +51,7 @@ ink_max_out_rlimit(int which, bool max_it, bool unlim_it)
     }
   }
 
-#if !defined(darwin)
+#if !(defined(darwin) || defined(freebsd))
   if (unlim_it) {
     ink_release_assert(getrlimit(MAGIC_CAST(which), &rl) >= 0);
     if (rl.rlim_cur != (rlim_t)RLIM_INFINITY) {
@@ -71,7 +71,7 @@ ink_get_max_files()
   struct rlimit lim;
 
   // Linux-only ...
-  if ((fd = fopen("/proc/sys/fs/file-max","r"))) {
+  if ((fd = fopen("/proc/sys/fs/file-max", "r"))) {
     uint64_t fmax;
     if (fscanf(fd, "%" PRIu64 "", &fmax) == 1) {
       fclose(fd);

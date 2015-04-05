@@ -26,28 +26,18 @@
 
 #include "List.h"
 
-// need to keep syncronized with TSSDKVersion
-//   in ts/ts.h.in
-typedef enum
-{
-  PLUGIN_SDK_VERSION_UNKNOWN = -1,
-  PLUGIN_SDK_VERSION_2_0,
-  PLUGIN_SDK_VERSION_3_0,
-  PLUGIN_SDK_VERSION_4_0
-} PluginSDKVersion;
-
-struct PluginRegInfo
-{
+struct PluginRegInfo {
   PluginRegInfo();
   ~PluginRegInfo();
 
   bool plugin_registered;
   char *plugin_path;
 
-  PluginSDKVersion sdk_version;
   char *plugin_name;
   char *vendor_name;
   char *support_email;
+
+  void *dlh;
 
   LINK(PluginRegInfo, link);
 };
@@ -56,7 +46,7 @@ struct PluginRegInfo
 extern DLL<PluginRegInfo> plugin_reg_list;
 extern PluginRegInfo *plugin_reg_current;
 
-void plugin_init(void);
+bool plugin_init(bool validateOnly = false);
 
 /** Abstract interface class for plugin based continuations.
 
@@ -74,7 +64,7 @@ void plugin_init(void);
  */
 class PluginIdentity
 {
- public:
+public:
   /// Make sure destructor is virtual.
   virtual ~PluginIdentity() {}
 
@@ -82,12 +72,20 @@ class PluginIdentity
       The returned string must have a lifetime at least as long as the plugin.
       @return A string identifying the plugin or @c NULL.
   */
-  virtual char const* getPluginTag() const { return NULL; }
+  virtual char const *
+  getPluginTag() const
+  {
+    return NULL;
+  }
   /** Get the plugin instance ID.
       A plugin can create multiple subsidiary instances. This is used as the
       identifier for those to distinguish the instances.
   */
-  virtual int64_t getPluginId() const { return 0; }
+  virtual int64_t
+  getPluginId() const
+  {
+    return 0;
+  }
 };
 
 #endif /* __PLUGIN_H__ */

@@ -27,6 +27,11 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/mgmt/utils \
   -I$(top_srcdir)/mgmt/api/include
 
+AM_LDFLAGS = \
+  @EXTRA_CXX_LDFLAGS@ \
+  @LIBTOOL_LINK_FLAGS@ \
+  @OPENSSL_LDFLAGS@
+
 traffic_crashlog_SOURCES = \
   procinfo.cc \
   traffic_crashlog.cc \
@@ -39,4 +44,4 @@ traffic_crashlog_LDADD = \
   $(top_builddir)/proxy/shared/libUglyLogStubs.a \
   $(top_builddir)/mgmt/api/libtsmgmt.la \
   $(top_builddir)/lib/ts/libtsutil.la \
-  @LIBTCL@ @HWLOC_LIBS@
+  @LIBTCL@ @HWLOC_LIBS@ @LIBPTHREAD@

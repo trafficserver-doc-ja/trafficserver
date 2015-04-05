@@ -28,8 +28,8 @@
 
  */
 
-#ifndef __TS_TYPES_H__
-#define __TS_TYPES_H__
+#ifndef __TS_APIDEFS_H__
+#define __TS_APIDEFS_H__
 
 /*
  * ATS Plugin just needs to include <ts/ts.h>,
@@ -83,10 +83,14 @@ extern "C"
 #define TS_HTTP_VERSION(a,b)  ((((a) & 0xFFFF) << 16) | ((b) & 0xFFFF))
 #define TS_HTTP_MINOR(v)      ((v) & 0xFFFF)
 #define TS_HTTP_MAJOR(v)      (((v) >> 16) & 0xFFFF)
+
+#ifndef TS_RES_MEM_PATH
 #define __TS_RES_PATH(x)   #x
 #define _TS_RES_PATH(x)    __TS_RES_PATH (x)
 #define TS_RES_PATH(x)     x __FILE__ ":" _TS_RES_PATH (__LINE__)
 #define TS_RES_MEM_PATH    TS_RES_PATH ("memory/")
+#endif
+
 #define TS_MAX_USER_NAME_LEN 256
 
 #ifndef TS_DEPRECATED
@@ -287,7 +291,8 @@ extern "C"
     TS_SSL_FIRST_HOOK,
     TS_VCONN_PRE_ACCEPT_HOOK = TS_SSL_FIRST_HOOK,
     TS_SSL_SNI_HOOK,
-    TS_SSL_LAST_HOOK = TS_SSL_SNI_HOOK,
+    TS_SSL_CERT_HOOK = TS_SSL_SNI_HOOK,
+    TS_SSL_LAST_HOOK = TS_SSL_CERT_HOOK,
     TS_HTTP_LAST_HOOK
   } TSHttpHookID;
   #define TS_HTTP_READ_REQUEST_PRE_REMAP_HOOK TS_HTTP_PRE_REMAP_HOOK  /* backwards compat */
@@ -378,6 +383,7 @@ extern "C"
     TS_EVENT_VCONN_WRITE_COMPLETE = 103,
     TS_EVENT_VCONN_EOS = 104,
     TS_EVENT_VCONN_INACTIVITY_TIMEOUT = 105,
+    TS_EVENT_VCONN_ACTIVE_TIMEOUT = 106,
 
     TS_EVENT_NET_CONNECT = 200,
     TS_EVENT_NET_CONNECT_FAILED = 201,
@@ -530,7 +536,13 @@ extern "C"
     TS_IOBUFFER_SIZE_INDEX_4K = 5,
     TS_IOBUFFER_SIZE_INDEX_8K = 6,
     TS_IOBUFFER_SIZE_INDEX_16K = 7,
-    TS_IOBUFFER_SIZE_INDEX_32K = 8
+    TS_IOBUFFER_SIZE_INDEX_32K = 8,
+    TS_IOBUFFER_SIZE_INDEX_64K = 9,
+    TS_IOBUFFER_SIZE_INDEX_128K = 10,
+    TS_IOBUFFER_SIZE_INDEX_256K = 11,
+    TS_IOBUFFER_SIZE_INDEX_512K = 12,
+    TS_IOBUFFER_SIZE_INDEX_1M = 13,
+    TS_IOBUFFER_SIZE_INDEX_2M = 14
   } TSIOBufferSizeIndex;
 
   /**
@@ -1146,6 +1158,7 @@ extern "C"
   extern tsapi const char * const TS_NPN_PROTOCOL_HTTP_0_9;
   extern tsapi const char * const TS_NPN_PROTOCOL_HTTP_1_0;
   extern tsapi const char * const TS_NPN_PROTOCOL_HTTP_1_1;
+  extern tsapi const char * const TS_NPN_PROTOCOL_HTTP_2_0_14;
   extern tsapi const char * const TS_NPN_PROTOCOL_HTTP_2_0;
   extern tsapi const char * const TS_NPN_PROTOCOL_SPDY_1;
   extern tsapi const char * const TS_NPN_PROTOCOL_SPDY_2;
@@ -1179,4 +1192,4 @@ extern "C"
 }
 #endif /* __cplusplus */
 
-#endif /* __TS_TYPES_H__ */
+#endif /* __TS_APIDEFS_H__ */

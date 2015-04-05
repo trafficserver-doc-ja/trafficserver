@@ -445,7 +445,7 @@ the same for both days, then you can calculate a rough metric that compares
 the two formats.
 
 For standard log formats, select Binary or ASCII (refer to
-`Setting Standard Log File Format Options`_). For the custom log
+`Using Standard Formats`_). For the custom log
 format, specify ASCII or Binary mode in the :ref:`LogObject`
 (refer to :ref:`using-custom-log-formats`). In addition
 to the ASCII and binary options, you can also write custom log entries
@@ -614,6 +614,9 @@ the Squid format, then all ICP transactions are recorded in the
 ``squid-icp.log`` file. When you disable ICP log splitting, Traffic Server
 records all ICP transactions in the same log file as HTTP transactions.
 
+
+.. _httphostlogsplitting:
+
 HTTP Host Log Splitting
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -740,16 +743,16 @@ Orphan log files require manual collation.
 To configure Traffic Server to collate event log files, you must perform
 the following tasks:
 
--  Either `Configure Traffic Server Node to Be a Collation
-   Server <Configuring Traffic Server to Be a Collation Server>`_ or install
-   and configure a `Standalone Collator <Using a Standalone Collator>`_.
+-  Either :ref:`admin-configuring-traffic-server-to-be-a-collation-server` or install
+   and configure a :ref:`admin-using-a-standalone-collator:`.
 
--  `Configure Traffic Server Nodes to Be a Collation
-   Clients <Configuring Traffic Server to Be a Collation Server>`_.
+-  :ref:`admin-configuring-traffic-server-to-be-a-collation-server`
 
 -  Add an attribute to the :ref:`LogObject` specification in
    :file:`logs_xml.config` if you are using custom log file formats. Refer to
    `Collating Custom Event Log Files`_.
+
+.. _admin-configuring-traffic-server-to-be-a-collation-server:
 
 Configuring Traffic Server to Be a Collation Server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -781,6 +784,8 @@ following configuration adjustments in :file:`records.config`:
     If you modify the ``collation_port`` or ``secret`` after
     connections between the collation server and collation clients have been
     established, then you must restart Traffic Server.
+
+.. _admin-using-a-standalone-collator:
 
 Using a Standalone Collator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -908,7 +913,7 @@ following information:
    Traffic Server installation.
 
 You can retrieve the statistics via the Traffic Line command-line
-interface. Refer to `Monitoring Traffic <../monitoring-traffic>`_.
+interface. Refer to :doc:`Monitoring Traffic <monitoring-traffic.en>`.
 
 Viewing Log Files
 =================
@@ -936,8 +941,8 @@ and Netscape Extended-2.
 
 .. _log-formats-squid-format:
 
-Squid Format
-------------
+Squid Log File Format
+---------------------
 
 The following figure shows a sample log entry in a ``squid.log`` file.
 
