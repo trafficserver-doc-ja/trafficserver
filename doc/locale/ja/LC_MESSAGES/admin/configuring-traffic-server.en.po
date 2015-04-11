@@ -89,16 +89,6 @@ msgstr ""
 "*var* の部分は設定項目に対応する変数、*value* は設定したい値です。変数の一覧"
 "については :ref:`configuration-variables` を見てください。"
 
-#: ../../admin/configuring-traffic-server.en.rst:61
-msgid ""
-"As an alternative to using Traffic Line or Traffic Shell, you can change "
-"Traffic Server configuration options by manually editing specific variables "
-"in :file:`records.config`."
-msgstr ""
-"Traffic Line や Traffic Shell を使用する代わりに、:file:`records.config` "
-"ファイルの具体的な変数を手動で編集することで Traffic Server の設定項目を変更"
-"することができます。"
-
 #: ../../admin/configuring-traffic-server.en.rst:65
 msgid ""
 "Traffic Server must reread the configuration files for any changes to take "
@@ -124,3 +114,19 @@ msgstr ""
 "ために使用されるその他の複数の設定ファイルを提供します。:ref:`configuration-"
 "file-reference` で説明されているように、すべての設定ファイルを手動で編集する"
 "ことができます。"
+
+#: ../../admin/configuring-traffic-server.en.rst:61
+msgid ""
+"As an alternative to using Traffic Line, you can change Traffic Server "
+"configuration options by manually editing specific variables in :file:"
+"`records.config`."
+msgstr ""
+
+#~ msgid ""
+#~ "As an alternative to using Traffic Line or Traffic Shell, you can change "
+#~ "Traffic Server configuration options by manually editing specific "
+#~ "variables in :file:`records.config`."
+#~ msgstr ""
+#~ "Traffic Line や Traffic Shell を使用する代わりに、:file:`records.config` "
+#~ "ファイルの具体的な変数を手動で編集することで Traffic Server の設定項目を"
+#~ "変更することができます。"
