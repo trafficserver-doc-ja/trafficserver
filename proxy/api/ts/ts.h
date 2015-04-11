@@ -1358,6 +1358,7 @@ tsapi struct sockaddr const *TSHttpTxnNextHopAddrGet(TSHttpTxn txnp);
 tsapi TSReturnCode TSHttpTxnClientFdGet(TSHttpTxn txnp, int *fdp);
 tsapi TSReturnCode TSHttpTxnOutgoingAddrSet(TSHttpTxn txnp, struct sockaddr const *addr);
 tsapi TSReturnCode TSHttpTxnOutgoingTransparencySet(TSHttpTxn txnp, int flag);
+tsapi TSReturnCode TSHttpTxnServerFdGet(TSHttpTxn txnp, int* fdp);
 
 /* TS-1008: the above TXN calls for the Client conn should work with SSN */
 tsapi struct sockaddr const *TSHttpSsnClientAddrGet(TSHttpSsn ssnp);
@@ -1656,8 +1657,13 @@ tsapi void TSFetchUrl(const char *request, int request_len, struct sockaddr cons
 tsapi void TSFetchPages(TSFetchUrlParams_t *params);
 
 /* Check if HTTP State machine is internal or not */
-tsapi TSReturnCode TSHttpIsInternalRequest(TSHttpTxn txnp);
-tsapi TSReturnCode TSHttpIsInternalSession(TSHttpSsn ssnp);
+/** @deprecated to be renamed as TSHttpTxnIsInternal **/
+tsapi TS_DEPRECATED TSReturnCode TSHttpIsInternalRequest(TSHttpTxn txnp);
+/** @deprecated to be renamed as TSHttpSsnIsInternal **/
+tsapi TS_DEPRECATED TSReturnCode TSHttpIsInternalSession(TSHttpSsn ssnp);
+
+tsapi TSReturnCode TSHttpTxnIsInternal(TSHttpTxn txnp);
+tsapi TSReturnCode TSHttpSsnIsInternal(TSHttpSsn ssnp);
 
 /* --------------------------------------------------------------------------
    HTTP alternate selection */

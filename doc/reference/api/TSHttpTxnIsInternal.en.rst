@@ -5,9 +5,9 @@
    to you under the Apache License, Version 2.0 (the
    "License"); you may not use this file except in compliance
    with the License.  You may obtain a copy of the License at
-   
+
        http://www.apache.org/licenses/LICENSE-2.0
-   
+
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,7 @@
 .. default-domain:: c
 
 =======================
-TSHttpIsInternalRequest
+TSHttpTxnIsInternal
 =======================
 
 Test whether a request is internally-generated.
@@ -26,21 +26,17 @@ Synopsis
 ========
 `#include <ts/ts.h>`
 
-.. function:: TSReturnCode TSHttpIsInternalRequest(TSHttpTxn txnp)
-.. function:: TSReturnCode TSHttpIsInternalSession(TSHttpSsn ssnp)
+.. function:: TSReturnCode TSHttpTxnIsInternal(TSHttpTxn txnp)
+.. function:: TSReturnCode TSHttpSsnIsInternal(TSHttpSsn ssnp)
 
 Description
 ===========
 
-:func:`TSHttpIsInternalRequest` tests whether a HTTP transaction
+:func:`TSHttpTxnIsInternal` tests whether a HTTP transaction
 was originated within Traffic Server.
 
-.. admonition:: Deprecated
-
-:func:`TSHttpIsInternalSession` tests whether a HTTP session
+:func:`TSHttpSsnIsInternal` tests whether a HTTP session
 was originated within Traffic Server.
-
-.. admonition:: Deprecated
 
 Return Values
 =============
@@ -51,7 +47,7 @@ object was internal (:data:`TS_SUCCESS`) or not (:data:`TS_ERROR`).
 Examples
 ========
 
-The ESI plugin uses :func:`TSHttpIsInternalRequest` to ignore requests that is
+The ESI plugin uses :func:`TSHttpTxnIsInternal` to ignore requests that is
 had generated while fetching portions of an ESI document:
 
 .. literalinclude:: ../../../plugins/experimental/esi/esi.cc

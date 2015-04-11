@@ -2492,6 +2492,14 @@ HTTP/2 Configuration
 ====================
 
 
+.. ts:cv:: CONFIG proxy.config.http2.enabled INT 0
+
+   Enable the experimental HTTP/2 feature. This implements most of the
+   specifications, with the one big exception being server PUSH.
+
+   .. note:: This configuration will be eliminated for v6.0.0, where HTTP/2 is
+	     enabled by default and controlled via the ports configuration.
+
 .. ts:cv:: CONFIG proxy.config.http2.max_concurrent_streams_in INT 100
    :reloadable:
 
@@ -2618,7 +2626,7 @@ Sockets
 
    Sets the receive buffer size for connections from the client to Traffic Server.
 
-.. ts:cv:: CONFIG proxy.config.net.sock_option_flag_in INT 0x0
+.. ts:cv:: CONFIG proxy.config.net.sock_option_flag_in INT 0x5
 
    Turns different options "on" for the socket handling client connections:::
 
@@ -2656,8 +2664,7 @@ Sockets
        keepalive options above.
 
         When SO_LINGER is enabled, the linger timeout time is set
-        to 0. This is useful when ATS and origin server were installed
-        This is useful when Traffic Server and the origin server
+        to 0. This is useful when Traffic Server and the origin server
         are co-located and large numbers of sockets are retained
         in the TIME_WAIT state.
 
