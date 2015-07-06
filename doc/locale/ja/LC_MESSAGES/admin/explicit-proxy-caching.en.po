@@ -77,33 +77,11 @@ msgstr "Traffic Server ノードの完全修飾ホスト名もしくは IP ア�
 msgid "Using a PAC File"
 msgstr "PAC ファイルの使用"
 
-#: ../../admin/explicit-proxy-caching.en.rst:69
-msgid ""
-"Either copy an existing PAC file into the Traffic Server ``config`` "
-"directory or enter a script that defines the proxy server configuration "
-"settings in the ``proxy.pac`` file provided. The file is empty by default. "
-"A sample script is provided in `Sample PAC File`_."
-msgstr ""
-"既存の PAC ファイルを Traffic Server の ``config`` ディレクトリにコピーする"
-"かプロキシーサーバー設定を定義するスクリプトを提供された ``proxy.pac`` に入"
-"力する。ファイルはデフォルトでは空です。サンプルスクリプトは `サンプル PAC "
-"ファイル`_ で提供されています。"
-
-#: ../../admin/explicit-proxy-caching.en.rst:74
-msgid ""
-"Specify the port Traffic Server uses to serve the its synthetic "
-"healthchecks. The default port is 8083, see :ts:cv:`proxy.config.admin."
-"synthetic_port`."
-msgstr ""
-"PAC ファイルを提供するために Traffic Server が使用するポートを指定する。デ"
-"フォルトポートは 8083 です。:ts:cv:`proxy.config.admin.autoconf_port` を参照"
-"してください。"
-
-#: ../../admin/explicit-proxy-caching.en.rst:78
+#: ../../admin/explicit-proxy-caching.en.rst:67
 msgid "Sample PAC File"
 msgstr "サンプル PAC ファイル"
 
-#: ../../admin/explicit-proxy-caching.en.rst:80
+#: ../../admin/explicit-proxy-caching.en.rst:69
 msgid ""
 "The following sample PAC file instructs browsers to connect directly to all "
 "hosts without a fully-qualified domain name and to all hosts in the local "
@@ -150,10 +128,29 @@ msgstr ""
 "格納しクライアントに対してこのファイルのための URL を提供することができま"
 "す。"
 
-#: ../../admin/explicit-proxy-caching.en.rst:66
-msgid ""
-"If you want to store a PAC file on the Traffic Server system, you must "
-"perform the following configuration:"
-msgstr ""
-"Traffic Server システムに PAC ファイルを格納したい場合、次の設定を行わなけれ"
-"ばなりません。"
+#~ msgid ""
+#~ "Either copy an existing PAC file into the Traffic Server ``config`` "
+#~ "directory or enter a script that defines the proxy server configuration "
+#~ "settings in the ``proxy.pac`` file provided. The file is empty by "
+#~ "default. A sample script is provided in `Sample PAC File`_."
+#~ msgstr ""
+#~ "既存の PAC ファイルを Traffic Server の ``config`` ディレクトリにコピーす"
+#~ "るかプロキシーサーバー設定を定義するスクリプトを提供された ``proxy.pac`` "
+#~ "に入力する。ファイルはデフォルトでは空です。サンプルスクリプトは `サンプ"
+#~ "ル PAC ファイル`_ で提供されています。"
+
+#~ msgid ""
+#~ "Specify the port Traffic Server uses to serve the its synthetic "
+#~ "healthchecks. The default port is 8083, see :ts:cv:`proxy.config.admin."
+#~ "synthetic_port`."
+#~ msgstr ""
+#~ "PAC ファイルを提供するために Traffic Server が使用するポートを指定する。"
+#~ "デフォルトポートは 8083 です。:ts:cv:`proxy.config.admin.autoconf_port` "
+#~ "を参照してください。"
+
+#~ msgid ""
+#~ "If you want to store a PAC file on the Traffic Server system, you must "
+#~ "perform the following configuration:"
+#~ msgstr ""
+#~ "Traffic Server システムに PAC ファイルを格納したい場合、次の設定を行わな"
+#~ "ければなりません。"
