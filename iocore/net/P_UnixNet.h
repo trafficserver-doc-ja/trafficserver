@@ -141,7 +141,6 @@ extern int http_accept_port_number;
 #define THROTTLE_FD_HEADROOM (128 + 64) // CACHE_DB_FDS + 64
 
 #define TRANSIENT_ACCEPT_ERROR_MESSAGE_EVERY HRTIME_HOURS(24)
-#define NET_RETRY_DELAY HRTIME_MSECONDS(10)
 
 // also the 'throttle connect headroom'
 #define THROTTLE_AT_ONCE 5
@@ -151,12 +150,8 @@ extern int http_accept_port_number;
 #define NET_THROTTLE_ACCEPT_HEADROOM 1.1  // 10%
 #define NET_THROTTLE_CONNECT_HEADROOM 1.0 // 0%
 #define NET_THROTTLE_MESSAGE_EVERY HRTIME_MINUTES(10)
-#define NET_PERIOD -HRTIME_MSECONDS(5)
-#define ACCEPT_PERIOD -HRTIME_MSECONDS(4)
-#define NET_THROTTLE_DELAY 50 /* mseconds */
 
 #define PRINT_IP(x) ((uint8_t *)&(x))[0], ((uint8_t *)&(x))[1], ((uint8_t *)&(x))[2], ((uint8_t *)&(x))[3]
-
 
 // function prototype needed for SSLUnixNetVConnection
 unsigned int net_next_connection_number();
@@ -190,8 +185,19 @@ public:
   DList(UnixNetVConnection, cop_link) cop_list;
   ASLLM(UnixNetVConnection, NetState, read, enable_link) read_enable_list;
   ASLLM(UnixNetVConnection, NetState, write, enable_link) write_enable_list;
-  Que(UnixNetVConnection, keep_alive_link) keep_alive_list;
-  uint32_t keep_alive_lru_size;
+  Que(UnixNetVConnection, keep_alive_queue_link) keep_alive_queue;
+  uint32_t keep_alive_queue_size;
+  Que(UnixNetVConnection, active_queue_link) active_queue;
+  uint32_t active_queue_size;
+  uint32_t max_connections_per_thread_in;
+  uint32_t max_connections_active_per_thread_in;
+
+  // configuration settings for managing the active and keep-alive queues
+  uint32_t max_connections_in;
+  uint32_t max_connections_active_in;
+  uint32_t inactive_threashold_in;
+  uint32_t transaction_no_activity_timeout_in;
+  uint32_t keep_alive_no_activity_timeout_in;
 
   time_t sec;
   int cycles;
@@ -200,8 +206,19 @@ public:
   int mainNetEvent(int event, Event *data);
   int mainNetEventExt(int event, Event *data);
   void process_enabled_list(NetHandler *);
+  void manage_keep_alive_queue();
+  bool manage_active_queue();
+  void add_to_keep_alive_queue(UnixNetVConnection *vc);
+  void remove_from_keep_alive_queue(UnixNetVConnection *vc);
+  bool add_to_active_queue(UnixNetVConnection *vc);
+  void remove_from_active_queue(UnixNetVConnection *vc);
+  void configure_per_thread();
 
   NetHandler();
+
+private:
+  void _close_vc(UnixNetVConnection *vc, ink_hrtime now, int &handle_event, int &closed, int &total_idle_time,
+                 int &total_idle_count);
 };
 
 static inline NetHandler *
@@ -244,7 +261,7 @@ net_connections_to_throttle(ThrottleType t)
 TS_INLINE void
 check_shedding_warning()
 {
-  ink_hrtime t = ink_get_hrtime();
+  ink_hrtime t = Thread::get_hrtime();
   if (t - last_shedding_warning > NET_THROTTLE_MESSAGE_EVERY) {
     last_shedding_warning = t;
     RecSignalWarning(REC_SIGNAL_SYSTEM_ERROR, "number of connections reaching shedding limit");
@@ -274,7 +291,7 @@ check_net_throttle(ThrottleType t, ink_hrtime now)
 TS_INLINE void
 check_throttle_warning()
 {
-  ink_hrtime t = ink_get_hrtime();
+  ink_hrtime t = Thread::get_hrtime();
   if (t - last_throttle_warning > NET_THROTTLE_MESSAGE_EVERY) {
     last_throttle_warning = t;
     RecSignalWarning(REC_SIGNAL_SYSTEM_ERROR, "too many connections, throttling");
@@ -299,7 +316,7 @@ check_emergency_throttle(Connection &con)
   int emergency = fds_limit - EMERGENCY_THROTTLE;
   if (fd > emergency) {
     int over = fd - emergency;
-    emergency_throttle_time = ink_get_hrtime() + (over * over) * HRTIME_SECOND;
+    emergency_throttle_time = Thread::get_hrtime() + (over * over) * HRTIME_SECOND;
     RecSignalWarning(REC_SIGNAL_SYSTEM_ERROR, "too many open file descriptors, emergency throttling");
     int hyper_emergency = fds_limit - HYPER_EMERGENCY_THROTTLE;
     if (fd > hyper_emergency)
@@ -372,7 +389,7 @@ accept_error_seriousness(int res)
 TS_INLINE void
 check_transient_accept_error(int res)
 {
-  ink_hrtime t = ink_get_hrtime();
+  ink_hrtime t = Thread::get_hrtime();
   if (!last_transient_accept_error || t - last_transient_accept_error > TRANSIENT_ACCEPT_ERROR_MESSAGE_EVERY) {
     last_transient_accept_error = t;
     Warning("accept thread received transient error: errno = %d", -res);

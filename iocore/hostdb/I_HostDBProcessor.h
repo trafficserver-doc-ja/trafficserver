@@ -254,6 +254,29 @@ struct HostDBInfo {
 
   uint64_t md5_high;
 
+  /*
+   * Given the current time `now` and the fail_window, determine if this real is alive
+   */
+  bool
+  alive(ink_time_t now, int32_t fail_window)
+  {
+    unsigned int last_failure = app.http_data.last_failure;
+
+    if (last_failure == 0 || (unsigned int)(now - fail_window) > last_failure) {
+      return true;
+    } else {
+      // Entry is marked down.  Make sure some nasty clock skew
+      //  did not occur.  Use the retry time to set an upper bound
+      //  as to how far in the future we should tolerate bogus last
+      //  failure times.  This sets the upper bound that we would ever
+      //  consider a server down to 2*down_server_timeout
+      if (now + fail_window < last_failure) {
+        app.http_data.last_failure = 0;
+        return false;
+      }
+      return false;
+    }
+  }
   bool
   failed()
   {

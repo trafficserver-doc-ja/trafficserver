@@ -77,25 +77,25 @@ another, one ``VConnection``'s input ``VIO`` is another
 ``VConnection``'s output ``VIO``. A ``VConnection``'s input ``VIO`` is
 also called its **write ``VIO``** because the input ``VIO`` refers to a
 write operation performed on the ``VConnection`` itself. Similarly, the
-outpt ``VIO`` is also called the **read ``VIO``**. For transformations,
+output ``VIO`` is also called the **read ``VIO``**. For transformations,
 which are designed to pass data in one direction, you can picture the
 relationship between the transformation ``VConnection`` and its
 ``VIO``\ s as follows:
 
-**Transformation and its ``VIO``\ s** {#TransformationAndVIOs}
+.. _transformationAndItsVIOs:
 
 .. figure:: /static/images/sdk/vconnection.jpg
    :alt: A Transformation and its VIOs
+   :align: center
 
-   A Transformation and its VIOs
+   **A Transformation and its VIOs**
 
 Because the Traffic Server API places transformations directly in the
 response or request data stream, the transformation ``VConnection`` is
 responsible only for reading the data from the input buffer,
 transforming it, and then writing it to the output buffer. The upstream
 ``VConnection`` writes the incoming data to the transformation's input
-buffer. In the figure above, `A Transformation and its
-``VIO``\ s <#TransformationAndVIOs>`__, the input ``VIO`` describes the
+buffer. In the figure above, :ref:`TransformationAndItsVIOs`, the input ``VIO`` describes the
 progress of the upstream ``VConnection``'s write operation on the
 transformation, while the output ``VIO`` describes the progress of the
 transformation's write operation on the output (downstream)
@@ -163,3 +163,21 @@ structure. Since only a single writer is allowed, there is no
 corresponding ``TSIOBufferWriter`` data structure. The writer simply
 modifies the IO buffer directly.
 
+Transaction Data Sink
+~~~~~~~~~~~~~~~~~~~~~
+
+The hook `TS_HTTP_RESPONSE_CLIENT_HOOK` is a hook that supports a special type of transformation, one with only input and no output.
+Although the transformation doesn't provide data back to Traffic Server it can do anything else with the data, such as writing it
+to another output device or process. It must, however, consume all the data for the transaction. There are two primary use cases.
+
+#. Tap in to the transaction to provide the data for external processing.
+#. Maintain the transaction.
+
+For the latter it is important to note that if all consumers of a transaction (primarily the user agent) shut down the transaction is also
+terminated, including the connection to the origin server. A data sink transform, unlike a standard transform, is considered to be a consumer
+and will keep the transaction and the origin server connection up. This is useful when the transaction is in some way expensive and should
+run to completion even if the user agent disconnects. Examples would be a standard transform that is expensive to initiate, or expensive
+origin server connections that should be :ts:cv:`shared <proxy.config.http.server_session_sharing.match>`.
+
+There is an `example plugin <https://github.com/apache/trafficserver/blob/master/example/txn-data-sink/txn-data-sink.c>`_ that demonstrates
+this used as a pure data sink to keep the transaction up regardless of whether the user agent disconnects.

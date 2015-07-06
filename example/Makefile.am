@@ -45,6 +45,7 @@ plugins = \
   ssl-sni.la \
   ssl-sni-whitelist.la \
   thread-1.la \
+  txn-data-sink.la \
   version.la
 
 if BUILD_EXAMPLE_PLUGINS
@@ -74,6 +75,7 @@ remap_header_add_la_SOURCES = remap_header_add/remap_header_add.cc
 response_header_1_la_SOURCES = response-header-1/response-header-1.c
 server_transform_la_SOURCES = server-transform/server-transform.c
 thread_1_la_SOURCES = thread-1/thread-1.c
+txn_data_sink_la_SOURCES = txn-data-sink/txn-data-sink.c
 psi_la_SOURCES = thread-pool/psi.c thread-pool/thread.c
 version_la_SOURCES = version/version.c
 secure_link_la_SOURCES = secure-link/secure-link.c
@@ -83,6 +85,5 @@ ssl_sni_whitelist_la_SOURCES = ssl-sni-whitelist/ssl-sni-whitelist.cc
 
 # The following examples do not build:
 #
-# prefetch_eg1_la_SOURCES = prefetch/prefetch-plugin-eg1.c
 # redirect_1_la_SOURCES = redirect-1/redirect-1.c
 # session_1_la_SOURCES = session-1/session-1.c

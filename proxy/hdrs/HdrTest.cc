@@ -604,7 +604,7 @@ HdrTest::test_http_parser_eos_boundary_cases()
                {"GET /index.html HTTP/1.0\r\nUser-Agent: foobar\r\n\r\n***BODY****", PARSE_DONE, 48},
                {"GET", PARSE_ERROR, 3},
                {"GET /index.html", PARSE_ERROR, 15},
-               {"GET /index.html\r\n", PARSE_DONE, 17},
+               {"GET /index.html\r\n", PARSE_ERROR, 17},
                {"GET /index.html HTTP/1.0", PARSE_ERROR, 24},
                {"GET /index.html HTTP/1.0\r", PARSE_ERROR, 25},
                {"GET /index.html HTTP/1.0\n", PARSE_DONE, 25},
@@ -1262,7 +1262,6 @@ HdrTest::test_http_hdr_print_and_copy_aux(int testnum, const char *request, cons
   marshal_hdr.unmarshal(marshal_buf, marshal_len, &ref);
   new_hdr.create(HTTP_TYPE_REQUEST);
   new_hdr.copy(&marshal_hdr);
-  ats_free(marshal_buf);
 
   /*** (3) print the request header and copy to buffers ***/
 
@@ -1271,6 +1270,8 @@ HdrTest::test_http_hdr_print_and_copy_aux(int testnum, const char *request, cons
 
   cpy_bufindex = cpy_dumpoffset = 0;
   cpy_ret = new_hdr.print(cpy_buf, cpy_bufsize, &cpy_bufindex, &cpy_dumpoffset);
+
+  ats_free(marshal_buf);
 
   if ((prt_ret != 1) || (cpy_ret != 1)) {
     printf("FAILED: (test #%d) couldn't print req hdr or copy --- prt_ret=%d, cpy_ret=%d\n", testnum, prt_ret, cpy_ret);

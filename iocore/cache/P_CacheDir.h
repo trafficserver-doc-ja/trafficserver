@@ -86,7 +86,6 @@ struct CacheVC;
     dir_assign(_e, _x);                 \
     dir_set_next(_e, next);             \
   } while (0)
-#if !TS_USE_INTERIM_CACHE
 // entry is valid
 #define dir_valid(_d, _e) (_d->header->phase == dir_phase(_e) ? vol_in_phase_valid(_d, _e) : vol_out_of_phase_valid(_d, _e))
 // entry is valid and outside of write aggregation region
@@ -95,7 +94,6 @@ struct CacheVC;
 #define dir_write_valid(_d, _e) \
   (_d->header->phase == dir_phase(_e) ? vol_in_phase_valid(_d, _e) : vol_out_of_phase_write_valid(_d, _e))
 #define dir_agg_buf_valid(_d, _e) (_d->header->phase == dir_phase(_e) && vol_in_phase_agg_buf_valid(_d, _e))
-#endif
 #define dir_is_empty(_e) (!dir_offset(_e))
 #define dir_clear(_e) \
   do {                \
@@ -155,41 +153,13 @@ struct FreeDir {
   unsigned int reserved : 8;
   unsigned int prev : 16; // (2)
   unsigned int next : 16; // (3)
-#if TS_USE_INTERIM_CACHE == 1
-  unsigned int offset_high : 12; // 8GB * 4K = 32TB
-  unsigned int index : 3;        // interim index
-  unsigned int ininterim : 1;    // in interim or not
-#else
-  inku16 offset_high; // 0: empty
-#endif
+  inku16 offset_high;     // 0: empty
 #else
   uint16_t w[5];
   FreeDir() { dir_clear(this); }
 #endif
 };
 
-#if TS_USE_INTERIM_CACHE == 1
-#define dir_ininterim(_e) (((_e)->w[4] >> 15) & 1)
-#define dir_set_ininterim(_e) ((_e)->w[4] |= (1 << 15));
-#define dir_set_indisk(_e) ((_e)->w[4] &= 0x0FFF);
-#define dir_get_index(_e) (((_e)->w[4] >> 12) & 0x7)
-#define dir_set_index(_e, i) ((_e)->w[4] |= (i << 12))
-#define dir_offset(_e) \
-  ((int64_t)(((uint64_t)(_e)->w[0]) | (((uint64_t)((_e)->w[1] & 0xFF)) << 16) | (((uint64_t)((_e)->w[4] & 0x0FFF)) << 24)))
-#define dir_set_offset(_e, _o)                                              \
-  do {                                                                      \
-    (_e)->w[0] = (uint16_t)_o;                                              \
-    (_e)->w[1] = (uint16_t)((((_o) >> 16) & 0xFF) | ((_e)->w[1] & 0xFF00)); \
-    (_e)->w[4] = (((_e)->w[4] & 0xF000) | ((uint16_t)((_o) >> 24)));        \
-  } while (0)
-#define dir_get_offset(_e) \
-  ((int64_t)(((uint64_t)(_e)->w[0]) | (((uint64_t)((_e)->w[1] & 0xFF)) << 16) | (((uint64_t)(_e)->w[4]) << 24)))
-
-void clear_interim_dir(Vol *v);
-void clear_interimvol_dir(Vol *v, int offset);
-void dir_clean_range_interimvol(off_t start, off_t end, InterimCacheVol *svol);
-
-#else
 #define dir_offset(_e) \
   ((int64_t)(((uint64_t)(_e)->w[0]) | (((uint64_t)((_e)->w[1] & 0xFF)) << 16) | (((uint64_t)(_e)->w[4]) << 24)))
 #define dir_set_offset(_e, _o)                                              \
@@ -198,7 +168,6 @@ void dir_clean_range_interimvol(off_t start, off_t end, InterimCacheVol *svol);
     (_e)->w[1] = (uint16_t)((((_o) >> 16) & 0xFF) | ((_e)->w[1] & 0xFF00)); \
     (_e)->w[4] = (uint16_t)((_o) >> 24);                                    \
   } while (0)
-#endif
 #define dir_bit(_e, _w, _b) ((uint32_t)(((_e)->w[_w] >> (_b)) & 1))
 #define dir_set_bit(_e, _w, _b, _v) (_e)->w[_w] = (uint16_t)(((_e)->w[_w] & ~(1 << (_b))) | (((_v) ? 1 : 0) << (_b)))
 #define dir_big(_e) ((uint32_t)((((_e)->w[1]) >> 8) & 0x3))
@@ -285,7 +254,7 @@ struct OpenDir : public Continuation {
 
   int open_write(CacheVC *c, int allow_if_writers, int max_writers);
   int close_write(CacheVC *c);
-  OpenDirEntry *open_read(CryptoHash *key);
+  OpenDirEntry *open_read(const CryptoHash *key);
   int signal_readers(int event, Event *e);
 
   OpenDir();
@@ -295,6 +264,7 @@ struct CacheSync : public Continuation {
   int vol_idx;
   char *buf;
   size_t buflen;
+  bool buf_huge;
   off_t writepos;
   AIOCallbackInternal io;
   Event *trigger;
@@ -302,7 +272,8 @@ struct CacheSync : public Continuation {
   int mainEvent(int event, Event *e);
   void aio_write(int fd, char *b, int n, off_t o);
 
-  CacheSync() : Continuation(new_ProxyMutex()), vol_idx(0), buf(0), buflen(0), writepos(0), trigger(0), start_time(0)
+  CacheSync()
+    : Continuation(new_ProxyMutex()), vol_idx(0), buf(0), buflen(0), buf_huge(false), writepos(0), trigger(0), start_time(0)
   {
     SET_HANDLER(&CacheSync::mainEvent);
   }
@@ -311,16 +282,16 @@ struct CacheSync : public Continuation {
 // Global Functions
 
 void vol_init_dir(Vol *d);
-int dir_token_probe(CacheKey *, Vol *, Dir *);
-int dir_probe(CacheKey *, Vol *, Dir *, Dir **);
-int dir_insert(CacheKey *key, Vol *d, Dir *to_part);
-int dir_overwrite(CacheKey *key, Vol *d, Dir *to_part, Dir *overwrite, bool must_overwrite = true);
-int dir_delete(CacheKey *key, Vol *d, Dir *del);
-int dir_lookaside_probe(CacheKey *key, Vol *d, Dir *result, EvacuationBlock **eblock);
+int dir_token_probe(const CacheKey *, Vol *, Dir *);
+int dir_probe(const CacheKey *, Vol *, Dir *, Dir **);
+int dir_insert(const CacheKey *key, Vol *d, Dir *to_part);
+int dir_overwrite(const CacheKey *key, Vol *d, Dir *to_part, Dir *overwrite, bool must_overwrite = true);
+int dir_delete(const CacheKey *key, Vol *d, Dir *del);
+int dir_lookaside_probe(const CacheKey *key, Vol *d, Dir *result, EvacuationBlock **eblock);
 int dir_lookaside_insert(EvacuationBlock *b, Vol *d, Dir *to);
-int dir_lookaside_fixup(CacheKey *key, Vol *d);
+int dir_lookaside_fixup(const CacheKey *key, Vol *d);
 void dir_lookaside_cleanup(Vol *d);
-void dir_lookaside_remove(CacheKey *key, Vol *d);
+void dir_lookaside_remove(const CacheKey *key, Vol *d);
 void dir_free_entry(Dir *e, int s, Vol *d);
 void dir_sync_init();
 int check_dir(Vol *d);
@@ -340,7 +311,7 @@ extern Dir empty_dir;
 #define dir_in_seg(_s, _i) ((Dir *)(((char *)(_s)) + (SIZEOF_DIR * (_i))))
 
 TS_INLINE bool
-dir_compare_tag(Dir *e, CacheKey *key)
+dir_compare_tag(const Dir *e, const CacheKey *key)
 {
   return (dir_tag(e) == DIR_MASK_TAG(key->slice32(2)));
 }
@@ -364,7 +335,7 @@ next_dir(Dir *d, Dir *seg)
   return dir_from_offset(i, seg);
 }
 TS_INLINE int64_t
-dir_to_offset(Dir *d, Dir *seg)
+dir_to_offset(const Dir *d, const Dir *seg)
 {
 #if DIR_DEPTH < 5
   return (((char *)d) - ((char *)seg)) / SIZEOF_DIR;

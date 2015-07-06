@@ -24,6 +24,8 @@
 
 #include "P_Cache.h"
 
+#include "hugepages.h"
+
 // #define LOOP_CHECK_MODE 1
 #ifdef LOOP_CHECK_MODE
 #define DIR_LOOP_THRESHOLD 1000
@@ -148,7 +150,7 @@ OpenDir::close_write(CacheVC *cont)
 }
 
 OpenDirEntry *
-OpenDir::open_read(INK_MD5 *key)
+OpenDir::open_read(const CryptoHash *key)
 {
   unsigned int h = key->slice32(0);
   int b = h % OPEN_DIR_BUCKETS;
@@ -376,97 +378,6 @@ dir_clean_vol(Vol *d)
   CHECK_DIR(d);
 }
 
-#if TS_USE_INTERIM_CACHE == 1
-static inline void
-interim_dir_clean_bucket(Dir *b, int s, Vol *vol, int offset)
-{
-  Dir *e = b, *p = NULL;
-  Dir *seg = dir_segment(s, vol);
-  do {
-    if (dir_ininterim(e) && dir_get_index(e) == offset) {
-      e = dir_delete_entry(e, p, s, vol);
-      continue;
-    }
-    p = e;
-    e = next_dir(e, seg);
-  } while (e);
-}
-
-void
-clear_interimvol_dir(Vol *v, int offset)
-{
-  for (int i = 0; i < v->segments; i++) {
-    Dir *seg = dir_segment(i, v);
-    for (int j = 0; j < v->buckets; j++) {
-      interim_dir_clean_bucket(dir_bucket(j, seg), i, v, offset);
-    }
-  }
-}
-void
-dir_clean_bucket(Dir *b, int s, InterimCacheVol *d)
-{
-  Dir *e = b, *p = NULL;
-  Vol *vol = d->vol;
-  Dir *seg = dir_segment(s, vol);
-#ifdef LOOP_CHECK_MODE
-  int loop_count = 0;
-#endif
-  do {
-#ifdef LOOP_CHECK_MODE
-    loop_count++;
-    if (loop_count > DIR_LOOP_THRESHOLD) {
-      if (dir_bucket_loop_fix(b, s, vol))
-        return;
-    }
-#endif
-    if (!dir_valid(d, e) || !dir_offset(e)) {
-      if (is_debug_tag_set("dir_clean"))
-        Debug("dir_clean", "cleaning %p tag %X boffset %" PRId64 " b %p p %p l %d", e, dir_tag(e), dir_offset(e), b, p,
-              dir_bucket_length(b, s, vol));
-      if (dir_offset(e))
-        CACHE_DEC_DIR_USED(vol->mutex);
-      e = dir_delete_entry(e, p, s, vol);
-      continue;
-    }
-    p = e;
-    e = next_dir(e, seg);
-  } while (e);
-}
-void
-dir_clean_segment(int s, InterimCacheVol *d)
-{
-  Dir *seg = dir_segment(s, d->vol);
-  for (int i = 0; i < d->vol->buckets; i++) {
-    dir_clean_bucket(dir_bucket(i, seg), s, d);
-    ink_assert(!dir_next(dir_bucket(i, seg)) || dir_offset(dir_bucket(i, seg)));
-  }
-}
-void
-dir_clean_interimvol(InterimCacheVol *d)
-{
-  for (int i = 0; i < d->vol->segments; i++)
-    dir_clean_segment(i, d);
-  CHECK_DIR(d);
-}
-
-void
-dir_clean_range_interimvol(off_t start, off_t end, InterimCacheVol *svol)
-{
-  Vol *vol = svol->vol;
-  int offset = svol - vol->interim_vols;
-
-  for (int i = 0; i < vol->buckets * DIR_DEPTH * vol->segments; i++) {
-    Dir *e = dir_index(vol, i);
-    if (dir_ininterim(e) && dir_get_index(e) == offset && !dir_token(e) && dir_offset(e) >= (int64_t)start &&
-        dir_offset(e) < (int64_t)end) {
-      CACHE_DEC_DIR_USED(vol->mutex);
-      dir_set_offset(e, 0); // delete
-    }
-  }
-
-  dir_clean_interimvol(svol);
-}
-#endif
 
 void
 dir_clear_range(off_t start, off_t end, Vol *vol)
@@ -593,7 +504,7 @@ dir_free_entry(Dir *e, int s, Vol *d)
 }
 
 int
-dir_probe(CacheKey *key, Vol *d, Dir *result, Dir **last_collision)
+dir_probe(const CacheKey *key, Vol *d, Dir *result, Dir **last_collision)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int s = key->slice32(0) % d->segments;
@@ -633,9 +544,7 @@ Lagain:
                  dir_offset(e));
           dir_assign(result, e);
           *last_collision = e;
-#if !TS_USE_INTERIM_CACHE
           ink_assert(dir_offset(e) * CACHE_BLOCK_SIZE < d->len);
-#endif
           return 1;
         } else { // delete the invalid entry
           CACHE_DEC_DIR_USED(d->mutex);
@@ -660,7 +569,7 @@ Lagain:
 }
 
 int
-dir_insert(CacheKey *key, Vol *d, Dir *to_part)
+dir_insert(const CacheKey *key, Vol *d, Dir *to_part)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int s = key->slice32(0) % d->segments, l;
@@ -697,21 +606,12 @@ Lagain:
   if (!e)
     goto Lagain;
 Llink:
-#if TS_USE_INTERIM_CACHE == 1
-  dir_assign(e, b);
-#else
   dir_set_next(e, dir_next(b));
-#endif
   dir_set_next(b, dir_to_offset(e, seg));
 Lfill:
-#if TS_USE_INTERIM_CACHE == 1
-  dir_assign_data(b, to_part);
-  dir_set_tag(b, key->slice32(2));
-#else
   dir_assign_data(e, to_part);
   dir_set_tag(e, key->slice32(2));
   ink_assert(vol_offset(d, e) < (d->skip + d->len));
-#endif
   DDebug("dir_insert", "insert %p %X into vol %d bucket %d at %p tag %X %X boffset %" PRId64 "", e, key->slice32(0), d->fd, bi, e,
          key->slice32(1), dir_tag(e), dir_offset(e));
   CHECK_DIR(d);
@@ -721,7 +621,7 @@ Lfill:
 }
 
 int
-dir_overwrite(CacheKey *key, Vol *d, Dir *dir, Dir *overwrite, bool must_overwrite)
+dir_overwrite(const CacheKey *key, Vol *d, Dir *dir, Dir *overwrite, bool must_overwrite)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int s = key->slice32(0) % d->segments, l;
@@ -753,11 +653,7 @@ Lagain:
         }
       }
 #endif
-#if TS_USE_INTERIM_CACHE == 1
-      if (dir_tag(e) == t && dir_get_offset(e) == dir_get_offset(overwrite))
-#else
       if (dir_tag(e) == t && dir_offset(e) == dir_offset(overwrite))
-#endif
         goto Lfill;
       e = next_dir(e, seg);
     } while (e);
@@ -797,7 +693,7 @@ Lfill:
 }
 
 int
-dir_delete(CacheKey *key, Vol *d, Dir *del)
+dir_delete(const CacheKey *key, Vol *d, Dir *del)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int s = key->slice32(0) % d->segments;
@@ -820,11 +716,7 @@ dir_delete(CacheKey *key, Vol *d, Dir *del)
           return 0;
       }
 #endif
-#if TS_USE_INTERIM_CACHE == 1
-      if (dir_compare_tag(e, key) && dir_get_offset(e) == dir_get_offset(del)) {
-#else
       if (dir_compare_tag(e, key) && dir_offset(e) == dir_offset(del)) {
-#endif
         CACHE_DEC_DIR_USED(d->mutex);
         dir_delete_entry(e, p, s, d);
         CHECK_DIR(d);
@@ -840,7 +732,7 @@ dir_delete(CacheKey *key, Vol *d, Dir *del)
 // Lookaside Cache
 
 int
-dir_lookaside_probe(CacheKey *key, Vol *d, Dir *result, EvacuationBlock **eblock)
+dir_lookaside_probe(const CacheKey *key, Vol *d, Dir *result, EvacuationBlock **eblock)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int i = key->slice32(3) % LOOKASIDE_SIZE;
@@ -881,7 +773,7 @@ dir_lookaside_insert(EvacuationBlock *eblock, Vol *d, Dir *to)
 }
 
 int
-dir_lookaside_fixup(CacheKey *key, Vol *d)
+dir_lookaside_fixup(const CacheKey *key, Vol *d)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int i = key->slice32(3) % LOOKASIDE_SIZE;
@@ -891,11 +783,7 @@ dir_lookaside_fixup(CacheKey *key, Vol *d)
       int res = dir_overwrite(key, d, &b->new_dir, &b->dir, false);
       DDebug("dir_lookaside", "fixup %X %X offset %" PRId64 " phase %d %d", key->slice32(0), key->slice32(1),
              dir_offset(&b->new_dir), dir_phase(&b->new_dir), res);
-#if TS_USE_INTERIM_CACHE == 1
-      int64_t o = dir_get_offset(&b->dir), n = dir_get_offset(&b->new_dir);
-#else
       int64_t o = dir_offset(&b->dir), n = dir_offset(&b->new_dir);
-#endif
       d->ram_cache->fixup(key, (uint32_t)(o >> 32), (uint32_t)o, (uint32_t)(n >> 32), (uint32_t)n);
       d->lookaside[i].remove(b);
       free_EvacuationBlock(b, d->mutex->thread_holding);
@@ -932,7 +820,7 @@ dir_lookaside_cleanup(Vol *d)
 }
 
 void
-dir_lookaside_remove(CacheKey *key, Vol *d)
+dir_lookaside_remove(const CacheKey *key, Vol *d)
 {
   ink_assert(d->mutex->thread_holding == this_ethread());
   int i = key->slice32(3) % LOOKASIDE_SIZE;
@@ -1011,6 +899,7 @@ sync_cache_dir_on_shutdown(void)
   Debug("cache_dir_sync", "sync started");
   char *buf = NULL;
   size_t buflen = 0;
+  bool buf_huge = false;
 
   EThread *t = (EThread *)0xdeadbeef;
   for (int i = 0; i < gnvol; i++) {
@@ -1055,32 +944,24 @@ sync_cache_dir_on_shutdown(void)
       d->header->write_serial++;
     }
 
-#if TS_USE_INTERIM_CACHE == 1
-    for (int i = 0; i < d->num_interim_vols; i++) {
-      InterimCacheVol *sv = &(d->interim_vols[i]);
-      if (sv->agg_buf_pos) {
-        Debug("cache_dir_sync", "Dir %s: flushing agg buffer first to interim", d->hash_text.get());
-        sv->header->agg_pos = sv->header->write_pos + sv->agg_buf_pos;
-
-        int r = pwrite(sv->fd, sv->agg_buffer, sv->agg_buf_pos, sv->header->write_pos);
-        if (r != sv->agg_buf_pos) {
-          ink_assert(!"flusing agg buffer failed to interim");
-          continue;
-        }
-        sv->header->last_write_pos = sv->header->write_pos;
-        sv->header->write_pos += sv->agg_buf_pos;
-        ink_assert(sv->header->write_pos == sv->header->agg_pos);
-        sv->agg_buf_pos = 0;
-        sv->header->write_serial++;
-      }
-    }
-#endif
 
     if (buflen < dirlen) {
-      if (buf)
-        ats_memalign_free(buf);
-      buf = (char *)ats_memalign(ats_pagesize(), dirlen);
+      if (buf) {
+        if (buf_huge)
+          ats_free_hugepage(buf, buflen);
+        else
+          ats_memalign_free(buf);
+        buf = NULL;
+      }
       buflen = dirlen;
+      if (ats_hugepage_enabled()) {
+        buf = (char *)ats_alloc_hugepage(buflen);
+        buf_huge = true;
+      }
+      if (buf == NULL) {
+        buf = (char *)ats_memalign(ats_pagesize(), buflen);
+        buf_huge = false;
+      }
     }
 
     if (!d->dir_sync_in_progress) {
@@ -1090,11 +971,6 @@ sync_cache_dir_on_shutdown(void)
     }
     d->footer->sync_serial = d->header->sync_serial;
 
-#if TS_USE_INTERIM_CACHE == 1
-    for (int j = 0; j < d->num_interim_vols; j++) {
-      d->interim_vols[j].header->sync_serial = d->header->sync_serial;
-    }
-#endif
     CHECK_DIR(d);
     memcpy(buf, d->raw_dir, dirlen);
     size_t B = d->header->sync_serial & 1;
@@ -1104,8 +980,13 @@ sync_cache_dir_on_shutdown(void)
     Debug("cache_dir_sync", "done syncing dir for vol %s", d->hash_text.get());
   }
   Debug("cache_dir_sync", "sync done");
-  if (buf)
-    ats_memalign_free(buf);
+  if (buf) {
+    if (buf_huge)
+      ats_free_hugepage(buf, buflen);
+    else
+      ats_memalign_free(buf);
+    buf = NULL;
+  }
 }
 
 
@@ -1120,11 +1001,6 @@ CacheSync::mainEvent(int event, Event *e)
 Lrestart:
   if (vol_idx >= gnvol) {
     vol_idx = 0;
-    if (buf) {
-      ats_memalign_free(buf);
-      buf = 0;
-      buflen = 0;
-    }
     Debug("cache_dir_sync", "sync done");
     if (event == EVENT_INTERVAL)
       trigger = e->ethread->schedule_in(this, HRTIME_SECONDS(cache_config_dir_sync_frequency));
@@ -1155,7 +1031,7 @@ Lrestart:
     }
 
     if (!vol->dir_sync_in_progress)
-      start_time = ink_get_hrtime();
+      start_time = Thread::get_hrtime();
 
     // recompute hit_evacuate_window
     vol->hit_evacuate_window = (vol->data_blocks * cache_config_hit_evacuate_percent) / 100;
@@ -1183,31 +1059,30 @@ Lrestart:
         vol->dir_sync_waiting = 1;
         if (!vol->is_io_in_progress())
           vol->aggWrite(EVENT_IMMEDIATE, 0);
-#if TS_USE_INTERIM_CACHE == 1
-        for (int i = 0; i < vol->num_interim_vols; i++) {
-          if (!vol->interim_vols[i].is_io_in_progress()) {
-            vol->interim_vols[i].sync = true;
-            vol->interim_vols[i].aggWrite(EVENT_IMMEDIATE, 0);
-          }
-        }
-#endif
         return EVENT_CONT;
       }
       Debug("cache_dir_sync", "pos: %" PRIu64 " Dir %s dirty...syncing to disk", vol->header->write_pos, vol->hash_text.get());
       vol->header->dirty = 0;
       if (buflen < dirlen) {
-        if (buf)
-          ats_memalign_free(buf);
-        buf = (char *)ats_memalign(ats_pagesize(), dirlen);
+        if (buf) {
+          if (buf_huge)
+            ats_free_hugepage(buf, buflen);
+          else
+            ats_memalign_free(buf);
+          buf = NULL;
+        }
         buflen = dirlen;
+        if (ats_hugepage_enabled()) {
+          buf = (char *)ats_alloc_hugepage(buflen);
+          buf_huge = true;
+        }
+        if (buf == NULL) {
+          buf = (char *)ats_memalign(ats_pagesize(), buflen);
+          buf_huge = false;
+        }
       }
       vol->header->sync_serial++;
       vol->footer->sync_serial = vol->header->sync_serial;
-#if TS_USE_INTERIM_CACHE == 1
-      for (int j = 0; j < vol->num_interim_vols; j++) {
-        vol->interim_vols[j].header->sync_serial = vol->header->sync_serial;
-      }
-#endif
       CHECK_DIR(d);
       memcpy(buf, vol->raw_dir, dirlen);
       vol->dir_sync_in_progress = 1;
@@ -1234,7 +1109,7 @@ Lrestart:
     } else {
       vol->dir_sync_in_progress = 0;
       CACHE_INCREMENT_DYN_STAT(cache_directory_sync_count_stat);
-      CACHE_SUM_DYN_STAT(cache_directory_sync_time_stat, ink_get_hrtime() - start_time);
+      CACHE_SUM_DYN_STAT(cache_directory_sync_time_stat, Thread::get_hrtime() - start_time);
       start_time = 0;
       goto Ldone;
     }
@@ -1429,8 +1304,8 @@ regress_rand_init(unsigned int i)
   regress_rand_seed = i;
 }
 
-void
-regress_rand_CacheKey(CacheKey *key)
+static void
+regress_rand_CacheKey(const CacheKey *key)
 {
   unsigned int *x = (unsigned int *)key;
   for (int i = 0; i < 4; i++)

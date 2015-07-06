@@ -131,7 +131,8 @@ plugin_load(int argc, char *argv[], bool validateOnly)
   if (plugin_reg_current->plugin_registered) {
     plugin_reg_list.push(plugin_reg_current);
   } else {
-    delete plugin_reg_current;
+    Fatal("plugin not registered by calling TSPluginRegister");
+    return false; // this line won't get called since Fatal brings down ATS
   }
 
   plugin_reg_current = NULL;

@@ -249,7 +249,7 @@ REGRESSION_TEST(SDK_API_TSConfig)(RegressionTest *test, int /* atype ATS_UNUSED 
 //////////////////////////////////////////////
 
 struct SDK_NetVConn_Params {
-  SDK_NetVConn_Params(const char *_a, RegressionTest *_t, int *_p) : buffer(NULL), api(_a), port(0), test(_t), pstatus(_p)
+  SDK_NetVConn_Params(const char *_a, RegressionTest *_t, int *_p) : buffer(NULL), api(_a), port(0), test(_t), pstatus(_p), vc(NULL)
   {
     this->status.client = this->status.server = REGRESSION_TEST_INPROGRESS;
   }
@@ -259,6 +259,9 @@ struct SDK_NetVConn_Params {
     if (this->buffer) {
       TSIOBufferDestroy(this->buffer);
     }
+    if (this->vc) {
+      TSVConnClose(this->vc);
+    }
   }
 
   TSIOBuffer buffer;
@@ -266,6 +269,7 @@ struct SDK_NetVConn_Params {
   unsigned short port;
   RegressionTest *test;
   int *pstatus;
+  TSVConn vc;
   struct {
     int client;
     int server;
@@ -281,6 +285,7 @@ server_handler(TSCont contp, TSEvent event, void *data)
     // Kick off a read so that we can receive an EOS event.
     SDK_RPRINT(params->test, params->api, "ServerEvent NET_ACCEPT", TC_PASS, "ok");
     params->buffer = TSIOBufferCreate();
+    params->vc = (TSVConn)data;
     TSVConnRead((TSVConn)data, contp, params->buffer, 100);
   } else if (event == TS_EVENT_VCONN_EOS) {
     // The server end of the test passes if it receives an EOF event. This means that it must have
@@ -2424,7 +2429,7 @@ test_url_print(TSMBuffer bufp, TSMLoc hdr_loc)
   output_buffer = TSIOBufferCreate();
 
   if (!output_buffer) {
-    TSError("couldn't allocate IOBuffer\n");
+    TSError("[InkAPITest] couldn't allocate IOBuffer");
   }
 
   reader = TSIOBufferReaderAlloc(output_buffer);
@@ -4300,7 +4305,7 @@ convert_http_hdr_to_string(TSMBuffer bufp, TSMLoc hdr_loc)
   output_buffer = TSIOBufferCreate();
 
   if (!output_buffer) {
-    TSError("couldn't allocate IOBuffer\n");
+    TSError("[InkAPITest] couldn't allocate IOBuffer");
   }
 
   reader = TSIOBufferReaderAlloc(output_buffer);
@@ -4508,7 +4513,7 @@ convert_mime_hdr_to_string(TSMBuffer bufp, TSMLoc hdr_loc)
   output_buffer = TSIOBufferCreate();
 
   if (!output_buffer) {
-    TSError("couldn't allocate IOBuffer\n");
+    TSError("[InkAPITest] couldn't allocate IOBuffer");
   }
 
   reader = TSIOBufferReaderAlloc(output_buffer);
@@ -5018,8 +5023,8 @@ REGRESSION_TEST(SDK_API_TSMimeHdrParse)(RegressionTest *test, int /* atype ATS_U
 REGRESSION_TEST(SDK_API_TSUrlParse)(RegressionTest *test, int /* atype ATS_UNUSED */, int *pstatus)
 {
   static char const *const urls[] = {
-    "file:///test.dat;ab?abc=def#abc", "http://www.example.com", "http://abc:def@www.example.com", "http://www.example.com:3426",
-    "http://abc:def@www.example.com:3426", "http://www.example.com/homepage.cgi",
+    "file:///test.dat;ab?abc=def#abc", "http://www.example.com/", "http://abc:def@www.example.com/", "http://www.example.com:3426/",
+    "http://abc:def@www.example.com:3426/", "http://www.example.com/homepage.cgi",
     "http://www.example.com/homepage.cgi;ab?abc=def#abc", "http://abc:def@www.example.com:3426/homepage.cgi;ab?abc=def#abc",
     "https://abc:def@www.example.com:3426/homepage.cgi;ab?abc=def#abc",
     "ftp://abc:def@www.example.com:3426/homepage.cgi;ab?abc=def#abc",
@@ -5057,7 +5062,7 @@ REGRESSION_TEST(SDK_API_TSUrlParse)(RegressionTest *test, int /* atype ATS_UNUSE
       }
     } else {
       start = url;
-      end = url + strlen(url) + 1;
+      end = url + strlen(url);
       if ((retval = TSUrlParse(bufp, url_loc, &start, end)) == TS_PARSE_ERROR) {
         SDK_RPRINT(test, "TSUrlParse", url, TC_FAIL, "TSUrlParse returns TS_PARSE_ERROR");
       } else {
@@ -5515,11 +5520,6 @@ typedef enum {
 } ORIG_TSVConnCloseFlags;
 
 typedef enum {
-  ORIG_TS_SDK_VERSION_2_0 = 0,
-  ORIG_TS_SDK_VERSION_3_0,
-} ORIG_TSSDKVersion;
-
-typedef enum {
   ORIG_TS_ERROR = -1,
   ORIG_TS_SUCCESS = 0,
 } ORIG_TSReturnCode;
@@ -5661,9 +5661,6 @@ REGRESSION_TEST(SDK_API_TSConstant)(RegressionTest *test, int /* atype ATS_UNUSE
 
   PRINT_DIFF(TS_VC_CLOSE_ABORT);
   PRINT_DIFF(TS_VC_CLOSE_NORMAL);
-
-  PRINT_DIFF(TS_SDK_VERSION_2_0);
-  PRINT_DIFF(TS_SDK_VERSION_3_0);
 
   PRINT_DIFF(TS_ERROR);
   PRINT_DIFF(TS_SUCCESS);
@@ -6633,9 +6630,9 @@ transform_hook_handler(TSCont contp, TSEvent event, void *edata)
       synclient_txn_delete(data->browser3);
       synclient_txn_delete(data->browser4);
 
+      TSContDataSet(contp, NULL);
       data->magic = MAGIC_DEAD;
       TSfree(data);
-      TSContDataSet(contp, NULL);
     }
     break;
 
@@ -7104,6 +7101,8 @@ EXCLUSIVE_REGRESSION_TEST(SDK_API_TSHttpConnectIntercept)(RegressionTest *test, 
   sockaddr_in addr;
   ats_ip4_set(&addr, 1, 1);
   data->vc = TSHttpConnect(ats_ip_sa_cast(&addr));
+  if (TSVConnClosedGet(data->vc))
+    SDK_RPRINT(data->test, "TSHttpConnect", "TestCase 1", TC_FAIL, "Connect reported as closed immediately after open");
   synclient_txn_send_request_to_vc(data->browser, data->request, data->vc);
 
   /* Wait until transaction is done */
@@ -7170,7 +7169,6 @@ const char *SDK_Overridable_Configs[TS_CONFIG_LAST_ENTRY] = {
   "proxy.config.url_remap.pristine_host_hdr", "proxy.config.http.chunking_enabled", "proxy.config.http.negative_caching_enabled",
   "proxy.config.http.negative_caching_lifetime", "proxy.config.http.cache.when_to_revalidate",
   "proxy.config.http.keep_alive_enabled_in", "proxy.config.http.keep_alive_enabled_out", "proxy.config.http.keep_alive_post_out",
-  "proxy.config.http.share_server_sessions", "proxy.config.http.server_session_sharing.pool",
   "proxy.config.http.server_session_sharing.match", "proxy.config.net.sock_recv_buffer_size_out",
   "proxy.config.net.sock_send_buffer_size_out", "proxy.config.net.sock_option_flag_out",
   "proxy.config.http.forward.proxy_auth_to_parent", "proxy.config.http.anonymize_remove_from",
@@ -7206,7 +7204,7 @@ const char *SDK_Overridable_Configs[TS_CONFIG_LAST_ENTRY] = {
   "proxy.config.ssl.hsts_max_age", "proxy.config.ssl.hsts_include_subdomains", "proxy.config.http.cache.open_read_retry_time",
   "proxy.config.http.cache.max_open_read_retries", "proxy.config.http.cache.range.write",
   "proxy.config.http.post.check.content_length.enabled", "proxy.config.http.global_user_agent_header",
-};
+  "proxy.config.http.auth_server_session_private", "proxy.config.http.slow.log.threshold", "proxy.config.http.cache.generation"};
 
 REGRESSION_TEST(SDK_API_OVERRIDABLE_CONFIGS)(RegressionTest *test, int /* atype ATS_UNUSED */, int *pstatus)
 {
@@ -7246,10 +7244,6 @@ REGRESSION_TEST(SDK_API_OVERRIDABLE_CONFIGS)(RegressionTest *test, int /* atype 
     switch (type) {
     case TS_RECORDDATATYPE_INT:
       ival_rand = generator.random() % 126; // to fit in a signed byte
-      // 4.1 backwards compatibility - remove for 5.0
-      if (TS_CONFIG_HTTP_SHARE_SERVER_SESSIONS == key)
-        ival_rand %= 2;
-      // end BC
       TSHttpTxnConfigIntSet(txnp, key, ival_rand);
       TSHttpTxnConfigIntGet(txnp, key, &ival_read);
       if (ival_rand != ival_read) {

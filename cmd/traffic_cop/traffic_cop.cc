@@ -92,7 +92,7 @@ static char manager_options[OPTIONS_LEN_MAX] = "";
 
 static char log_file[PATH_NAME_MAX] = "traffic.out";
 
-static int autoconf_port = 8083;
+static int synthetic_port = 8083;
 static int rs_port = 8088;
 static MgmtClusterType cluster_type = NO_CLUSTER;
 static int http_backdoor_port = 8084;
@@ -107,6 +107,7 @@ static int server_failures = 0;
 static int server_not_found = 0;
 
 static const int sleep_time = 10;          // 10 sec
+static int init_sleep_time = sleep_time;   // 10 sec
 static const int manager_timeout = 3 * 60; //  3 min
 static const int server_timeout = 3 * 60;  //  3 min
 
@@ -270,7 +271,7 @@ sig_term(int signum)
     child_status = status;
   }
   cop_log_trace("Leaving sig_term(%d), exiting traffic_cop\n", signum);
-  exit(0);
+  _exit(0);
 }
 
 static void
@@ -475,7 +476,8 @@ transient_error(int error, int wait_ms)
 }
 
 static void
-config_register_variable(RecT rec_type, RecDataT data_type, const char *name, const char *value, bool /* inc_version */)
+config_register_variable(RecT rec_type, RecDataT data_type, const char *name, const char *value, RecSourceT /* source */,
+                         bool /* inc_version */)
 {
   configTable[std::string(name)] = ConfigValue(rec_type, data_type, value);
 }
@@ -650,9 +652,10 @@ config_reload_records()
   Layout::relative_to(log_file, sizeof(log_file), logdir, log_filename);
 
   config_read_int("proxy.config.process_manager.mgmt_port", &http_backdoor_port, true);
-  config_read_int("proxy.config.admin.autoconf_port", &autoconf_port, true);
+  config_read_int("proxy.config.admin.synthetic_port", &synthetic_port, true);
   config_read_int("proxy.config.cluster.rsport", &rs_port, true);
   config_read_int("proxy.config.lm.sem_id", &sem_id, true);
+  config_read_int("proxy.config.cop.init_sleep_time", &init_sleep_time, true);
 
 #if defined(linux)
   // TS-1075 : auto-port ::connect DoS on high traffic linux systems
@@ -1281,7 +1284,7 @@ test_server_http_port()
 
   // Generate a request for a the 'synthetic.txt' document the manager
   // servers up on the autoconf port.
-  snprintf(request, sizeof(request), "GET http://127.0.0.1:%d/synthetic.txt HTTP/1.0\r\n\r\n", autoconf_port);
+  snprintf(request, sizeof(request), "GET http://127.0.0.1:%d/synthetic.txt HTTP/1.0\r\n\r\n", synthetic_port);
 
   return test_http_port(http_backdoor_port, request, server_timeout * 1000, localhost, localhost);
 }
@@ -1348,6 +1351,10 @@ heartbeat_server()
       //   if it is taking too long to kill the server
       //
       safe_kill(server_lockfile, server_binary, false);
+      // Allow a configurable longer sleep init time
+      // to load very large remap files
+      cop_log_trace("performing additional sleep for %d sec during init", init_sleep_time);
+      millisleep(init_sleep_time * 1000);
     }
   } else {
     if (server_failures)
@@ -1651,6 +1658,11 @@ check(void *arg)
       ats_scoped_str runtimedir(config_read_runtime_dir());
       TSInit(runtimedir, static_cast<TSInitOptionT>(TS_MGMT_OPT_NO_EVENTS));
       mgmt_init = true;
+
+      // Allow a configurable longer sleep init time
+      // to load very large remap files
+      cop_log_trace("performing additional sleep for %d sec during init", init_sleep_time);
+      millisleep(init_sleep_time * 1000);
     }
   }
 

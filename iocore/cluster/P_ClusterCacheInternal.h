@@ -309,7 +309,7 @@ struct CacheContinuation : public Continuation {
   static CacheContinuation *cacheContAllocator_alloc();
   static void cacheContAllocator_free(CacheContinuation *);
   inkcoreapi static Action *callback_failure(Action *, int, int, CacheContinuation *this_cc = 0);
-  static Action *do_remote_lookup(Continuation *, CacheKey *, CacheContinuation *, CacheFragType, char *, int);
+  static Action *do_remote_lookup(Continuation *, const CacheKey *, CacheContinuation *, CacheFragType, const char *, int);
   inkcoreapi static Action *do_op(Continuation *, ClusterMachine *, void *, int, char *, int, int nbytes = -1, MIOBuffer *b = 0);
   static int setup_local_vc(char *data, int data_len, CacheContinuation *cc, ClusterMachine *mp, Action **);
   static void disposeOfDataBuffer(void *buf);
@@ -324,14 +324,14 @@ struct CacheContinuation : public Continuation {
 // Bit definitions for cfl_flags.
 // Note: Limited to 16 bits
 #define CFL_OVERWRITE_ON_WRITE (1 << 1)
-#define CFL_REMOVE_USER_AGENTS (1 << 2)
-#define CFL_REMOVE_LINK (1 << 3)
+#define CFL_REMOVE_USER_AGENTS (1 << 2) // Historical, now unused
+#define CFL_REMOVE_LINK (1 << 3)        // Historical, now unused
 #define CFL_LOPENWRITE_HAVE_OLDINFO (1 << 4)
 #define CFL_ALLOW_MULTIPLE_WRITES (1 << 5)
 #define CFL_MAX (1 << 15)
 
 struct CacheOpArgs_General {
-  INK_MD5 *url_md5;
+  const INK_MD5 *url_md5;
   time_t pin_in_cache; // open_write() specific arg
   CacheFragType frag_type;
   uint16_t cfl_flags;

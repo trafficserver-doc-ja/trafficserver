@@ -284,7 +284,7 @@ rcv_rst_stream_frame(Http2ClientSession &cs, Http2ConnectionState &cstate, const
   DebugSsn(&cs, "http2_cs", "[%" PRId64 "] Received RST_STREAM frame.", cs.connection_id());
 
   Http2Stream *stream = cstate.find_stream(frame.header().streamid);
-  if (stream == NULL) {
+  if (frame.header().streamid == 0) {
     return HTTP2_ERROR_PROTOCOL_ERROR;
   }
 
@@ -292,7 +292,7 @@ rcv_rst_stream_frame(Http2ClientSession &cs, Http2ConnectionState &cstate, const
     return HTTP2_ERROR_FRAME_SIZE_ERROR;
   }
 
-  if (!stream->change_state(frame.header().type, frame.header().flags)) {
+  if (stream != NULL && !stream->change_state(frame.header().type, frame.header().flags)) {
     // If a RST_STREAM frame identifying an idle stream is received, the
     // recipient MUST treat this as a connection error of type PROTOCOL_ERROR.
     return HTTP2_ERROR_PROTOCOL_ERROR;
@@ -304,9 +304,11 @@ rcv_rst_stream_frame(Http2ClientSession &cs, Http2ConnectionState &cstate, const
     return HTTP2_ERROR_PROTOCOL_ERROR;
   }
 
-  DebugSsn(&cs, "http2_cs", "[%" PRId64 "] RST_STREAM: Stream ID: %u, Error Code: %u)", cs.connection_id(), stream->get_id(),
-           rst_stream.error_code);
-  cstate.delete_stream(stream);
+  if (stream != NULL) {
+    DebugSsn(&cs, "http2_cs", "[%" PRId64 "] RST_STREAM: Stream ID: %u, Error Code: %u)", cs.connection_id(), stream->get_id(),
+             rst_stream.error_code);
+    cstate.delete_stream(stream);
+  }
 
   return HTTP2_ERROR_NO_ERROR;
 }
@@ -638,8 +640,8 @@ Http2ConnectionState::main_event_handler(int event, void *edata)
     Http2ErrorCode error;
 
     //  Implementations MUST ignore and discard any frame that has a type that is unknown.
-    ink_assert(frame->header().type < countof(frame_handlers));
-    if (frame->header().type > countof(frame_handlers)) {
+    ink_assert(frame->header().type < HTTP2_FRAME_TYPE_MAX);
+    if (frame->header().type >= HTTP2_FRAME_TYPE_MAX) {
       return 0;
     }
 
@@ -651,7 +653,7 @@ Http2ConnectionState::main_event_handler(int event, void *edata)
 
     if (error != HTTP2_ERROR_NO_ERROR) {
       this->send_goaway_frame(last_streamid, error);
-
+      cleanup_streams();
       // XXX We need to think a bit harder about how to coordinate the client session and the
       // protocol connection. At this point, the protocol is shutting down, but there's no way
       // to tell that to the client session. Perhaps this could be solved by implementing the
@@ -860,7 +862,7 @@ Http2ConnectionState::send_data_frame(FetchSM *fetch_sm)
     }
 
     // xmit event
-    MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
+    SCOPED_MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
     this->ua_session->handleEvent(HTTP2_SESSION_EVENT_XMIT, &data);
 
     if (flags & HTTP2_FLAGS_DATA_END_STREAM) {
@@ -915,7 +917,7 @@ Http2ConnectionState::send_headers_frame(FetchSM *fetch_sm)
     headers.finalize(payload_length);
 
     // xmit event
-    MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
+    SCOPED_MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
     this->ua_session->handleEvent(HTTP2_SESSION_EVENT_XMIT, &headers);
   } while (cont);
 }
@@ -930,7 +932,7 @@ Http2ConnectionState::send_rst_stream_frame(Http2StreamId id, Http2ErrorCode ec)
   rst_stream.finalize(HTTP2_RST_STREAM_LEN);
 
   // xmit event
-  MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
+  SCOPED_MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
   this->ua_session->handleEvent(HTTP2_SESSION_EVENT_XMIT, &rst_stream);
 }
 
@@ -944,7 +946,7 @@ Http2ConnectionState::send_ping_frame(Http2StreamId id, uint8_t flag, const uint
   ping.finalize(HTTP2_PING_LEN);
 
   // xmit event
-  MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
+  SCOPED_MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
   this->ua_session->handleEvent(HTTP2_SESSION_EVENT_XMIT, &ping);
 }
 
@@ -964,7 +966,7 @@ Http2ConnectionState::send_goaway_frame(Http2StreamId id, Http2ErrorCode ec)
   frame.finalize(HTTP2_GOAWAY_LEN);
 
   // xmit event
-  MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
+  SCOPED_MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
   this->ua_session->handleEvent(HTTP2_SESSION_EVENT_XMIT, &frame);
 
   handleEvent(HTTP2_SESSION_EVENT_FINI, NULL);
@@ -980,7 +982,7 @@ Http2ConnectionState::send_window_update_frame(Http2StreamId id, uint32_t size)
   window_update.finalize(sizeof(uint32_t));
 
   // xmit event
-  MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
+  SCOPED_MUTEX_LOCK(lock, this->ua_session->mutex, this_ethread());
   this->ua_session->handleEvent(HTTP2_SESSION_EVENT_XMIT, &window_update);
 }
 
@@ -1003,7 +1005,7 @@ Http2Stream::init_fetcher(Http2ConnectionState &cstate)
   // Initialize FetchSM
   _fetch_sm = FetchSMAllocator.alloc();
   _fetch_sm->ext_init((Continuation *)cstate.ua_session, method, url, HTTP2_FETCHING_HTTP_VERSION,
-                      cstate.ua_session->get_client_addr(), TS_FETCH_FLAGS_DECHUNK);
+                      cstate.ua_session->get_client_addr(), (TS_FETCH_FLAGS_DECHUNK | TS_FETCH_FLAGS_NOT_INTERNAL_REQUEST));
 
   // Set request header
   MIMEFieldIter fiter;

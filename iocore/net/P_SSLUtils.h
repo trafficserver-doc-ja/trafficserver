@@ -1,4 +1,4 @@
-/** @file
+/**
 
   @section license License
 
@@ -24,6 +24,7 @@
 
 #include "ink_config.h"
 #include "Diags.h"
+#include "P_SSLClientUtils.h"
 
 #define OPENSSL_THREAD_DEFINES
 #include <openssl/opensslconf.h>
@@ -90,6 +91,10 @@ enum SSL_Stats {
   ssl_sni_name_set_failure,
   ssl_total_success_handshake_count_out_stat,
 
+  /* ocsp stapling stats */
+  ssl_ocsp_revoked_cert_stat,
+  ssl_ocsp_unknown_cert_stat,
+
   ssl_cipher_stats_start = 100,
   ssl_cipher_stats_end = 300,
 
@@ -111,9 +116,6 @@ extern RecRawStatBlock *ssl_rsb;
 
 // Create a default SSL server context.
 SSL_CTX *SSLDefaultServerContext();
-
-// Create and initialize a SSL client context.
-SSL_CTX *SSLInitClientContext(const SSLConfigParams *param);
 
 // Initialize the SSL library.
 void SSLInitializeLibrary();

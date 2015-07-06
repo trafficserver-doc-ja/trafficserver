@@ -47,7 +47,7 @@ replace_header(TSHttpTxn txnp)
   TSMLoc field_loc;
 
   if (TSHttpTxnServerRespGet(txnp, &resp_bufp, &resp_loc) != TS_SUCCESS) {
-    TSError("couldn't retrieve server response header.\n");
+    TSError("[replace_header] Couldn't retrieve server response header.");
     goto done;
   }
 
@@ -102,8 +102,8 @@ TSPluginInit(int argc ATS_UNUSED, const char *argv[] ATS_UNUSED)
   info.vendor_name = "MyCompany";
   info.support_email = "ts-api-support@MyCompany.com";
 
-  if (TSPluginRegister(TS_SDK_VERSION_3_0, &info) != TS_SUCCESS) {
-    TSError("Plugin registration failed. \n");
+  if (TSPluginRegister(&info) != TS_SUCCESS) {
+    TSError("[replace_header] Plugin registration failed.");
   }
 
   TSHttpHookAdd(TS_HTTP_READ_RESPONSE_HDR_HOOK, TSContCreate(replace_header_plugin, NULL));

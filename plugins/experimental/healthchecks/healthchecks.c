@@ -108,19 +108,15 @@ typedef struct HCState_t {
 static void
 reload_status_file(HCFileInfo *info, HCFileData *data)
 {
-  struct stat buf;
+  FILE *fd;
 
   memset(data, 0, sizeof(HCFileData));
-  if (!stat(info->fname, &buf)) {
-    FILE *fd;
-
-    if (NULL != (fd = fopen(info->fname, "r"))) {
-      data->exists = 1;
-      do {
-        data->b_len = fread(data->body, 1, MAX_BODY_LEN, fd);
-      } while (!feof(fd)); /*  Only save the last 16KB of the file ... */
-      fclose(fd);
-    }
+  if (NULL != (fd = fopen(info->fname, "r"))) {
+    data->exists = 1;
+    do {
+      data->b_len = fread(data->body, 1, MAX_BODY_LEN, fd);
+    } while (!feof(fd)); /*  Only save the last 16KB of the file ... */
+    fclose(fd);
   }
 }
 
@@ -417,12 +413,12 @@ hc_process_read(TSCont contp, TSEvent event, HCState *my_state)
     TSVConnShutdown(my_state->net_vc, 1, 0);
     my_state->write_vio = TSVConnWrite(my_state->net_vc, contp, my_state->resp_reader, INT64_MAX);
   } else if (event == TS_EVENT_ERROR) {
-    TSError("hc_process_read: Received TS_EVENT_ERROR\n");
+    TSError("[healthchecks] hc_process_read: Received TS_EVENT_ERROR");
   } else if (event == TS_EVENT_VCONN_EOS) {
     /* client may end the connection, simply return */
     return;
   } else if (event == TS_EVENT_NET_ACCEPT_FAILED) {
-    TSError("hc_process_read: Received TS_EVENT_NET_ACCEPT_FAILED\n");
+    TSError("[healthchecks] hc_process_read: Received TS_EVENT_NET_ACCEPT_FAILED");
   } else {
     TSReleaseAssert(!"Unexpected Event");
   }
@@ -447,7 +443,7 @@ hc_process_write(TSCont contp, TSEvent event, HCState *my_state)
   } else if (TS_EVENT_VCONN_WRITE_COMPLETE) {
     cleanup(contp, my_state);
   } else if (event == TS_EVENT_ERROR) {
-    TSError("hc_process_write: Received TS_EVENT_ERROR\n");
+    TSError("[healthchecks] hc_process_write: Received TS_EVENT_ERROR");
   } else {
     TSReleaseAssert(!"Unexpected Event");
   }
@@ -543,7 +539,7 @@ TSPluginInit(int argc, const char *argv[])
   TSPluginRegistrationInfo info;
 
   if (2 != argc) {
-    TSError("Must specify a configuration file.\n");
+    TSError("[healthchecks] Must specify a configuration file.");
     return;
   }
 
@@ -551,21 +547,21 @@ TSPluginInit(int argc, const char *argv[])
   info.vendor_name = "Apache Software Foundation";
   info.support_email = "dev@trafficserver.apache.org";
 
-  if (TS_SUCCESS != TSPluginRegister(TS_SDK_VERSION_3_0, &info)) {
-    TSError("Plugin registration failed. \n");
+  if (TS_SUCCESS != TSPluginRegister(&info)) {
+    TSError("[healthchecks] Plugin registration failed.");
     return;
   }
 
   /* This will update the global configuration file, and is not reloaded at run time */
   /* ToDo: Support reloading with traffic_line -x  ? */
   if (NULL == (g_config = parse_configs(argv[1]))) {
-    TSError("Unable to read / parse %s config file", argv[1]);
+    TSError("[healthchecks] Unable to read / parse %s config file", argv[1]);
     return;
   }
 
   /* Setup the background thread */
   if (!TSThreadCreate(hc_thread, NULL)) {
-    TSError("Failure in thread creation");
+    TSError("[healthchecks] Failure in thread creation");
     return;
   }
 

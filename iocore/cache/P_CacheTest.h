@@ -94,7 +94,7 @@ struct CacheTestSM : public RegressionSM {
   void
   make_request()
   {
-    start_time = ink_get_hrtime();
+    start_time = Thread::get_hrtime();
     make_request_internal();
   }
   virtual void make_request_internal() = 0;
@@ -113,7 +113,7 @@ struct CacheTestSM : public RegressionSM {
   void
   run()
   {
-    MUTEX_LOCK(lock, mutex, this_ethread());
+    SCOPED_MUTEX_LOCK(lock, mutex, this_ethread());
     timeout = eventProcessor.schedule_imm(this);
   }
   virtual RegressionSM *clone() = 0;

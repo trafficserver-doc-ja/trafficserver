@@ -136,6 +136,7 @@ enum SquidLogCode {
   SQUID_LOG_UDP_FUTURE_2 = 'o',
   SQUID_LOG_ERR_READ_TIMEOUT = 'p',
   SQUID_LOG_ERR_LIFETIME_EXP = 'q',
+  SQUID_LOG_ERR_POST_ENTITY_TOO_LARGE = 'L',
   SQUID_LOG_ERR_NO_CLIENTS_BIG_OBJ = 'r',
   SQUID_LOG_ERR_READ_ERROR = 's',
   SQUID_LOG_ERR_CLIENT_ABORT = 't',
@@ -671,7 +672,7 @@ private:
 /*-------------------------------------------------------------------------
   -------------------------------------------------------------------------*/
 
-inline HTTPVersion::HTTPVersion() : m_version(HTTP_VERSION(0, 9))
+inline HTTPVersion::HTTPVersion() : m_version(HTTP_VERSION(1, 0))
 {
 }
 

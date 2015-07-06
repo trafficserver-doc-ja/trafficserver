@@ -388,7 +388,7 @@ does_method_effect_cache(int method)
 inline static HttpTransact::StateMachineAction_t
 how_to_open_connection(HttpTransact::State *s)
 {
-  ink_assert(s->pending_work == NULL);
+  ink_assert((s->pending_work == NULL) || (s->current.request_to == HttpTransact::PARENT_PROXY));
 
   // Originally we returned which type of server to open
   // Now, however, we may want to issue a cache
@@ -709,11 +709,10 @@ HttpTransact::StartRemapRequest(State *s)
 
   const char syntxt[] = "synthetic.txt";
 
-  s->cop_test_page =
-    (ptr_len_cmp(host, host_len, local_host_ip_str, sizeof(local_host_ip_str) - 1) == 0) &&
-    (ptr_len_cmp(path, path_len, syntxt, sizeof(syntxt) - 1) == 0) && port == s->http_config_param->autoconf_port &&
-    s->method == HTTP_WKSIDX_GET && s->orig_scheme == URL_WKSIDX_HTTP &&
-    (!s->http_config_param->autoconf_localhost_only || ats_ip4_addr_cast(&s->client_info.addr.sa) == htonl(INADDR_LOOPBACK));
+  s->cop_test_page = (ptr_len_cmp(host, host_len, local_host_ip_str, sizeof(local_host_ip_str) - 1) == 0) &&
+                     (ptr_len_cmp(path, path_len, syntxt, sizeof(syntxt) - 1) == 0) &&
+                     port == s->http_config_param->synthetic_port && s->method == HTTP_WKSIDX_GET &&
+                     s->orig_scheme == URL_WKSIDX_HTTP && ats_ip4_addr_cast(&s->client_info.addr.sa) == htonl(INADDR_LOOPBACK);
 
   //////////////////////////////////////////////////////////////////
   // FIX: this logic seems awfully convoluted and hard to follow; //
@@ -819,6 +818,10 @@ HttpTransact::EndRemapRequest(State *s)
       TRANSACT_RETURN(SM_ACTION_INTERNAL_CACHE_NOOP, NULL);
     }
 
+    if (!s->http_config_param->url_remap_required && !incoming_request->is_target_in_url()) {
+      s->hdr_info.client_request.set_url_target_from_host_field();
+    }
+
     /////////////////////////////////////////////////////////
     // check for: (1) reverse proxy is on, and no URL host //
     /////////////////////////////////////////////////////////
@@ -842,8 +845,10 @@ HttpTransact::EndRemapRequest(State *s)
         // socket when there is no host. Need to handle DNS failure elsewhere.
       } else if (host == NULL) { /* no host */
         build_error_response(s, HTTP_STATUS_BAD_REQUEST, "Host Header Required", "request#no_host", NULL);
+        s->squid_codes.log_code = SQUID_LOG_ERR_INVALID_URL;
       } else {
         build_error_response(s, HTTP_STATUS_NOT_FOUND, "Not Found on Accelerator", "urlrouting#no_mapping", NULL);
+        s->squid_codes.log_code = SQUID_LOG_ERR_INVALID_URL;
       }
       s->reverse_proxy = false;
       goto done;
@@ -856,6 +861,7 @@ HttpTransact::EndRemapRequest(State *s)
 
       SET_VIA_STRING(VIA_DETAIL_TUNNEL, VIA_DETAIL_TUNNEL_NO_FORWARD);
       build_error_response(s, HTTP_STATUS_NOT_FOUND, "Not Found", "urlrouting#no_mapping", NULL);
+      s->squid_codes.log_code = SQUID_LOG_ERR_INVALID_URL;
 
       s->reverse_proxy = false;
       goto done;
@@ -1248,6 +1254,32 @@ HttpTransact::HandleRequest(State *s)
   // client keep-alive, cache action, etc.
   initialize_state_variables_from_request(s, &s->hdr_info.client_request);
 
+
+  // The following chunk of code will limit the maximum number of websocket connections (TS-3659)
+  if (s->is_upgrade_request && s->is_websocket && s->http_config_param->max_websocket_connections >= 0) {
+    int64_t val = 0;
+    HTTP_READ_DYN_SUM(http_websocket_current_active_client_connections_stat, val);
+    if (val >= s->http_config_param->max_websocket_connections) {
+      s->is_websocket = false; // unset to avoid screwing up stats.
+      DebugTxn("http_trans", "Rejecting websocket connection because the limit has been exceeded");
+      bootstrap_state_variables_from_request(s, &s->hdr_info.client_request);
+      build_error_response(s, HTTP_STATUS_SERVICE_UNAVAILABLE, "WebSocket Connection Limit Exceeded", NULL, NULL);
+      TRANSACT_RETURN(SM_ACTION_SEND_ERROR_CACHE_NOOP, NULL);
+    }
+  }
+
+  // The following code is configurable to allow a user to control the max post size (TS-3631)
+  if (s->http_config_param->max_post_size > 0 && s->hdr_info.request_content_length > 0 &&
+      s->hdr_info.request_content_length > s->http_config_param->max_post_size) {
+    DebugTxn("http_trans", "Max post size %" PRId64 " Client tried to post a body that was too large.",
+             s->http_config_param->max_post_size);
+    HTTP_INCREMENT_TRANS_STAT(http_post_body_too_large);
+    bootstrap_state_variables_from_request(s, &s->hdr_info.client_request);
+    build_error_response(s, HTTP_STATUS_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large", "request#entity_too_large", NULL);
+    s->squid_codes.log_code = SQUID_LOG_ERR_POST_ENTITY_TOO_LARGE;
+    TRANSACT_RETURN(SM_ACTION_SEND_ERROR_CACHE_NOOP, NULL);
+  }
+
   // The following chunk of code allows you to disallow post w/ expect 100-continue (TS-3459)
   if (s->hdr_info.request_content_length && s->http_config_param->disallow_post_100_continue) {
     MIMEField *expect = s->hdr_info.client_request.field_find(MIME_FIELD_EXPECT, MIME_LEN_EXPECT);
@@ -1353,11 +1385,17 @@ HttpTransact::HandleRequest(State *s)
       s->parent_params->ParentTable->hostMatch) {
     s->force_dns = 1;
   }
-  // YTS Team, yamsat Plugin
-  // Doing a Cache Lookup in case of a Redirection to ensure that
-  // the newly requested object is not in the CACHE
-  if (s->txn_conf->cache_http && s->redirect_info.redirect_in_process && s->state_machine->enable_redirection) {
-    TRANSACT_RETURN(SM_ACTION_CACHE_LOOKUP, NULL);
+  /* A redirect means we need to check some things again.
+     If the cache is enabled then we need to check the new (redirected) request against the cache.
+     If not, then we need to at least do DNS again to guarantee we are using the correct IP address
+     (if the host changed). Note DNS comes after cache lookup so in both cases we do the DNS.
+  */
+  if (s->redirect_info.redirect_in_process && s->state_machine->enable_redirection) {
+    if (s->txn_conf->cache_http) {
+      TRANSACT_RETURN(SM_ACTION_CACHE_LOOKUP, NULL);
+    } else {
+      TRANSACT_RETURN(SM_ACTION_DNS_LOOKUP, OSDNSLookup); // effectively s->force_dns
+    }
   }
 
 
@@ -1431,11 +1469,12 @@ HttpTransact::HandleApiErrorJump(State *s)
   // case the txn was reenabled in error by a plugin from hook SEND_RESPONSE_HDR.
   // build_response doesn't clean the header. So clean it up before.
   // Do fields_clear() instead of clear() to prevent memory leak
-  // and set the source to internal so chunking is handled correctly
   if (s->hdr_info.client_response.valid()) {
     s->hdr_info.client_response.fields_clear();
-    s->source = SOURCE_INTERNAL;
   }
+
+  // Set the source to internal so chunking is handled correctly
+  s->source = SOURCE_INTERNAL;
 
   /**
     The API indicated an error. Lets use a >=400 error from the state (if one's set) or fallback to a
@@ -1856,7 +1895,7 @@ HttpTransact::DecideCacheLookup(State *s)
     s->cache_info.action = CACHE_DO_NO_ACTION;
     s->current.mode = GENERIC_PROXY;
   } else {
-    if (is_request_cache_lookupable(s)) {
+    if (is_request_cache_lookupable(s) && !s->is_upgrade_request) {
       s->cache_info.action = CACHE_DO_LOOKUP;
       s->current.mode = GENERIC_PROXY;
     } else {
@@ -1935,7 +1974,9 @@ HttpTransact::DecideCacheLookup(State *s)
     // for redirect, we skipped cache lookup to do the automatic redirection
     if (s->redirect_info.redirect_in_process) {
       // without calling out the CACHE_LOOKUP_COMPLETE_HOOK
-      s->cache_info.action = CACHE_DO_WRITE;
+      if (s->txn_conf->cache_http) {
+        s->cache_info.action = CACHE_DO_WRITE;
+      }
       LookupSkipOpenServer(s);
     } else {
       // calling out CACHE_LOOKUP_COMPLETE_HOOK even when the cache
@@ -2651,11 +2692,6 @@ HttpTransact::HandleCacheOpenReadHit(State *s)
         //        ink_release_assert(s->current.request_to == PARENT_PROXY ||
         //                    s->http_config_param->no_dns_forward_to_parent != 0);
 
-        // Set ourselves up to handle pending revalidate issues
-        //  after the PP DNS lookup
-        ink_assert(s->pending_work == NULL);
-        s->pending_work = issue_revalidate;
-
         // We must be going a PARENT PROXY since so did
         //  origin server DNS lookup right after state Start
         //
@@ -2664,6 +2700,11 @@ HttpTransact::HandleCacheOpenReadHit(State *s)
         //  missing ip but we won't take down the system
         //
         if (s->current.request_to == PARENT_PROXY) {
+          // Set ourselves up to handle pending revalidate issues
+          //  after the PP DNS lookup
+          ink_assert(s->pending_work == NULL);
+          s->pending_work = issue_revalidate;
+
           TRANSACT_RETURN(SM_ACTION_DNS_LOOKUP, PPDNSLookup);
         } else if (s->current.request_to == ORIGIN_SERVER) {
           TRANSACT_RETURN(SM_ACTION_DNS_LOOKUP, OSDNSLookup);
@@ -2904,8 +2945,30 @@ HttpTransact::handle_cache_write_lock(State *s)
     // No write lock, ignore the cache and proxy only;
     // FIX: Should just serve from cache if this is a revalidate
     s->cache_info.action = CACHE_DO_NO_ACTION;
-    s->cache_info.write_status = CACHE_WRITE_LOCK_MISS;
-    remove_ims = true;
+    if (s->cache_open_write_fail_action & CACHE_OPEN_WRITE_FAIL_ERROR_ON_MISS) {
+      DebugTxn("http_error", "cache_open_write_fail_action, cache miss, return error");
+      s->cache_info.write_status = CACHE_WRITE_ERROR;
+      build_error_response(s, HTTP_STATUS_BAD_GATEWAY, "Connection Failed", "connect#failed_connect", NULL);
+      MIMEField *ats_field;
+      HTTPHdr *header = &(s->hdr_info.client_response);
+
+      if ((ats_field = header->field_find(MIME_FIELD_ATS_INTERNAL, MIME_LEN_ATS_INTERNAL)) == NULL) {
+        if (likely((ats_field = header->field_create(MIME_FIELD_ATS_INTERNAL, MIME_LEN_ATS_INTERNAL)) != NULL))
+          header->field_attach(ats_field);
+      }
+      if (likely(ats_field)) {
+        Debug("http_error", "Adding Ats-Internal-Messages: %d", CACHE_WL_FAIL);
+        header->field_value_set_int(ats_field, CACHE_WL_FAIL);
+      } else {
+        Debug("http_error", "failed to add Ats-Internal-Messages: %d", CACHE_WL_FAIL);
+      }
+
+      TRANSACT_RETURN(SM_ACTION_SEND_ERROR_CACHE_NOOP, NULL);
+      return;
+    } else {
+      s->cache_info.write_status = CACHE_WRITE_LOCK_MISS;
+      remove_ims = true;
+    }
     break;
   case CACHE_WL_READ_RETRY:
     //  Write failed but retried and got a vector to read
@@ -3409,7 +3472,7 @@ HttpTransact::handle_response_from_icp_suggested_host(State *s)
       }
       return;
     }
-    ink_assert(&s->hdr_info.server_request);
+    ink_assert(s->hdr_info.server_request.valid());
     s->next_action = how_to_open_connection(s);
     if (s->current.server == &s->server_info && s->next_hop_scheme == URL_WKSIDX_HTTP) {
       HttpTransactHeaders::remove_host_name_from_url(&s->hdr_info.server_request);
@@ -3580,6 +3643,18 @@ HttpTransact::handle_response_from_server(State *s)
     s->current.server->set_connect_fail(EUSERS); // too many users
     handle_server_connection_not_open(s);
     break;
+  case CONNECTION_CLOSED:
+  /* fall through */
+  case PARSE_ERROR:
+  /* fall through */
+  case BAD_INCOMING_RESPONSE: {
+    // this case should not be allowed to retry because we'll end up making another request
+    DebugTxn("http_trans",
+             "[handle_response_from_server] Transaction received a bad response or a partial response, not retrying...");
+    SET_VIA_STRING(VIA_DETAIL_SERVER_CONNECT, VIA_DETAIL_SERVER_FAILURE);
+    handle_server_connection_not_open(s);
+    break;
+  }
   case OPEN_RAW_ERROR:
   /* fall through */
   case CONNECTION_ERROR:
@@ -3587,12 +3662,6 @@ HttpTransact::handle_response_from_server(State *s)
   case STATE_UNDEFINED:
   /* fall through */
   case INACTIVE_TIMEOUT:
-  /* fall through */
-  case PARSE_ERROR:
-  /* fall through */
-  case CONNECTION_CLOSED:
-  /* fall through */
-  case BAD_INCOMING_RESPONSE:
     // Set to generic I/O error if not already set specifically.
     if (!s->current.server->had_connect_fail())
       s->current.server->set_connect_fail(EIO);
@@ -3900,8 +3969,9 @@ HttpTransact::handle_forward_server_connection_open(State *s)
         break;
       default:
         DebugTxn("http_trans", "[hfsco] redirect in progress, non-3xx response, setting cache_do_write");
-        if (cw_vc)
+        if (cw_vc && s->txn_conf->cache_http) {
           s->cache_info.action = CACHE_DO_WRITE;
+        }
         break;
       }
     }
@@ -6002,6 +6072,10 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
     return false;
   }
 
+  // the plugin may decide we don't want to cache the response
+  if (s->api_server_response_no_store) {
+    return false;
+  }
   // if method is not GET or HEAD, do not cache.
   // Note: POST is also cacheable with Expires or Cache-control.
   // but due to INKqa11567, we are not caching POST responses.
@@ -6020,7 +6094,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
   if (!(is_request_cache_lookupable(s))) {
     DebugTxn("http_trans", "[is_response_cacheable] "
                            "request is not cache lookupable, response is not cachable");
-    return (false);
+    return false;
   }
   // already has a fresh copy in the cache
   if (s->range_setup == RANGE_NOT_HANDLED)
@@ -6032,13 +6106,13 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
       do_cookies_prevent_caching((int)s->txn_conf->cache_responses_to_cookies, request, response)) {
     DebugTxn("http_trans", "[is_response_cacheable] "
                            "response has uncachable cookies, response is not cachable");
-    return (false);
+    return false;
   }
   // if server spits back a WWW-Authenticate
   if ((s->txn_conf->cache_ignore_auth) == 0 && response->presence(MIME_PRESENCE_WWW_AUTHENTICATE)) {
     DebugTxn("http_trans", "[is_response_cacheable] "
                            "response has WWW-Authenticate, response is not cachable");
-    return (false);
+    return false;
   }
   // does server explicitly forbid storing?
   // If OS forbids storing but a ttl is set, allow caching
@@ -6046,7 +6120,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
       (s->cache_control.ttl_in_cache <= 0)) {
     DebugTxn("http_trans", "[is_response_cacheable] server does not permit storing and config file does not "
                            "indicate that server directive should be ignored");
-    return (false);
+    return false;
   }
   // DebugTxn("http_trans", "[is_response_cacheable] server permits storing");
 
@@ -6057,7 +6131,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
       (s->cache_control.never_cache)) {
     DebugTxn("http_trans", "[is_response_cacheable] config doesn't allow storing, and cache control does not "
                            "say to ignore no-cache and does not specify never-cache or a ttl");
-    return (false);
+    return false;
   }
   // DebugTxn("http_trans", "[is_response_cacheable] config permits storing");
 
@@ -6065,7 +6139,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
   if (!s->cache_info.directives.does_client_permit_storing && !s->cache_control.ignore_client_no_cache) {
     DebugTxn("http_trans", "[is_response_cacheable] client does not permit storing, "
                            "and cache control does not say to ignore client no-cache");
-    return (false);
+    return false;
   }
   DebugTxn("http_trans", "[is_response_cacheable] client permits storing");
 
@@ -6094,7 +6168,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
                                  "last_modified, expires, or max-age is required");
 
           s->squid_codes.hit_miss_code = ((response->get_date() == 0) ? (SQUID_MISS_HTTP_NO_DLE) : (SQUID_MISS_HTTP_NO_LE));
-          return (false);
+          return false;
         }
         break;
 
@@ -6102,7 +6176,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
         if (!response->presence(MIME_PRESENCE_EXPIRES) && !(response->get_cooked_cc_mask() & cc_mask)) {
           DebugTxn("http_trans", "[is_response_cacheable] "
                                  "expires header or max-age is required");
-          return (false);
+          return false;
         }
         break;
 
@@ -6173,10 +6247,7 @@ HttpTransact::is_response_cacheable(State *s, HTTPHdr *request, HTTPHdr *respons
       return false;
     }
   }
-  // the plugin may decide we don't want to cache the response
-  if (s->api_server_response_no_store) {
-    return (false);
-  }
+
   // default cacheability
   if (!s->txn_conf->negative_caching_enabled) {
     if ((response_code == HTTP_STATUS_OK) || (response_code == HTTP_STATUS_NOT_MODIFIED) ||
@@ -7062,7 +7133,7 @@ HttpTransact::calculate_document_freshness_limit(State *s, HTTPHdr *response, ti
       freshness_limit = (int)response->get_cooked_cc_max_age();
       DebugTxn("http_match", "calculate_document_freshness_limit --- max_age set, freshness_limit = %d", freshness_limit);
     }
-    freshness_limit = min(max(0, freshness_limit), NUM_SECONDS_IN_ONE_YEAR);
+    freshness_limit = min(max(0, freshness_limit), (int)s->txn_conf->cache_guaranteed_max_lifetime);
   } else {
     date_set = last_modified_set = false;
 
@@ -7099,7 +7170,7 @@ HttpTransact::calculate_document_freshness_limit(State *s, HTTPHdr *response, ti
       DebugTxn("http_match", "calculate_document_freshness_limit --- Expires: %" PRId64 ", Date: %" PRId64 ", freshness_limit = %d",
                (int64_t)expires_value, (int64_t)date_value, freshness_limit);
 
-      freshness_limit = min(max(0, freshness_limit), NUM_SECONDS_IN_ONE_YEAR);
+      freshness_limit = min(max(0, freshness_limit), (int)s->txn_conf->cache_guaranteed_max_lifetime);
     } else {
       last_modified_value = 0;
       if (response->presence(MIME_PRESENCE_LAST_MODIFIED)) {
@@ -7136,7 +7207,7 @@ HttpTransact::calculate_document_freshness_limit(State *s, HTTPHdr *response, ti
 
   // The freshness limit must always fall within the min and max guaranteed bounds.
   min_freshness_bounds = max((MgmtInt)0, s->txn_conf->cache_guaranteed_min_lifetime);
-  max_freshness_bounds = min((MgmtInt)NUM_SECONDS_IN_ONE_YEAR, s->txn_conf->cache_guaranteed_max_lifetime);
+  max_freshness_bounds = s->txn_conf->cache_guaranteed_max_lifetime;
 
   // Heuristic freshness can be more strict.
   if (*heuristic) {
@@ -7169,7 +7240,7 @@ HttpTransact::calculate_document_freshness_limit(State *s, HTTPHdr *response, ti
 int
 HttpTransact::calculate_freshness_fuzz(State *s, int fresh_limit)
 {
-  static double LOG_YEAR = log10((double)NUM_SECONDS_IN_ONE_YEAR);
+  static double LOG_YEAR = log10((double)s->txn_conf->cache_guaranteed_max_lifetime);
   const uint32_t granularity = 1000;
   int result = 0;
 
@@ -7224,6 +7295,13 @@ HttpTransact::what_is_document_freshness(State *s, HTTPHdr *client_request, HTTP
   uint32_t cc_mask, cooked_cc_mask;
   uint32_t os_specifies_revalidate;
 
+  if (s->cache_open_write_fail_action & CACHE_OPEN_WRITE_FAIL_STALE_OR_REVALIDATE) {
+    if (is_stale_cache_response_returnable(s)) {
+      DebugTxn("http_match", "[what_is_document_freshness] cache_serve_stale_on_write_lock_fail, return FRESH");
+      return (FRESHNESS_FRESH);
+    }
+  }
+
   //////////////////////////////////////////////////////
   // If config file has a ttl-in-cache field set,     //
   // it has priority over any other http headers and  //
@@ -7265,7 +7343,7 @@ HttpTransact::what_is_document_freshness(State *s, HTTPHdr *client_request, HTTP
   if (s->txn_conf->freshness_fuzz_time >= 0) {
     fresh_limit = fresh_limit - calculate_freshness_fuzz(s, fresh_limit);
     fresh_limit = max(0, fresh_limit);
-    fresh_limit = min(NUM_SECONDS_IN_ONE_YEAR, fresh_limit);
+    fresh_limit = min((int)s->txn_conf->cache_guaranteed_max_lifetime, fresh_limit);
   }
 
   current_age = HttpTransactHeaders::calculate_document_age(s->request_sent_time, s->response_received_time, cached_obj_response,
@@ -7273,9 +7351,9 @@ HttpTransact::what_is_document_freshness(State *s, HTTPHdr *client_request, HTTP
 
   // Overflow ?
   if (current_age < 0)
-    current_age = NUM_SECONDS_IN_ONE_YEAR; // TODO: Should we make a new "max age" define?
+    current_age = s->txn_conf->cache_guaranteed_max_lifetime;
   else
-    current_age = min((time_t)NUM_SECONDS_IN_ONE_YEAR, current_age);
+    current_age = min((time_t)s->txn_conf->cache_guaranteed_max_lifetime, current_age);
 
   DebugTxn("http_match", "[what_is_document_freshness] fresh_limit:  %d  current_age: %" PRId64, fresh_limit, (int64_t)current_age);
 
@@ -8229,11 +8307,11 @@ ink_cluster_time(void)
 
 #ifdef DEBUG
   ink_mutex_acquire(&http_time_lock);
-  ink_time_t local_time = ink_get_hrtime() / HRTIME_SECOND;
+  ink_time_t local_time = Thread::get_hrtime() / HRTIME_SECOND;
   last_http_local_time = local_time;
   ink_mutex_release(&http_time_lock);
 #else
-  ink_time_t local_time = ink_get_hrtime() / HRTIME_SECOND;
+  ink_time_t local_time = Thread::get_hrtime() / HRTIME_SECOND;
 #endif
 
   highest_delta = (int)HttpConfig::m_master.cluster_time_delta;

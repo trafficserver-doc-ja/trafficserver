@@ -162,6 +162,18 @@ public:
     transparentPassThrough = val;
   };
 
+  void
+  set_session_accept_pointer(SessionAccept *acceptPtr)
+  {
+    sessionAcceptPtr = acceptPtr;
+  };
+
+  SessionAccept *
+  get_session_accept_pointer(void) const
+  {
+    return sessionAcceptPtr;
+  };
+
   // Copy up here so we overload but don't override
   using super::reenable;
 
@@ -207,6 +219,30 @@ public:
   // least some of the hooks
   bool calledHooks(TSHttpHookID /* eventId */) { return (this->sslHandshakeHookState != HANDSHAKE_HOOKS_PRE); }
 
+  MIOBuffer *
+  get_ssl_iobuf()
+  {
+    return iobuf;
+  }
+
+  void
+  set_ssl_iobuf(MIOBuffer *buf)
+  {
+    iobuf = buf;
+  }
+
+  IOBufferReader *
+  get_ssl_reader()
+  {
+    return reader;
+  }
+
+  bool
+  isEosRcvd()
+  {
+    return eosRcvd;
+  }
+
 private:
   SSLNetVConnection(const SSLNetVConnection &);
   SSLNetVConnection &operator=(const SSLNetVConnection &);
@@ -243,6 +279,10 @@ private:
 
   const SSLNextProtocolSet *npnSet;
   Continuation *npnEndpoint;
+  SessionAccept *sessionAcceptPtr;
+  MIOBuffer *iobuf;
+  IOBufferReader *reader;
+  bool eosRcvd;
 };
 
 typedef int (SSLNetVConnection::*SSLNetVConnHandler)(int, void *);

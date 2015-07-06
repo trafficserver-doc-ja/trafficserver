@@ -21,6 +21,8 @@
 #include "ts/ts.h"
 #include "ts/remap.h"
 
+#include "ts/ink_atomic.h"
+
 #include "parser.h"
 #include "ruleset.h"
 #include "resources.h"
@@ -32,28 +34,18 @@ const char PLUGIN_NAME_DBG[] = "dbg_header_rewrite";
 // Forward declaration for the main continuation.
 static int cont_rewrite_headers(TSCont, TSEvent, void *);
 
-
 // Simple wrapper around a configuration file / set. This is useful such that
 // we can reuse most of the code for both global and per-remap rule sets.
 class RulesConfig
 {
 public:
-  RulesConfig()
+  RulesConfig() : _ref_count(0)
   {
     memset(_rules, 0, sizeof(_rules));
     memset(_resids, 0, sizeof(_resids));
 
     _cont = TSContCreate(cont_rewrite_headers, NULL);
     TSContDataSet(_cont, static_cast<void *>(this));
-  }
-
-  ~RulesConfig()
-  {
-    for (int i = TS_HTTP_READ_REQUEST_HDR_HOOK; i < TS_HTTP_LAST_HOOK; ++i) {
-      delete _rules[i];
-    }
-
-    TSContDestroy(_cont);
   }
 
   TSCont
@@ -75,10 +67,31 @@ public:
 
   bool parse_config(const std::string fname, TSHttpHookID default_hook);
 
+  void
+  hold()
+  {
+    ink_atomic_increment(&_ref_count, 1);
+  }
+  void
+  release()
+  {
+    if (1 >= ink_atomic_decrement(&_ref_count, 1))
+      delete this;
+  }
+
 private:
+  ~RulesConfig()
+  {
+    for (int i = TS_HTTP_READ_REQUEST_HDR_HOOK; i < TS_HTTP_LAST_HOOK; ++i) {
+      delete _rules[i];
+    }
+    TSContDestroy(_cont);
+  }
+
   bool add_rule(RuleSet *rule);
 
   TSCont _cont;
+  volatile int _ref_count;
   RuleSet *_rules[TS_HTTP_LAST_HOOK + 1];
   ResourceIDs _resids[TS_HTTP_LAST_HOOK + 1];
 };
@@ -116,7 +129,7 @@ RulesConfig::parse_config(const std::string fname, TSHttpHookID default_hook)
   int lineno = 0;
 
   if (0 == fname.size()) {
-    TSError("%s: no config filename provided", PLUGIN_NAME);
+    TSError("[%s] no config filename provided", PLUGIN_NAME);
     return false;
   }
 
@@ -129,7 +142,7 @@ RulesConfig::parse_config(const std::string fname, TSHttpHookID default_hook)
 
   f.open(filename.c_str(), std::ios::in);
   if (!f.is_open()) {
-    TSError("%s: unable to open %s", PLUGIN_NAME, filename.c_str());
+    TSError("[%s] unable to open %s", PLUGIN_NAME, filename.c_str());
     return false;
   }
 
@@ -236,8 +249,11 @@ cont_rewrite_headers(TSCont contp, TSEvent event, void *edata)
   case TS_EVENT_HTTP_SEND_RESPONSE_HDR:
     hook = TS_HTTP_SEND_RESPONSE_HDR_HOOK;
     break;
+  case TS_EVENT_HTTP_TXN_CLOSE:
+    conf->release();
+    break;
   default:
-    TSError("%s: unknown event for this plugin", PLUGIN_NAME);
+    TSError("[%s] unknown event for this plugin", PLUGIN_NAME);
     TSDebug(PLUGIN_NAME, "unknown event for this plugin");
     break;
   }
@@ -279,14 +295,16 @@ TSPluginInit(int argc, const char *argv[])
   info.vendor_name = (char *)"Apache Software Foundation";
   info.support_email = (char *)"dev@trafficserver.apache.org";
 
-  if (TS_SUCCESS != TSPluginRegister(TS_SDK_VERSION_3_0, &info)) {
-    TSError("%s: plugin registration failed.\n", PLUGIN_NAME);
+  if (TS_SUCCESS != TSPluginRegister(&info)) {
+    TSError("[%s] plugin registration failed.", PLUGIN_NAME);
   }
 
   // Parse the global config file(s). All rules are just appended
   // to the "global" Rules configuration.
   RulesConfig *conf = new RulesConfig;
   bool got_config = false;
+
+  conf->hold();
 
   for (int i = 1; i < argc; ++i) {
     // Parse the config file(s). Note that multiple config files are
@@ -296,7 +314,7 @@ TSPluginInit(int argc, const char *argv[])
       TSDebug(PLUGIN_NAME, "Succesfully loaded global config file %s", argv[i]);
       got_config = true;
     } else {
-      TSError("header_rewrite: failed to parse configuration file %s", argv[i]);
+      TSError("[header_rewrite] failed to parse configuration file %s", argv[i]);
     }
   }
 
@@ -312,8 +330,8 @@ TSPluginInit(int argc, const char *argv[])
     }
   } else {
     // Didn't get anything, nuke it.
-    TSError("%s: failed to parse configuration file", PLUGIN_NAME);
-    delete conf;
+    TSError("[%s] failed to parse configuration file", PLUGIN_NAME);
+    conf->release();
   }
 }
 
@@ -351,16 +369,18 @@ TSRemapNewInstance(int argc, char *argv[], void **ih, char * /* errbuf ATS_UNUSE
   TSDebug(PLUGIN_NAME, "Instantiating a new remap.config plugin rule");
 
   if (argc < 3) {
-    TSError("%s: Unable to create remap instance, need config file", PLUGIN_NAME);
+    TSError("[%s] Unable to create remap instance, need config file", PLUGIN_NAME);
     return TS_ERROR;
   }
 
   RulesConfig *conf = new RulesConfig;
 
+  conf->hold();
+
   for (int i = 2; i < argc; ++i) {
     TSDebug(PLUGIN_NAME, "Loading remap configuration file %s", argv[i]);
     if (!conf->parse_config(argv[i], TS_REMAP_PSEUDO_HOOK)) {
-      TSError("%s: Unable to create remap instance", PLUGIN_NAME);
+      TSError("[%s] Unable to create remap instance", PLUGIN_NAME);
       return TS_ERROR;
     } else {
       TSDebug(PLUGIN_NAME, "Succesfully loaded remap config file %s", argv[i]);
@@ -384,9 +404,7 @@ TSRemapNewInstance(int argc, char *argv[], void **ih, char * /* errbuf ATS_UNUSE
 void
 TSRemapDeleteInstance(void *ih)
 {
-  RulesConfig *conf = static_cast<RulesConfig *>(ih);
-
-  delete conf;
+  static_cast<RulesConfig *>(ih)->release();
 }
 
 
@@ -396,6 +414,8 @@ TSRemapDeleteInstance(void *ih)
 TSRemapStatus
 TSRemapDoRemap(void *ih, TSHttpTxn rh, TSRemapRequestInfo *rri)
 {
+  bool hooked_p = false;
+
   // Make sure things are properly setup (this should never happen)
   if (NULL == ih) {
     TSDebug(PLUGIN_NAME, "No Rules configured, falling back to default");
@@ -408,9 +428,16 @@ TSRemapDoRemap(void *ih, TSHttpTxn rh, TSRemapRequestInfo *rri)
   // Go through all hooks we support, and setup the txn hook(s) as necessary
   for (int i = TS_HTTP_READ_REQUEST_HDR_HOOK; i < TS_HTTP_LAST_HOOK; ++i) {
     if (conf->rule(i)) {
+      hooked_p = true;
       TSHttpTxnHookAdd(rh, static_cast<TSHttpHookID>(i), conf->continuation());
       TSDebug(PLUGIN_NAME, "Added remapped TXN hook=%s", TSHttpHookNameLookup((TSHttpHookID)i));
     }
+  }
+
+  // Two assumptions - configuration never uses this hook nor uses TS_HTTP_SSN_CLOSE_HOOK.
+  if (hooked_p) {
+    conf->hold();                                                       // mark as in use.
+    TSHttpTxnHookAdd(rh, TS_HTTP_TXN_CLOSE_HOOK, conf->continuation()); // clean up after.
   }
 
   // Now handle the remap specific rules for the "remap hook" (which is not a real hook).

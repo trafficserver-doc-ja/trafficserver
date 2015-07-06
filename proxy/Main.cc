@@ -84,12 +84,12 @@ extern "C" int plock(int);
 #include "Plugin.h"
 #include "DiagsConfig.h"
 #include "CoreUtils.h"
-#include "Update.h"
 #include "congest/Congestion.h"
 #include "RemapProcessor.h"
 #include "I_Tasks.h"
 #include "InkAPIInternal.h"
 #include "HTTP2.h"
+#include "ts/ink_config.h"
 
 #include <ts/ink_cap.h>
 
@@ -181,21 +181,8 @@ static const ArgumentDescription argument_descriptions[] = {
   {"dprintf_level", 'o', "Debug output level", "I", &cmd_line_dprintf_level, "PROXY_DPRINTF_LEVEL", NULL},
 
 #if TS_HAS_TESTS
-  {"regression", 'R',
-#ifdef DEBUG
-   "Regression Level (quick:1..long:3)",
-#else
-   0,
-#endif
-   "I", &regression_level, "PROXY_REGRESSION", NULL},
-  {"regression_test", 'r',
-
-#ifdef DEBUG
-   "Run Specific Regression Test",
-#else
-   0,
-#endif
-   "S512", regression_test, "PROXY_REGRESSION_TEST", NULL},
+  {"regression", 'R', "Regression Level (quick:1..long:3)", "I", &regression_level, "PROXY_REGRESSION", NULL},
+  {"regression_test", 'r', "Run Specific Regression Test", "S512", regression_test, "PROXY_REGRESSION_TEST", NULL},
 #endif // TS_HAS_TESTS
 
 #if TS_USE_DIAGS
@@ -541,7 +528,7 @@ CB_After_Cache_Init()
   }
 
   time_t cache_ready_at = time(NULL);
-  RecSetRecordInt("proxy.node.restarts.proxy.cache_ready_time", cache_ready_at);
+  RecSetRecordInt("proxy.node.restarts.proxy.cache_ready_time", cache_ready_at, REC_SOURCE_DEFAULT);
 
   // Alert the plugins the cache is initialized.
   hook = lifecycle_hooks->get(TS_LIFECYCLE_CACHE_READY_HOOK);
@@ -592,7 +579,7 @@ cmd_check_internal(char * /* cmd ATS_UNUSED */, bool fix = false)
 
   printf("%s\n\n", n);
 
-  hostdb_current_interval = (ink_get_based_hrtime() / HRTIME_MINUTE);
+  hostdb_current_interval = (Thread::get_hrtime() / HRTIME_MINUTE);
 
 #if 0
   printf("Host Database\n");
@@ -956,12 +943,12 @@ adjust_sys_settings(void)
   rlim_t maxfiles;
 
 // TODO: I think we might be able to get rid of this?
-#if defined(ATS_MMAP_MAX)
+#if defined(M_MMAP_MAX)
   int mmap_max = -1;
 
   REC_ReadConfigInteger(mmap_max, "proxy.config.system.mmap_max");
   if (mmap_max >= 0)
-    ats_mallopt(ATS_MMAP_MAX, mmap_max);
+    ats_mallopt(M_MMAP_MAX, mmap_max);
 #endif
 
   maxfiles = ink_get_max_files();
@@ -1458,6 +1445,13 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   // Restart syslog now that we have configuration info
   syslog_log_configure();
 
+  // init huge pages
+  int enabled;
+  REC_ReadConfigInteger(enabled, "proxy.config.allocator.hugepages");
+  ats_hugepage_init(enabled);
+  Debug("hugepages", "ats_pagesize reporting %zu", ats_pagesize());
+  Debug("hugepages", "ats_hugepage_size reporting %zu", ats_hugepage_size());
+
   if (!num_accept_threads)
     REC_ReadConfigInteger(num_accept_threads, "proxy.config.accept_threads");
 
@@ -1781,11 +1775,6 @@ main(int /* argc ATS_UNUSED */, const char **argv)
     if (netProcessor.socks_conf_stuff->accept_enabled) {
       start_SocksProxy(netProcessor.socks_conf_stuff->accept_port);
     }
-
-    ///////////////////////////////////////////
-    // Initialize Scheduled Update subsystem
-    ///////////////////////////////////////////
-    updateManager.start();
 
     pmgmt->registerMgmtCallback(MGMT_EVENT_SHUTDOWN, mgmt_restart_shutdown_callback, NULL);
     pmgmt->registerMgmtCallback(MGMT_EVENT_RESTART, mgmt_restart_shutdown_callback, NULL);

@@ -377,7 +377,7 @@ Traffic Line commands do not execute under the following conditions:
 .. XXX: this is wrong
 
     You should always start and stop Traffic Server with the
-    :program:`trafficserver start`` and :program:`trafficserver stop` commands to ensure
+    :program:`trafficserver start` and :program:`trafficserver stop` commands to ensure
     that all the processes start and stop correctly. For more information,
     refer to :ref:`getting-started`.
 
@@ -588,6 +588,16 @@ the system log files (``/var/log/messages``)::
 To avoid memory exhaustion, add more RAM to the system or reduce the
 load on Traffic Server.
 
+Config checker
+--------------
+
+Traffic Server supports the below command to validate the config offline, inorder to
+allow the config to be pre-checked for possible service disruptions due to synatx errors::
+
+   traffic_server -Cverify_config -D<config_dir>
+
+<config_dir> is the location of the config files to be validated.
+
 Connection timeouts with the origin server
 ------------------------------------------
 
@@ -596,4 +606,17 @@ origin servers. If you cannot avoid such timeouts by otherwise addressing the
 performance on your origin servers, you may adjust the origin connection timeout
 in Traffic Server by changing :ts:cv:`proxy.config.http.connect_attempts_timeout`
 in :file:`records.config` to a larger value.
+
+Timers applicable to various states in the transaction
+-----------------------------------------------------
+
+Traffic Server runs a variety of timers at various states of a transaction. Typically,
+a given transaction may include upto two connections (one on the UA/client side and the
+other on the Origin side). Traffic Server supports two kinds of timers "Active" and
+"Inactive" timers for each side respectively, as applicable at a given state. The below
+picture illustrates the specific timers run at various states in the current implementation.
+
+.. figure:: ../static/images/admin/transaction_states_timers.svg
+   :align: center
+   :alt: Active and Inactive Timers in various states
 

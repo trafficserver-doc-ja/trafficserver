@@ -28,6 +28,7 @@
 #define XHEADER_X_CACHE_KEY 0x0004u
 #define XHEADER_X_MILESTONES 0x0008u
 #define XHEADER_X_CACHE 0x0010u
+#define XHEADER_X_GENERATION 0x0020u
 
 static int XArgIndex = 0;
 static TSCont XInjectHeadersCont = NULL;
@@ -53,6 +54,24 @@ FindOrMakeHdrField(TSMBuffer buffer, TSMLoc hdr, const char *name, unsigned len)
   }
 
   return field;
+}
+
+static void
+InjectGenerationHeader(TSHttpTxn txn, TSMBuffer buffer, TSMLoc hdr)
+{
+  TSMgmtInt value;
+  TSMLoc dst = TS_NULL_MLOC;
+
+  if (TSHttpTxnConfigIntGet(txn, TS_CONFIG_HTTP_CACHE_GENERATION, &value) == TS_SUCCESS) {
+    dst = FindOrMakeHdrField(buffer, hdr, "X-Cache-Generation", lengthof("X-Cache-Generation"));
+    if (dst != TS_NULL_MLOC) {
+      TSReleaseAssert(TSMimeHdrFieldValueInt64Set(buffer, hdr, dst, -1 /* idx */, value) == TS_SUCCESS);
+    }
+  }
+
+  if (dst != TS_NULL_MLOC) {
+    TSHandleMLocRelease(buffer, hdr, dst);
+  }
 }
 
 static void
@@ -165,6 +184,8 @@ InjectMilestonesHeader(TSHttpTxn txn, TSMBuffer buffer, TSMLoc hdr)
     {TS_MILESTONE_CACHE_OPEN_WRITE_END, "CACHE-OPEN-WRITE-END"},
     {TS_MILESTONE_DNS_LOOKUP_BEGIN, "DNS-LOOKUP-BEGIN"},
     {TS_MILESTONE_DNS_LOOKUP_END, "DNS-LOOKUP-END"},
+    {TS_MILESTONE_PLUGIN_ACTIVE, "PLUGIN-ACTIVE"},
+    {TS_MILESTONE_PLUGIN_TOTAL, "PLUGIN-TOTAL"},
   };
 
   TSMLoc dst = TS_NULL_MLOC;
@@ -234,6 +255,10 @@ XInjectResponseHeaders(TSCont /* contp */, TSEvent event, void *edata)
     InjectMilestonesHeader(txn, buffer, hdr);
   }
 
+  if (xheaders & XHEADER_X_GENERATION) {
+    InjectGenerationHeader(txn, buffer, hdr);
+  }
+
 done:
   TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
   return TS_EVENT_NONE;
@@ -280,6 +305,8 @@ XScanRequestHeaders(TSCont /* contp */, TSEvent event, void *edata)
         xheaders |= XHEADER_X_MILESTONES;
       } else if (header_field_eq("x-cache", value, vsize)) {
         xheaders |= XHEADER_X_CACHE;
+      } else if (header_field_eq("x-cache-generation", value, vsize)) {
+        xheaders |= XHEADER_X_GENERATION;
       } else if (header_field_eq("via", value, vsize)) {
         // If the client requests the Via header, enable verbose Via debugging for this transaction.
         TSHttpTxnConfigIntSet(txn, TS_CONFIG_HTTP_INSERT_RESPONSE_VIA_STR, 3);
@@ -323,8 +350,8 @@ TSPluginInit(int /* argc */, const char * /*argv */ [])
   info.vendor_name = (char *)"Apache Software Foundation";
   info.support_email = (char *)"dev@trafficserver.apache.org";
 
-  if (TSPluginRegister(TS_SDK_VERSION_3_0, &info) != TS_SUCCESS) {
-    TSError("xdebug plugin registration failed");
+  if (TSPluginRegister(&info) != TS_SUCCESS) {
+    TSError("[xdebug] Plugin registration failed");
   }
 
   TSReleaseAssert(TSHttpArgIndexReserve("xdebug", "xdebug header requests", &XArgIndex) == TS_SUCCESS);

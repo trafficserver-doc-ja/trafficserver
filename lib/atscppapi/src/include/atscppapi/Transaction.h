@@ -30,7 +30,7 @@
 #include "atscppapi/shared_ptr.h"
 #include "atscppapi/ClientRequest.h"
 #include "atscppapi/Response.h"
-
+#include <../ts/apidefs.h>
 namespace atscppapi
 {
 // forward declarations
@@ -255,6 +255,19 @@ public:
   void setTimeout(TimeoutType type, int time_ms);
 
   /**
+   * Represents different states of an object served out of the cache
+   */
+  enum CacheStatus {
+    CACHE_LOOKUP_MISS = 0,  /**< The object was not found in the cache */
+    CACHE_LOOKUP_HIT_STALE, /**< The object was found in cache but stale */
+    CACHE_LOOKUP_HIT_FRESH, /**< The object was found in cache and was fresh */
+    CACHE_LOOKUP_SKIPED,    /**< Cache lookup was not performed */
+    CACHE_LOOKUP_NONE
+  };
+
+  CacheStatus getCacheStatus();
+
+  /**
    * Returns the TSHttpTxn related to the current Transaction
    *
    * @return a void * which can be cast back to a TSHttpTxn.
@@ -307,6 +320,14 @@ public:
    * Redirect the transaction a different @a url.
    */
   void redirectTo(std::string const &url);
+
+  bool configIntSet(TSOverridableConfigKey conf, int value);
+  bool configIntGet(TSOverridableConfigKey conf, int *value);
+  bool configFloatSet(TSOverridableConfigKey conf, float value);
+  bool configFloatGet(TSOverridableConfigKey conf, float *value);
+  bool configStringSet(TSOverridableConfigKey conf, std::string const &value);
+  bool configStringGet(TSOverridableConfigKey conf, std::string &value);
+  bool configFind(std::string const &name, TSOverridableConfigKey *conf, TSRecordDataType *type);
 
 private:
   TransactionState *state_;          //!< The internal TransactionState object tied to the current Transaction

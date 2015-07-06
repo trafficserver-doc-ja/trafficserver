@@ -337,8 +337,13 @@ ConditionQuery::eval(const Resources &res)
 
 // ConditionUrl: request or response header. TODO: This is not finished, at all!!!
 void
-ConditionUrl::initialize(Parser & /* p ATS_UNUSED */)
+ConditionUrl::initialize(Parser &p)
 {
+  Condition::initialize(p);
+
+  Matchers<std::string> *match = new Matchers<std::string>(_cond_op);
+  match->set(p.get_arg());
+  _matcher = match;
 }
 
 
@@ -358,11 +363,56 @@ ConditionUrl::append_value(std::string & /* s ATS_UNUSED */, const Resources & /
 
 
 bool
-ConditionUrl::eval(const Resources & /* res ATS_UNUSED */)
+ConditionUrl::eval(const Resources &res)
 {
-  bool ret = false;
+  TSDebug(PLUGIN_NAME, "ConditionUrl::eval");
+  TSMLoc url = NULL;
+  TSMBuffer bufp = NULL;
+  std::string s;
 
-  return ret;
+  if (res._rri != NULL) {
+    // called at the remap hook
+    bufp = res._rri->requestBufp;
+    if (_type == URL || _type == CLIENT) {
+      // res._rri->requestBufp and res.client_bufp are the same if it is at the remap hook
+      TSDebug(PLUGIN_NAME, "   Using the request url");
+      url = res._rri->requestUrl;
+    } else if (_type == FROM) {
+      TSDebug(PLUGIN_NAME, "   Using the from url");
+      url = res._rri->mapFromUrl;
+    } else if (_type == TO) {
+      TSDebug(PLUGIN_NAME, "   Using the to url");
+      url = res._rri->mapToUrl;
+    } else {
+      TSError("[header_rewrite] Invalid option value");
+      return false;
+    }
+  } else {
+    TSMLoc hdr_loc = NULL;
+    if (_type == CLIENT) {
+      bufp = res.client_bufp;
+      hdr_loc = res.client_hdr_loc;
+    } else if (_type == URL) {
+      bufp = res.bufp;
+      hdr_loc = res.hdr_loc;
+    } else {
+      TSError("[header_rewrite] Rule not supported at this hook");
+      return false;
+    }
+    if (TSHttpHdrUrlGet(bufp, hdr_loc, &url) != TS_SUCCESS) {
+      TSError("[header_rewrite] Error getting the URL");
+      return false;
+    }
+  }
+
+  if (_url_qual == URL_QUAL_HOST) {
+    int host_len = 0;
+    const char *host = TSUrlHostGet(bufp, url, &host_len);
+    s.append(host, host_len);
+    TSDebug(PLUGIN_NAME, "   Host to match is: %.*s", host_len, host);
+  }
+
+  return static_cast<const Matchers<std::string> *>(_matcher)->test(s);
 }
 
 
@@ -388,7 +438,7 @@ ConditionDBM::initialize(Parser &p)
     //   TSError("Failed to open DBM file: %s", _file.c_str());
     // }
   } else {
-    TSError("%s: Malformed DBM condition", PLUGIN_NAME);
+    TSError("[%s] Malformed DBM condition", PLUGIN_NAME);
   }
 }
 
@@ -563,4 +613,48 @@ ConditionIncomingPort::append_value(std::string &s, const Resources &res)
   oss << port;
   s += oss.str();
   TSDebug(PLUGIN_NAME, "Appending %d to evaluation value -> %s", port, s.c_str());
+}
+
+// ConditionTransactCount
+void
+ConditionTransactCount::initialize(Parser &p)
+{
+  Condition::initialize(p);
+
+  MatcherType *match = new MatcherType(_cond_op);
+  std::string const &arg = p.get_arg();
+  match->set(strtol(arg.c_str(), NULL, 10));
+
+  _matcher = match;
+}
+
+bool
+ConditionTransactCount::eval(const Resources &res)
+{
+  TSHttpSsn ssn = TSHttpTxnSsnGet(res.txnp);
+  bool rval = false;
+  if (ssn) {
+    int n = TSHttpSsnTransactionCount(ssn);
+    rval = static_cast<MatcherType *>(_matcher)->test(n);
+    TSDebug(PLUGIN_NAME, "Evaluating TXN-COUNT(): %d: rval: %s", n, rval ? "true" : "false");
+  } else {
+    TSDebug(PLUGIN_NAME, "Evaluation TXN-COUNT(): No session found, returning false");
+  }
+  return rval;
+}
+
+void
+ConditionTransactCount::append_value(std::string &s, Resources const &res)
+{
+  TSHttpSsn ssn = TSHttpTxnSsnGet(res.txnp);
+
+  if (ssn) {
+    char value[32]; // enough for UINT64_MAX
+    int count = TSHttpSsnTransactionCount(ssn);
+    int length = ink_fast_itoa(count, value, sizeof(value));
+    if (length > 0) {
+      TSDebug(PLUGIN_NAME, "Appending TXN-COUNT %s to evaluation value %.*s", _qualifier.c_str(), length, value);
+      s.append(value, length);
+    }
+  }
 }

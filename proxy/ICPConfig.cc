@@ -46,7 +46,7 @@
 //    hostname (string)         -- hostname, used only if (host_ip_str == 0)
 //    host_ip_str (string)      -- decimal dot notation; if null get IP
 //                                   addresss via lookup on hostname
-//    ctype (int)               -- 1=Parent, 2=Sibling
+//    ctype (int)               -- 1=Parent, 2=Sibling, 3=local
 //    proxy_port (int)          -- TCP Port #
 //    icp_port (int)            -- UDP Port #
 //    multicast_member          -- 0=No 1=Yes
@@ -392,6 +392,8 @@ ICPConfiguration::ICPConfiguration() : _icp_config_callouts(0)
   ICP_EstablishStaticConfigInteger(_icp_cdata_current->_stale_lookup, "proxy.config.icp.stale_icp_enabled");
   ICP_EstablishStaticConfigInteger(_icp_cdata_current->_reply_to_unknown_peer, "proxy.config.icp.reply_to_unknown_peer");
   ICP_EstablishStaticConfigInteger(_icp_cdata_current->_default_reply_port, "proxy.config.icp.default_reply_port");
+  REC_EstablishStaticConfigInteger(_icp_cdata_current->_cache_generation, "proxy.config.http.cache.generation");
+
   UpdateGlobalConfig(); // sync working copy with current
 
   //**********************************************************
@@ -556,7 +558,7 @@ ICPConfiguration::icp_config_change_callback(void *data, void *value, int startu
   //  Each line is formatted as follows with ":" separator for each field
   //    - hostname (string)           -- Identifier for entry
   //    - host_ip_str (string)        -- decimal dot notation
-  //    - ctype (int)                 -- 1=Parent, 2=Sibling
+  //    - ctype (int)                 -- 1=Parent, 2=Sibling, 3=Local
   //    - proxy_port (int)            -- TCP Port #
   //    - icp_port (int)              -- UDP Port #
   //    - multicast_member            -- 0=No 1=Yes
@@ -664,7 +666,8 @@ ICPConfiguration::icp_config_change_callback(void *data, void *value, int startu
     *next++ = 0;
     if (cur != (next - 1)) {
       P[n]._ctype = atoi(cur);
-      if ((P[n]._ctype != PeerConfigData::CTYPE_PARENT) && (P[n]._ctype != PeerConfigData::CTYPE_SIBLING)) {
+      if ((P[n]._ctype != PeerConfigData::CTYPE_PARENT) && (P[n]._ctype != PeerConfigData::CTYPE_SIBLING) &&
+          (P[n]._ctype != PeerConfigData::CTYPE_LOCAL)) {
         RecSignalWarning(REC_SIGNAL_CONFIG_ERROR, "read icp.config, bad ctype, line %d", ln);
         error = 1;
         break;
@@ -802,7 +805,7 @@ Peer::LogRecvMsg(ICPMsg_t *m, int valid)
   // Note: ICPMsg_t (m) is in native byte order
 
   // Note numerous stats on a per peer basis
-  _stats.last_receive = ink_get_hrtime();
+  _stats.last_receive = Thread::get_hrtime();
   if ((m->h.opcode >= ICP_OP_QUERY) && (m->h.opcode <= ICP_OP_LAST)) {
     _stats.recv[m->h.opcode]++;
   } else {
@@ -959,7 +962,7 @@ ParentSiblingPeer::LogSendMsg(ICPMsg_t *m, sockaddr const * /* sa ATS_UNUSED */)
   // Note: ICPMsg_t (m) is in network byte order
 
   // Note numerous stats on a per peer basis
-  _stats.last_send = ink_get_hrtime();
+  _stats.last_send = Thread::get_hrtime();
   _stats.sent[m->h.opcode]++;
   _stats.total_sent++;
 }
@@ -1086,7 +1089,7 @@ MultiCastPeer::LogSendMsg(ICPMsg_t *m, sockaddr const *sa)
 
   } else {
     // Note numerous stats on MultiCast peer and each member peer
-    _stats.last_send = ink_get_hrtime();
+    _stats.last_send = Thread::get_hrtime();
     _stats.sent[m->h.opcode]++;
     _stats.total_sent++;
 
@@ -1270,7 +1273,7 @@ ICPPeriodicCont::DoReconfigAction(int event, Event *e)
 ink_hrtime
 ICPlog::GetElapsedTime()
 {
-  return (ink_get_hrtime() - _s->_start_time);
+  return (Thread::get_hrtime() - _s->_start_time);
 }
 
 sockaddr const *

@@ -65,8 +65,6 @@ drainIncomingChannel_broadcast(void *arg)
     mgmt_sleep_sec(1);
   }
 
-  lmgmt->syslogThrInit();
-
   for (;;) { /* Loop draining mgmt network channels */
     int nevents = 0;
 
@@ -155,8 +153,6 @@ drainIncomingChannel(void *arg)
   while (lmgmt->ccom != ccom || !lmgmt->ccom->init) {
     mgmt_sleep_sec(1);
   }
-
-  lmgmt->syslogThrInit();
 
   for (;;) { /* Loop draining mgmt network channels */
     ink_zero(message);
@@ -2336,7 +2332,7 @@ checkBackDoor(int req_fd, char *message)
       return false;
     }
     // TODO: I think this is correct, it used to do lmgmt->record_data-> ...
-    if (RecSetRecordConvert(variable, value, true, false) == REC_ERR_OKAY) {
+    if (RecSetRecordConvert(variable, value, REC_SOURCE_EXPLICIT, true, false) == REC_ERR_OKAY) {
       ink_strlcpy(reply, "\nRecord Updated\n\n", sizeof(reply));
       mgmt_writeline(req_fd, reply, strlen(reply));
     } else {

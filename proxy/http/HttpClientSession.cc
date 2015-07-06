@@ -93,7 +93,7 @@ HttpClientSession::destroy()
     conn_decrease = false;
   }
 
-  ProxyClientSession::cleanup();
+  super::destroy();
   THREAD_FREE(this, httpClientSessionAllocator, this_thread());
 }
 
@@ -121,6 +121,13 @@ HttpClientSession::new_transaction()
   ink_assert(current_reader == NULL);
   PluginIdentity *pi = dynamic_cast<PluginIdentity *>(client_vc);
 
+  if (!pi && client_vc->add_to_active_queue() == false) {
+    // no room in the active queue close the connection
+    this->do_io_close();
+    return;
+  }
+
+
   // Defensive programming, make sure nothing persists across
   // connection re-use
   half_close = false;
@@ -131,7 +138,6 @@ HttpClientSession::new_transaction()
   transact_count++;
   DebugHttpSsn("[%" PRId64 "] Starting transaction %d using sm [%" PRId64 "]", con_id, transact_count, current_reader->sm_id);
 
-  client_vc->remove_from_keep_alive_lru();
   current_reader->attach_client_session(this, sm_reader);
   if (pi) {
     // it's a plugin VC of some sort with identify information.
@@ -194,6 +200,14 @@ HttpClientSession::new_connection(NetVConnection *new_vc, MIOBuffer *iobuf, IOBu
 
   DebugHttpSsn("[%" PRId64 "] session born, netvc %p", con_id, new_vc);
 
+  if (!iobuf) {
+    SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection *>(new_vc);
+    if (ssl_vc) {
+      iobuf = ssl_vc->get_ssl_iobuf();
+      sm_reader = ssl_vc->get_ssl_reader();
+    }
+  }
+
   read_buffer = iobuf ? iobuf : new_MIOBuffer(HTTP_HEADER_BUFFER_SIZE_INDEX);
   sm_reader = reader ? reader : read_buffer->alloc_reader();
 
@@ -220,7 +234,8 @@ HttpClientSession::do_io_write(Continuation *c, int64_t nbytes, IOBufferReader *
   /* conditionally set the tcp initial congestion window
      before our first write. */
   DebugHttpSsn("tcp_init_cwnd_set %d\n", (int)tcp_init_cwnd_set);
-  if (!tcp_init_cwnd_set) {
+  // Checking c to avoid clang detected NULL derference path
+  if (c && !tcp_init_cwnd_set) {
     tcp_init_cwnd_set = true;
     set_tcp_init_cwnd();
   }
@@ -293,16 +308,21 @@ HttpClientSession::do_io_close(int alerrno)
     client_vc->set_active_timeout(HRTIME_SECONDS(current_reader->t_state.txn_conf->keep_alive_no_activity_timeout_out));
   } else {
     read_state = HCS_CLOSED;
+    // clean up ssl's first byte iobuf
+    SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection *>(client_vc);
+    if (ssl_vc) {
+      ssl_vc->set_ssl_iobuf(NULL);
+    }
     if (upgrade_to_h2c) {
       Http2ClientSession *h2_session = http2ClientSessionAllocator.alloc();
 
       h2_session->set_upgrade_context(&current_reader->t_state.hdr_info.client_request);
       h2_session->new_connection(client_vc, NULL, NULL, false /* backdoor */);
+      // Handed over control of the VC to the new H2 session, don't clean it up
+      this->release_netvc();
       // TODO Consider about handling HTTP/1 hooks and stats
     } else {
-      client_vc->do_io_close(alerrno);
       DebugHttpSsn("[%" PRId64 "] session closed", con_id);
-      client_vc = NULL;
     }
     HTTP_SUM_DYN_STAT(http_transactions_per_client_con, transact_count);
     HTTP_DECREMENT_DYN_STAT(http_current_client_connections_stat);
@@ -493,6 +513,9 @@ HttpClientSession::release(IOBufferReader *r)
 
   HTTP_DECREMENT_DYN_STAT(http_current_client_transactions_stat);
 
+  // Clean up the write VIO in case of inactivity timeout
+  this->do_io_write(NULL, 0, NULL);
+
   // Check to see there is remaining data in the
   //  buffer.  If there is, spin up a new state
   //  machine to process it.  Otherwise, issue an
@@ -506,7 +529,7 @@ HttpClientSession::release(IOBufferReader *r)
     SET_HANDLER(&HttpClientSession::state_keep_alive);
     ka_vio = this->do_io_read(this, INT64_MAX, read_buffer);
     ink_assert(slave_ka_vio != ka_vio);
-    client_vc->add_to_keep_alive_lru();
+    client_vc->add_to_keep_alive_queue();
     client_vc->set_inactivity_timeout(HRTIME_SECONDS(ka_in));
     client_vc->cancel_active_timeout();
   }

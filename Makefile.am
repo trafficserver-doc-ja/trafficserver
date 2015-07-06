@@ -29,7 +29,7 @@ export CCACHE_BASEDIR
 # proxy/api/ts has to be built first, since so much of libraries and "core
 # depends on the generates ts/ts.h include file.
 
-SUBDIRS = lib/ck proxy/api/ts iocore lib proxy/hdrs proxy/shared mgmt proxy cmd plugins tools example rc doc
+SUBDIRS = proxy/api/ts iocore lib proxy/hdrs proxy/shared mgmt proxy cmd plugins tools example rc doc
 
 
 DIST_BUILD_USER=`id -nu`
@@ -52,6 +52,10 @@ distclean-local:
 
 doxygen:
 	@cd doc && $(MAKE) $(AM_MAKEFLAGS) $@
+
+changelog:
+	./tools/changelog.pl $(VERSION) > CHANGELOG-$(VERSION)
+	-git add CHANGELOG-$(VERSION) && git commit -m "Adding CHANGELOG-$(VERSION)"
 
 asf-dist: asf-distdir
 	tardir=$(distdir) && $(am__tar) --mtime=./configure.ac | bzip2 -9 -c >$(distdir).tar.bz2
@@ -77,10 +81,10 @@ asf-dist-sign-rc: asf-dist-rc
 	sha1sum -b $(distdir)-rc$(RC).tar.bz2 >$(distdir)-rc$(RC).tar.bz2.sha1
 	gpg --armor --output $(distdir)-rc$(RC).tar.bz2.asc  --detach-sig $(distdir)-rc$(RC).tar.bz2
 
-release: asf-dist-sign
+release: changelog asf-dist-sign
 	git tag -fs -m "Release $(VERSION)" $(VERSION)
 
-rel-candidate: asf-dist-sign-rc
+rel-candidate: changelog asf-dist-sign-rc
 	git tag -fs -m "Release Candidate $(VERSION)-rc$(RC)" $(VERSION)-rc$(RC)
 
 examples: all
@@ -99,7 +103,7 @@ submodules:
 	git submodule update --init
 
 clang-format:
-	for f in `find $(top_srcdir) -iname \*.[ch] -o -iname \*.cc | fgrep -v -e lib/ck -e lib/luajit -e lib/tsconfig`; do \
+	for f in `find $(top_srcdir) -iname \*.[ch] -o -iname \*.cc | fgrep -v -e lib/luajit -e lib/tsconfig`; do \
 	  echo $$f; clang-format -i $$f; done
 
 help:
@@ -122,4 +126,3 @@ help:
 	echo 'install          install by copying the built files to system-wide dirs' && \
 	echo 'install-strip    same as install but then strips debugging symbols' && \
 	echo 'install-examples install examples by copying the built files to system-wide dirs'
-

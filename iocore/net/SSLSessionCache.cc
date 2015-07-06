@@ -22,7 +22,6 @@
 #include "P_SSLConfig.h"
 #include "SSLSessionCache.h"
 #include <cstring>
-#include <memory>
 
 #define SSLSESSIONCACHE_STRINGIFY0(x) #x
 #define SSLSESSIONCACHE_STRINGIFY(x) SSLSESSIONCACHE_STRINGIFY0(x)
@@ -132,7 +131,7 @@ SSLSessionBucket::insertSession(const SSLSessionID &id, SSL_SESSION *sess)
   unsigned char *loc = reinterpret_cast<unsigned char *>(buf->data());
   i2d_SSL_SESSION(sess, &loc);
 
-  std::auto_ptr<SSLSession> ssl_session(new SSLSession(id, buf, len));
+  ats_scoped_obj<SSLSession> ssl_session(new SSLSession(id, buf, len));
 
   MUTEX_TRY_LOCK(lock, mutex, this_ethread());
   if (!lock.is_locked()) {
@@ -234,7 +233,7 @@ void inline SSLSessionBucket::removeOldestSession()
 void
 SSLSessionBucket::removeSession(const SSLSessionID &id)
 {
-  MUTEX_LOCK(lock, mutex, this_ethread()); // We can't bail on contention here because this session MUST be removed.
+  SCOPED_MUTEX_LOCK(lock, mutex, this_ethread()); // We can't bail on contention here because this session MUST be removed.
   SSLSession *node = queue.head;
   while (node) {
     if (node->session_id == id) {

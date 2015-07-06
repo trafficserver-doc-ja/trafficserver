@@ -56,11 +56,11 @@ struct ShowNet : public ShowCont {
     NetHandler *nh = get_NetHandler(ethread);
     MUTEX_TRY_LOCK(lock, nh->mutex, ethread);
     if (!lock.is_locked()) {
-      ethread->schedule_in(this, NET_RETRY_DELAY);
+      ethread->schedule_in(this, HRTIME_MSECONDS(net_retry_delay));
       return EVENT_DONE;
     }
 
-    ink_hrtime now = ink_get_hrtime();
+    ink_hrtime now = Thread::get_hrtime();
     forl_LL(UnixNetVConnection, vc, nh->open_list)
     {
       //      uint16_t port = ats_ip_port_host_order(&addr.sa);
@@ -150,7 +150,7 @@ struct ShowNet : public ShowCont {
     PollDescriptor *pollDescriptor = get_PollDescriptor(ethread);
     MUTEX_TRY_LOCK(lock, nh->mutex, ethread);
     if (!lock.is_locked()) {
-      ethread->schedule_in(this, NET_RETRY_DELAY);
+      ethread->schedule_in(this, HRTIME_MSECONDS(net_retry_delay));
       return EVENT_DONE;
     }
 

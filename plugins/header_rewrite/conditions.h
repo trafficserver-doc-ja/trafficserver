@@ -26,6 +26,7 @@
 #include <cstring>
 
 #include "ts/ts.h"
+#include "ts/ink_string.h"
 
 #include "condition.h"
 #include "matcher.h"
@@ -278,7 +279,10 @@ private:
 class ConditionUrl : public Condition
 {
 public:
-  explicit ConditionUrl(bool client = false) : _url_qual(URL_QUAL_NONE), _client(client)
+  enum UrlType { CLIENT, URL, FROM, TO };
+
+
+  explicit ConditionUrl(const UrlType type) : _url_qual(URL_QUAL_NONE), _type(type)
   {
     TSDebug(PLUGIN_NAME_DBG, "Calling CTOR for ConditionUrl");
   };
@@ -294,7 +298,7 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ConditionUrl);
 
   UrlQualifiers _url_qual;
-  bool _client;
+  UrlType _type;
 };
 
 
@@ -368,6 +372,24 @@ protected:
 
 private:
   DISALLOW_COPY_AND_ASSIGN(ConditionIncomingPort);
+};
+
+// Transact Count
+class ConditionTransactCount : public Condition
+{
+  typedef Matchers<int> MatcherType;
+
+public:
+  ConditionTransactCount() { TSDebug(PLUGIN_NAME_DBG, "Calling CTOR for ConditionTransactCount"); }
+
+  void initialize(Parser &p);
+  void append_value(std::string &s, const Resources &res);
+
+protected:
+  bool eval(const Resources &res);
+
+private:
+  DISALLOW_COPY_AND_ASSIGN(ConditionTransactCount);
 };
 
 #endif // __CONDITIONS_H

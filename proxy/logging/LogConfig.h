@@ -74,32 +74,27 @@ extern RecRawStatBlock *log_rsb;
 
 struct dirent;
 struct LogCollationAccept;
-struct PreDefinedFormatList;
-struct PreDefinedFormatInfo;
-
 /*-------------------------------------------------------------------------
-  LogConfig
-
-  This object keeps the state of the logging configuraion variables.  Upon
+  this object keeps the state of the logging configuraion variables.  upon
   construction, the log configuration file is read and the logging
   variables are initialized.
 
-  The "global" LogConfig object is kept as a static pointer in the Log
+  the "global" logconfig object is kept as a static pointer in the log
   class, called "config", and changed whenever the configuration variables
-  are changed in the config file, using Log::change_configuration().
+  are changed in the config file, using log::change_configuration().
 
-  To add a new config variable:
-     1. Add a line in records.config for the new config variable.
-        The name in records.config should be "proxy.config.log.xxx".
-     2. Create a member variable to store the current value.
-        The name of the member variable should be "xxx".
-     3. If the member variable is a string, add a delete for it in the
-        destructor, LogConfig::~LogConfig.
-     4. Initialize the member variable in LogConfig::setup_default_values
-     5. Update the member variable from the records.config file
-        in LogConfig::read_configuration_variables() using a call to
-        ConfigReadInteger or ConfigReadString.
-     6. Add a line in the LogConfig::register_config_callbacks() function
+  to add a new config variable:
+     1. add a line in records.config for the new config variable.
+        the name in records.config should be "proxy.config.log.xxx".
+     2. create a member variable to store the current value.
+        the name of the member variable should be "xxx".
+     3. if the member variable is a string, add a delete for it in the
+        destructor, logconfig::~logconfig.
+     4. initialize the member variable in logconfig::setup_default_values
+     5. update the member variable from the records.config file
+        in logconfig::read_configuration_variables() using a call to
+        configreadinteger or configreadstring.
+     6. add a line in the logconfig::register_config_callbacks() function
         for this new variable if it is exposed in the GUI
   -------------------------------------------------------------------------*/
 
@@ -181,14 +176,6 @@ public:
   int max_space_mb_for_orphan_logs;
   int max_space_mb_headroom;
   int logfile_perm;
-  bool squid_log_enabled;
-  bool squid_log_is_ascii;
-  bool common_log_enabled;
-  bool common_log_is_ascii;
-  bool extended_log_enabled;
-  bool extended_log_is_ascii;
-  bool extended2_log_enabled;
-  bool extended2_log_is_ascii;
   bool separate_icp_logs;
   bool separate_host_logs;
   int collation_mode;
@@ -204,16 +191,6 @@ public:
   bool auto_delete_rolled_files;
   bool custom_logs_enabled;
 
-  bool search_log_enabled;
-  int search_rolling_interval_sec;
-  unsigned int search_server_ip_addr;
-  int search_server_port;
-  int search_top_sites;
-  char *search_log_filters;
-  char *search_url_filter;
-  char *search_log_file_one;
-  char *search_log_file_two;
-
   int sampling_frequency;
   int file_stat_frequency;
   int space_used_frequency;
@@ -223,31 +200,18 @@ public:
 
   char *hostname;
   char *logfile_dir;
-  char *squid_log_name;
-  char *squid_log_header;
-  char *common_log_name;
-  char *common_log_header;
-  char *extended_log_name;
-  char *extended_log_header;
-  char *extended2_log_name;
-  char *extended2_log_header;
   char *collation_host;
   char *collation_secret;
 
 private:
-  void read_xml_log_config(int from_memory);
+  void read_xml_log_config();
   char **read_log_hosts_file(size_t *nhosts);
 
   void setup_default_values();
   void setup_collation(LogConfig *prev_config);
-  LogFilter *split_by_protocol(const PreDefinedFormatList &pre_def_info_list);
-  size_t split_by_hostname(const PreDefinedFormatList &pre_def_info_list, LogFilter *reject_protocol);
-  LogObject *create_predefined_object(const PreDefinedFormatInfo *pdi, size_t nfilters, LogFilter **filters,
-                                      const char *filt_name = 0, bool force_extension = false);
-  void create_predefined_objects_with_filter(const PreDefinedFormatList &pre_def_info_list, size_t nfilters, LogFilter **filters,
-                                             const char *filt_name = 0, bool force_extension = false);
 
-  void add_filters_to_search_log_object(const char *format_name);
+  LogFilter *split_by_protocol();
+  size_t split_by_hostname(LogFilter *reject_protocol);
 
 private:
   // if true, use max_space_mb_for_orphan_logs to determine the amount

@@ -25,13 +25,11 @@
 #include <cstring>
 #include <map>
 #include <string>
-#include <ts/ts.h>
 #include <ink_memory.h>
 #include "atscppapi/shared_ptr.h"
 #include "logging_internal.h"
 #include "utils_internal.h"
 #include "atscppapi/noncopyable.h"
-
 using std::map;
 using std::string;
 using namespace atscppapi;
@@ -96,6 +94,54 @@ Transaction::~Transaction()
     TSHandleMLocRelease(state_->client_response_hdr_buf_, NULL_PARENT_LOC, state_->client_response_hdr_loc_);
   }
   delete state_;
+}
+
+bool
+Transaction::configIntSet(TSOverridableConfigKey conf, int value)
+{
+  return TS_SUCCESS == TSHttpTxnConfigIntSet(state_->txn_, conf, static_cast<TSMgmtInt>(value));
+}
+bool
+Transaction::configIntGet(TSOverridableConfigKey conf, int *value)
+{
+  return TS_SUCCESS == TSHttpTxnConfigIntGet(state_->txn_, conf, reinterpret_cast<TSMgmtInt *>(value));
+}
+
+bool
+Transaction::configFloatSet(TSOverridableConfigKey conf, float value)
+{
+  return TS_SUCCESS == TSHttpTxnConfigFloatSet(state_->txn_, conf, static_cast<TSMgmtFloat>(value));
+}
+
+bool
+Transaction::configFloatGet(TSOverridableConfigKey conf, float *value)
+{
+  return TS_SUCCESS == TSHttpTxnConfigFloatGet(state_->txn_, conf, value);
+}
+
+bool
+Transaction::configStringSet(TSOverridableConfigKey conf, std::string const &value)
+{
+  return TS_SUCCESS == TSHttpTxnConfigStringSet(state_->txn_, conf, const_cast<TSMgmtString>(value.data()), value.length());
+}
+
+bool
+Transaction::configStringGet(TSOverridableConfigKey conf, std::string &value)
+{
+  const char *svalue;
+  int length;
+  bool zret = TS_SUCCESS == TSHttpTxnConfigStringGet(state_->txn_, conf, &svalue, &length);
+  if (zret)
+    value.assign(svalue, length);
+  else
+    value.clear();
+  return zret;
+}
+
+bool
+Transaction::configFind(std::string const &name, TSOverridableConfigKey *conf, TSRecordDataType *type)
+{
+  return TS_SUCCESS == TSHttpTxnConfigFind(name.data(), name.length(), conf, type);
 }
 
 void
@@ -300,6 +346,30 @@ Transaction::setTimeout(Transaction::TimeoutType type, int time_ms)
     break;
   default:
     break;
+  }
+}
+
+
+Transaction::CacheStatus
+Transaction::getCacheStatus()
+{
+  int obj_status = TS_ERROR;
+
+  if (TSHttpTxnCacheLookupStatusGet(state_->txn_, &obj_status) == TS_ERROR) {
+    return CACHE_LOOKUP_NONE;
+  }
+
+  switch (obj_status) {
+  case TS_CACHE_LOOKUP_MISS:
+    return CACHE_LOOKUP_MISS;
+  case TS_CACHE_LOOKUP_HIT_STALE:
+    return CACHE_LOOKUP_HIT_STALE;
+  case TS_CACHE_LOOKUP_HIT_FRESH:
+    return CACHE_LOOKUP_HIT_FRESH;
+  case TS_CACHE_LOOKUP_SKIPPED:
+    return CACHE_LOOKUP_SKIPED;
+  default:
+    return CACHE_LOOKUP_NONE;
   }
 }
 

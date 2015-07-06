@@ -265,10 +265,8 @@ one of the following options:
 *Traffic Server considers all HTTP objects in the cache to be fresh:*
     Never revalidate HTTP objects in the cache with the origin server.
 
-*Traffic Server considers all HTTP objects without* ``Expires`` *or*
-``Cache-control`` *headers to be stale:*
-    Revalidate all HTTP objects without ``Expires`` or
-    ``Cache-Control`` headers.
+*Traffic Server considers all HTTP objects without* ``Expires`` *or* ``Cache-control`` *headers to be stale:*
+    Revalidate all HTTP objects without ``Expires`` or ``Cache-Control`` headers.
 
 To configure how Traffic Server revalidates objects in the cache, you
 can set specific revalidation rules in :file:`cache.config`.
@@ -279,91 +277,6 @@ To configure revalidation options
    in :file:`records.config`.
 
 #. Run the :option:`traffic_line -x` command to apply the configuration changes.
-
-.. _scheduling-updates-to-local-cache-content:
-
-Scheduling Updates to Local Cache Content
-=========================================
-
-To further increase performance and to ensure that HTTP objects are
-fresh in the cache, you can use the *Scheduled Update* option. This
-configures Traffic Server to load specific objects into the cache at
-scheduled times, regardless of whether there is an active client request
-for those objects at the scheduled time. You might find this especially
-beneficial in a reverse proxy setup, where you can preload content you
-anticipate will be in demand.
-
-To use the scheduled update option, you must:
-
--  Specify the list of URLs that contain the objects you want to schedule
-   for update.
-
--  Specify the time the update should take place.
-
--  Specify the recursion depth for the URL.
-
--  Enable the scheduled update option and configure optional retry
-   settings.
-
-Traffic Server uses the information you provide to determine URLs for
-which it is responsible. For each URL, Traffic Server derives all
-recursive URLs (if applicable) and then generates a unique URL list.
-Using this list, Traffic Server initiates an HTTP ``GET`` for each
-unaccessed URL. It ensures that it remains within the user-defined
-limits for HTTP concurrency at any given time. The system logs the
-completion of all HTTP ``GET`` operations so you can monitor the
-performance of this feature.
-
-Traffic Server also provides a *Force Immediate Update* option that
-enables you to update URLs immediately without waiting for the specified
-update time to occur. You can use this option to test your scheduled
-update configuration. Refer to `Forcing an Immediate Update`_.
-
-Configuring the Scheduled Update Option
----------------------------------------
-
-To configure the scheduled update option
-
-#. Edit :file:`update.config` to enter a line in the file for each URL you
-   want to update.
-
-#. Adjust the following variables in :file:`records.config`:
-
-   -  :ts:cv:`proxy.config.update.enabled`
-   -  :ts:cv:`proxy.config.update.retry_count`
-   -  :ts:cv:`proxy.config.update.retry_interval`
-   -  :ts:cv:`proxy.config.update.concurrent_updates`
-
-#. Run the :option:`traffic_line -x` command to apply the configuration changes.
-
-Forcing Immediate Updates
--------------------------
-
-Traffic Server provides a *Force Immediate Update* option that enables
-you to immediately verify the URLs listed in :file:`update.config`.
-This option disregards the offset hour and interval set in :file:`update.config`
-and immediately updates the URLs listed.
-
-To configure the Force Immediate Update option:
-
-#. Enable :ts:cv:`proxy.config.update.enabled` in :file:`records.config`::
-
-    CONFIG proxy.config.update.enabled INT 1
-
-#. Enable :ts:cv:`proxy.config.update.force` in :file:`records.config`::
-
-    CONFIG proxy.config.update.force INT 1
-
-   While enabled, this overrides all normal scheduling intervals.
-
-#. Run the command :option:`traffic_line -x` to apply the configuration changes.
-
-.. important::
-
-   When you enable the Force Immediate Update option, Traffic Server
-   continually updates the URLs specified in :file:`update.config` until you
-   disable the option. To disable the Force Immediate Update option, set
-   :ts:cv:`proxy.config.update.force` to ``0`` (zero).
 
 .. _pushing-content-into-the-cache:
 
@@ -685,16 +598,16 @@ of alternate versions of an object allowed in the cache.
 Configuring How Traffic Server Caches Alternates
 ------------------------------------------------
 
-To configure how Traffic Server caches alternates::
+To configure how Traffic Server caches alternates:
 
-1. Edit the following variables in :file:`records.config`:
+#. Edit the following variables in :file:`records.config`:
 
    -  :ts:cv:`proxy.config.http.cache.enable_default_vary_headers`
    -  :ts:cv:`proxy.config.http.cache.vary_default_text`
    -  :ts:cv:`proxy.config.http.cache.vary_default_images`
    -  :ts:cv:`proxy.config.http.cache.vary_default_other`
 
-2. Run the command :option:`traffic_line -x` to apply the configuration changes.
+#. Run the command :option:`traffic_line -x` to apply the configuration changes.
 
 .. note::
 

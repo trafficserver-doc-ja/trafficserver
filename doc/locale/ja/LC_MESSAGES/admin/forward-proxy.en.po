@@ -91,13 +91,7 @@ msgstr ""
 msgid "Proxy Configuration"
 msgstr ""
 
-#: ../../admin/forward-proxy.en.rst:64
-msgid ""
-"Configuring basic forward proxy operation in Traffic Server is quite simple "
-"and straightforward."
-msgstr ""
-
-#: ../../admin/forward-proxy.en.rst:67
+#: ../../admin/forward-proxy.en.rst:48
 msgid ""
 "Permit Traffic Server to process requests for hosts not explicitly "
 "configured in the remap rules, by modifying :ts:cv:`proxy.config.url_remap."
