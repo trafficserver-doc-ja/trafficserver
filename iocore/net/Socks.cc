@@ -31,7 +31,9 @@
 */
 
 #include "P_Net.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
+#include "ts/ink_sock.h"
+#include "ts/InkErrno.h"
 #include <ts/IpMapConf.h>
 
 socks_conf_struct *g_socks_conf_stuff = 0;
@@ -146,7 +148,7 @@ SocksEntry::free()
 
 #ifdef SOCKS_WITH_TS
   if (!lerrno && netVConnection && server_result.retry)
-    server_params->recordRetrySuccess(&server_result);
+    server_params->markParentUp(&server_result);
 #endif
 
   if ((action_.cancelled || lerrno) && netVConnection)

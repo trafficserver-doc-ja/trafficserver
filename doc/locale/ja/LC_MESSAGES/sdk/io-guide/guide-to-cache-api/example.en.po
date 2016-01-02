@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -40,15 +41,15 @@ msgid ""
 "Assume the following data:"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:37
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:38
 msgid "In the ``TS_CACHE_OPEN_READ`` handler:"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:45
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:47
 msgid "In the ``TS_EVENT_VCONN_READ_READY`` handler:"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:56
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:59
 msgid ""
 "Do not try to get continuations or VIOs from ``TSVConn`` objects for cache "
 "vconnections. Also note that the following APIs can only be used on "
@@ -56,29 +57,29 @@ msgid ""
 "net vconnections:"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:61
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:64
 msgid "``TSVConnWriteVIOGet``"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:63
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:66
 msgid "``TSVConnReadVIOGet``"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:65
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:68
 msgid "``TSVConnClosedGet``"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:67
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:70
 msgid ""
 "APIs such as ``TSVConnRead``, ``TSVConnWrite``, ``TSVConnClose``, "
 "``TSVConnAbort``, and ``TSVConnShutdown`` can be used on any kind of "
 "vconnections."
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:71
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:74
 msgid "When you are finished:"
 msgstr ""
 
-#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:73
+#: ../../sdk/io-guide/guide-to-cache-api/example.en.rst:76
 msgid "``TSCacheKeyDestroy (key);``"
 msgstr ""

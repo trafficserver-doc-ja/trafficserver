@@ -27,8 +27,9 @@
  *
  ****************************************************************************/
 
-#include "libts.h"
-#include "I_Layout.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_sock.h"
+#include "ts/I_Layout.h"
 #include "LocalManager.h"
 #include "Alarms.h"
 #include "MgmtUtils.h"
@@ -210,11 +211,9 @@ error:
 void *
 mgmt_synthetic_main(void *)
 {
-  int autoconfFD = -1;           // FD for incoming autoconf connections
-  int clientFD = -1;             // FD for accepted connections
-  int publicPort = -1;           // Port for incoming autoconf connections
-  struct sockaddr_in clientInfo; // Info about client connection
-  int addrLen;
+  int autoconfFD = -1; // FD for incoming autoconf connections
+  int clientFD = -1;   // FD for accepted connections
+  int publicPort = -1; // Port for incoming autoconf connections
 
 #if !defined(linux)
   sigset_t allSigs; // Set of all signals
@@ -244,6 +243,10 @@ mgmt_synthetic_main(void *)
   }
 
   while (1) {
+    struct sockaddr_in clientInfo; // Info about client connection
+    socklen_t addrLen = sizeof(clientInfo);
+
+    ink_zero(clientInfo);
     if ((clientFD = mgmt_accept(autoconfFD, (sockaddr *)&clientInfo, &addrLen)) < 0) {
       mgmt_log(stderr, "[SyntheticHealthServer] accept() on incoming port failed: %s\n", strerror(errno));
     } else if (safe_setsockopt(clientFD, IPPROTO_TCP, TCP_NODELAY, SOCKOPT_ON, sizeof(int)) < 0) {
@@ -253,7 +256,7 @@ mgmt_synthetic_main(void *)
       mgmt_log(stderr, "[SyntheticHealthServer] Connect by disallowed client %s, closing\n", inet_ntoa(clientInfo.sin_addr));
       close_socket(clientFD);
     } else {
-      ink_thread thrId = ink_thread_create(synthetic_thread, (void *)&clientFD);
+      ink_thread thrId = ink_thread_create(synthetic_thread, (void *)&clientFD, 1);
 
       if (thrId <= 0) {
         mgmt_log(stderr, "[SyntheticHealthServer] Failed to create worker thread");

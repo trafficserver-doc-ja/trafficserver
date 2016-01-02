@@ -25,7 +25,8 @@
 #ifndef _P_CACHE_INTERNAL_H__
 #define _P_CACHE_INTERNAL_H__
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/InkErrno.h"
 
 #ifdef HTTP_CACHE
 #include "HTTP.h"
@@ -59,8 +60,6 @@ struct EvacuationBlock;
 #endif
 
 #define AIO_SOFT_FAILURE -100000
-// retry read from writer delay
-#define WRITER_RETRY_DELAY HRTIME_MSECONDS(50)
 
 #ifndef CACHE_LOCK_FAIL_RATE
 #define CACHE_TRY_LOCK(_l, _m, _t) MUTEX_TRY_LOCK(_l, _m, _t)
@@ -92,19 +91,15 @@ struct EvacuationBlock;
 
 #define CONT_SCHED_LOCK_RETRY(_c) _c->mutex->thread_holding->schedule_in_local(_c, HRTIME_MSECONDS(cache_config_mutex_retry_delay))
 
-#define VC_SCHED_WRITER_RETRY()                                   \
-  do {                                                            \
-    ink_assert(!trigger);                                         \
-    writer_lock_retry++;                                          \
-    ink_hrtime _t = WRITER_RETRY_DELAY;                           \
-    if (writer_lock_retry > 2)                                    \
-      _t = WRITER_RETRY_DELAY * 2;                                \
-    else if (writer_lock_retry > 5)                               \
-      _t = WRITER_RETRY_DELAY * 10;                               \
-    else if (writer_lock_retry > 10)                              \
-      _t = WRITER_RETRY_DELAY * 100;                              \
-    trigger = mutex->thread_holding->schedule_in_local(this, _t); \
-    return EVENT_CONT;                                            \
+#define VC_SCHED_WRITER_RETRY()                                           \
+  do {                                                                    \
+    ink_assert(!trigger);                                                 \
+    writer_lock_retry++;                                                  \
+    ink_hrtime _t = HRTIME_MSECONDS(cache_read_while_writer_retry_delay); \
+    if (writer_lock_retry > 2)                                            \
+      _t = HRTIME_MSECONDS(cache_read_while_writer_retry_delay) * 2;      \
+    trigger = mutex->thread_holding->schedule_in_local(this, _t);         \
+    return EVENT_CONT;                                                    \
   } while (0)
 
 
@@ -221,6 +216,7 @@ extern int cache_config_hit_evacuate_size_limit;
 extern int cache_config_force_sector_size;
 extern int cache_config_target_fragment_size;
 extern int cache_config_mutex_retry_delay;
+extern int cache_read_while_writer_retry_delay;
 extern int cache_config_read_while_writer_max_retries;
 
 // CacheVC
@@ -272,6 +268,20 @@ struct CacheVC : public CacheVConnection {
       }
     }
     return -1;
+  }
+  int
+  get_volume_number() const
+  {
+    if (vol && vol->cache_vol) {
+      return vol->cache_vol->vol_number;
+    }
+    return -1;
+  }
+  bool
+  is_compressed_in_ram() const
+  {
+    ink_assert(vio.op == VIO::READ);
+    return !f.compressed_in_ram;
   }
 
   bool writer_done();
@@ -481,6 +491,7 @@ struct CacheVC : public CacheVConnection {
       unsigned int readers : 1;
       unsigned int doc_from_ram_cache : 1;
       unsigned int hit_evacuate : 1;
+      unsigned int compressed_in_ram : 1; // compressed state in ram cache
 #ifdef HTTP_CACHE
       unsigned int allow_empty_doc : 1; // used for cache empty http document
 #endif

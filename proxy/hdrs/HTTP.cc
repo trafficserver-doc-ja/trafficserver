@@ -21,14 +21,15 @@
   limitations under the License.
  */
 
-#include "ink_defs.h"
-#include "libts.h"
+#include "ts/ink_defs.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_inet.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include "HTTP.h"
 #include "HdrToken.h"
-#include "Diags.h"
+#include "ts/Diags.h"
 
 /***********************************************************************
  *                                                                     *
@@ -157,6 +158,15 @@ inline static int
 is_digit(char c)
 {
   return ((c <= '9') && (c >= '0'));
+}
+
+// test to see if a character is a valid character for a host in a URI according to
+// RFC 3986 and RFC 1034
+inline static int
+is_host_char(char c)
+{
+  return (ParseRules::is_alnum(c) || (c == '-') || (c == '.') || (c == '[') || (c == ']') || (c == '_') || (c == ':') ||
+          (c == '~') || (c == '%'));
 }
 
 /***********************************************************************
@@ -1105,6 +1115,18 @@ http_parser_parse_req(HTTPParser *parser, HdrHeap *heap, HTTPHdrImpl *hh, const 
   return mime_parser_parse(&parser->m_mime_parser, heap, hh->m_fields_impl, start, end, must_copy_strings, eof);
 }
 
+// Checks if `addr` is a valid FQDN string
+bool
+validate_host_name(ts::ConstBuffer addr)
+{
+  while (addr) {
+    if (!(is_host_char(*addr)))
+      return false;
+    ++addr;
+  }
+  return true;
+}
+
 MIMEParseResult
 validate_hdr_host(HTTPHdrImpl *hh)
 {
@@ -1122,9 +1144,11 @@ validate_hdr_host(HTTPHdrImpl *hh)
           if (port.size() > 5)
             return PARSE_ERROR;
           int port_i = ink_atoi(port.data(), port.size());
-          if (port.size() > 5 || port_i >= 65536 || port_i <= 0)
+          if (port_i >= 65536 || port_i <= 0)
             return PARSE_ERROR;
         }
+        if (!validate_host_name(addr))
+          return PARSE_ERROR;
         while (rest && PARSE_DONE == ret) {
           if (!ParseRules::is_ws(*rest))
             return PARSE_ERROR;
@@ -1530,12 +1554,12 @@ HTTPHdr::_fill_target_cache() const
     m_port_in_header = 0 != url->port_get_raw();
     m_host_mime = NULL;
   } else if (0 != (m_host_mime = const_cast<HTTPHdr *>(this)->get_host_port_values(0, &m_host_length, &port_ptr, 0))) {
+    m_port = 0;
     if (port_ptr) {
-      m_port = 0;
       for (; is_digit(*port_ptr); ++port_ptr)
         m_port = m_port * 10 + *port_ptr - '0';
-      m_port_in_header = (0 != m_port);
     }
+    m_port_in_header = (0 != m_port);
     m_port = url_canonicalize_port(url->m_url_impl->m_url_type, m_port);
   }
 
@@ -1605,7 +1629,7 @@ class UrlPrintHack
       if (0 == hdr->m_url_cached.port_get_raw() && hdr->m_port_in_header) {
         ink_assert(0 == ui->m_ptr_port); // shouldn't be set if not in URL.
         ui->m_ptr_port = m_port_buff;
-        ui->m_len_port = sprintf(m_port_buff, "%.5d", hdr->m_port);
+        ui->m_len_port = snprintf(m_port_buff, sizeof(m_port_buff), "%d", hdr->m_port);
         m_port_modified_p = true;
       } else {
         m_port_modified_p = false;
@@ -1651,7 +1675,7 @@ class UrlPrintHack
   HTTPHdr *m_hdr;
   ///@}
   /// Temporary buffer for port data.
-  char m_port_buff[6];
+  char m_port_buff[32];
 };
 
 char *
@@ -2186,3 +2210,45 @@ HTTPInfo::push_frag_offset(FragOffset offset)
 
   m_alt->m_frag_offsets[m_alt->m_frag_offset_count++] = offset;
 }
+
+
+/*-------------------------------------------------------------------------
+ * Regression tests
+  -------------------------------------------------------------------------*/
+#if TS_HAS_TESTS
+#include "ts/TestBox.h"
+
+const static struct {
+  const char *const text;
+  bool valid;
+} http_validate_hdr_field_test_case[] = {{"yahoo", true},
+                                         {"yahoo.com", true},
+                                         {"yahoo.wow.com", true},
+                                         {"yahoo.wow.much.amaze.com", true},
+                                         {"209.131.52.50", true},
+                                         {"192.168.0.1", true},
+                                         {"localhost", true},
+                                         {"3ffe:1900:4545:3:200:f8ff:fe21:67cf", true},
+                                         {"fe80:0:0:0:200:f8ff:fe21:67cf", true},
+                                         {"fe80::200:f8ff:fe21:67cf", true},
+                                         {"<svg onload=alert(1)>", false}, // Sample host header XSS attack
+                                         {"jlads;f8-9349*(D&F*D(234jD*(FSD*(VKLJ#(*$@()#$)))))", false},
+                                         {"\"\t\n", false},
+                                         {"!@#$%^ &*(*&^%$#@#$%^&*(*&^%$#))", false},
+                                         {":):(:O!!!!!!", false}};
+
+REGRESSION_TEST(VALIDATE_HDR_FIELD)(RegressionTest *t, int /* level ATS_UNUSED */, int *pstatus)
+{
+  TestBox box(t, pstatus);
+  box = REGRESSION_TEST_PASSED;
+
+  for (unsigned int i = 0; i < sizeof(http_validate_hdr_field_test_case) / sizeof(http_validate_hdr_field_test_case[0]); ++i) {
+    const char *const txt = http_validate_hdr_field_test_case[i].text;
+    ts::ConstBuffer tmp = ts::ConstBuffer(txt, strlen(txt));
+    box.check(validate_host_name(tmp) == http_validate_hdr_field_test_case[i].valid,
+              "Validation of FQDN (host) header: \"%s\", expected %s, but not", txt,
+              (http_validate_hdr_field_test_case[i].valid ? "true" : "false"));
+  }
+}
+
+#endif // TS_HAS_TESTS

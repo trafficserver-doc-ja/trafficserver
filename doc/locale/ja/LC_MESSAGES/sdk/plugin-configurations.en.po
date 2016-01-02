@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -40,6 +41,14 @@ msgid ""
 "changing global configuration information within a plugin."
 msgstr ""
 
+#: ../../sdk/plugin-configurations.en.rst:32
+msgid ""
+"The functions discussed in this section do not examine or modify Traffic "
+"Server configuration variables. To examine Traffic Server configuration and "
+"statistics variables, see `\"Reading Traffic Server Settings and Statistics"
+"\" <../plugin-management/reading-trafficserver-settings-and-statistics>`__"
+msgstr ""
+
 #: ../../sdk/plugin-configurations.en.rst:37
 msgid ""
 "The ``TSConfig`` family of functions is designed to provide a fast and "
@@ -68,31 +77,30 @@ msgstr ""
 msgid "Here's how the interface works:"
 msgstr ""
 
-#: ../../sdk/plugin-configurations.en.rst:105
+#: ../../sdk/plugin-configurations.en.rst:106
 msgid "The configuration functions are:"
 msgstr ""
 
-#: ../../sdk/plugin-configurations.en.rst:107
-msgid ":c:func:`TSConfigDataGet`"
-msgstr ""
-
-#: ../../sdk/plugin-configurations.en.rst:109
-msgid ":c:func:`TSConfigGet`"
-msgstr ""
-
-#: ../../sdk/plugin-configurations.en.rst:111
-msgid ":c:func:`TSConfigRelease`"
-msgstr ""
-
-#: ../../sdk/plugin-configurations.en.rst:113
-msgid ":c:func:`TSConfigSet`"
-msgstr ""
-
-#: ../../sdk/plugin-configurations.en.rst:32
+#: ../../sdk/plugin-configurations.en.rst:108
 msgid ""
-"The functions discussed in this section do not examine or modify Traffic "
-"Server configuration variables. To examine Traffic Server configuration and "
-"statistics variables, see :doc:`\"Reading Traffic Server Settings and "
-"Statistics\" <plugin-management/reading-trafficserver-settings-and-"
-"statistics.en>`."
+"```TSConfigDataGet`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#aed2a6f9d350935ac890f75fdd80605db>`__"
+msgstr ""
+
+#: ../../sdk/plugin-configurations.en.rst:110
+msgid ""
+"```TSConfigGet`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a478189d6ad87c6b873d8676cb51508c5>`__"
+msgstr ""
+
+#: ../../sdk/plugin-configurations.en.rst:112
+msgid ""
+"```TSConfigRelease`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a06711d4a0e70f1ff27f9b5ca34bb649c>`__"
+msgstr ""
+
+#: ../../sdk/plugin-configurations.en.rst:114
+msgid ""
+"```TSConfigSet`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a8bba9468fdca478e68035a9776f6e9ca>`__"
 msgstr ""

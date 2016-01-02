@@ -47,6 +47,20 @@ static int spdy_process_fetch_header(TSEvent event, SpdyClientSession *sm, TSFet
 static int spdy_process_fetch_body(TSEvent event, SpdyClientSession *sm, TSFetchSM fetch_sm, SpdyRequest *req);
 static uint64_t g_sm_id = 1;
 
+SpdyRequest *
+SpdyRequest::alloc()
+{
+  return spdyRequestAllocator.alloc();
+}
+
+void
+SpdyRequest::destroy()
+{
+  this->clear();
+  spdyRequestAllocator.free(this);
+}
+
+
 void
 SpdyRequest::init(SpdyClientSession *sm, int id)
 {
@@ -94,7 +108,7 @@ SpdyClientSession::init(NetVConnection *netvc)
 {
   int r;
 
-  this->mutex = new_ProxyMutex();
+  this->mutex = netvc->mutex;
   this->vc = netvc;
   this->req_map.clear();
 
@@ -120,6 +134,9 @@ SpdyClientSession::init(NetVConnection *netvc)
 void
 SpdyClientSession::clear()
 {
+  if (!mutex)
+    return; // this object wasn't initialized.
+
   int last_event = event;
 
   SPDY_DECREMENT_THREAD_DYN_STAT(SPDY_STAT_CURRENT_CLIENT_SESSION_COUNT, this->mutex->thread_holding);
@@ -133,8 +150,7 @@ SpdyClientSession::clear()
   for (; iter != endIter; ++iter) {
     SpdyRequest *req = iter->second;
     if (req) {
-      req->clear();
-      spdyRequestAllocator.free(req);
+      req->destroy();
     } else {
       Error("req null in SpdSM::clear");
     }
@@ -144,6 +160,11 @@ SpdyClientSession::clear()
   this->mutex = NULL;
 
   if (vc) {
+    // clean up ssl's first byte iobuf
+    SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection *>(vc);
+    if (ssl_vc) {
+      ssl_vc->set_ssl_iobuf(NULL);
+    }
     TSVConnClose(reinterpret_cast<TSVConn>(vc));
     vc = NULL;
   }
@@ -187,13 +208,20 @@ SpdyClientSession::new_connection(NetVConnection *new_vc, MIOBuffer *iobuf, IOBu
 
   sm->init(new_vc);
 
-  sm->req_buffer = iobuf ? reinterpret_cast<TSIOBuffer>(iobuf) : TSIOBufferCreate();
+  sm->req_buffer = iobuf ? reinterpret_cast<TSIOBuffer>(iobuf) : reinterpret_cast<TSIOBuffer>(new_empty_MIOBuffer());
   sm->req_reader = reader ? reinterpret_cast<TSIOBufferReader>(reader) : TSIOBufferReaderAlloc(sm->req_buffer);
 
-  sm->resp_buffer = TSIOBufferCreate();
+  sm->resp_buffer = reinterpret_cast<TSIOBuffer>(new_empty_MIOBuffer());
   sm->resp_reader = TSIOBufferReaderAlloc(sm->resp_buffer);
 
-  eventProcessor.schedule_imm(sm, ET_NET);
+  // Block on the mutex.  We just allocated the object, so the lock should be available.
+  EThread *thread(this_ethread());
+  MUTEX_TAKE_LOCK(sm->mutex, thread);
+  // Call state_session_start directly rather than scheduling the event
+  // and leaving a half-setup session around.  It seems like there are some
+  // degenerate cases when event re-ordering causes problems (TS-3957)
+  sm->state_session_start(ET_NET, NULL);
+  MUTEX_UNTAKE_LOCK(sm->mutex, thread);
 }
 
 int
@@ -204,12 +232,12 @@ SpdyClientSession::state_session_start(int /* event */, void * /* edata */)
     {SPDYLAY_SETTINGS_INITIAL_WINDOW_SIZE, SPDYLAY_ID_FLAG_SETTINGS_NONE, spdy_initial_window_size}};
   int r;
 
+  this->read_vio = (TSVIO) this->vc->do_io_read(this, INT64_MAX, reinterpret_cast<MIOBuffer *>(this->req_buffer));
+  this->write_vio = (TSVIO) this->vc->do_io_write(this, INT64_MAX, reinterpret_cast<IOBufferReader *>(this->resp_reader));
+
   if (TSIOBufferReaderAvail(this->req_reader) > 0) {
     spdy_process_read(TS_EVENT_VCONN_WRITE_READY, this);
   }
-
-  this->read_vio = (TSVIO) this->vc->do_io_read(this, INT64_MAX, reinterpret_cast<MIOBuffer *>(this->req_buffer));
-  this->write_vio = (TSVIO) this->vc->do_io_write(this, INT64_MAX, reinterpret_cast<IOBufferReader *>(this->resp_reader));
 
   SET_HANDLER(&SpdyClientSession::state_session_readwrite);
 
@@ -479,6 +507,14 @@ spdy_process_fetch_body(TSEvent event, SpdyClientSession *sm, TSFetchSM fetch_sm
 void
 SpdyClientSession::do_io_close(int alertno)
 {
+  if (vc) {
+    // vc is released (null'ed) within ProxyClientSession when handling
+    // TS_HTTP_SSN_CLOSE_HOOK, so, reset ssl_iobuf to prevent double free
+    SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection *>(vc);
+    if (ssl_vc) {
+      ssl_vc->set_ssl_iobuf(NULL);
+    }
+  }
   // The object will be cleaned up from within ProxyClientSession::handle_api_return
   // This way, the object will still be alive for any SSN_CLOSE hooks
   do_api_callout(TS_HTTP_SSN_CLOSE_HOOK);

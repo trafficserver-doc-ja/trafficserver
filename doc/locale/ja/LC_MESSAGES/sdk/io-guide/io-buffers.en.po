@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -18,7 +19,7 @@ msgstr ""
 "Project-Id-Version: Apache Traffic Server 4.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-08 17:57+0900\n"
-"PO-Revision-Date: 2014-05-11 11:28+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -27,7 +28,7 @@ msgstr ""
 
 #: ../../sdk/io-guide/io-buffers.en.rst:2
 msgid "IO Buffers"
-msgstr "IO バッファー"
+msgstr ""
 
 #: ../../sdk/io-guide/io-buffers.en.rst:21
 msgid ""
@@ -41,40 +42,6 @@ msgid ""
 "pointers and adjust reference counts appropriately (and doesn't actually "
 "copy any data)."
 msgstr ""
-"IO バッファーデータ構造は vconnection 抽象構造の構成要素です。 **IO バッ"
-"ファー** (``TSIOBuffer``)  はバッファーデータを指すバッファーブロックのリス"
-"トで構成されます。バッファーブロック (``TSIOBufferBlock``) とバッファーデー"
-"タ (``TSIOBufferData``) の両方のデータ構造は参照カウントされ、同時に複数の"
-"バッファーに存在できます。 Traffic Server はポインターのコピーと適切な参照カ"
-"ウントの調節（と実際にデータをコピーしないこと）のみすれば良いため、 "
-"``TSIOBufferCopy`` によりデータをある IO バッファーから別の IO バッファーに"
-"コピーするのが極めて効率的になります。"
-
-#: ../../sdk/io-guide/io-buffers.en.rst:40
-msgid "Additional information about IO buffer functions:"
-msgstr "IO バッファー関数に関する追加情報"
-
-#: ../../sdk/io-guide/io-buffers.en.rst:42
-msgid ""
-"The ``TSIOBufferReader`` data structure tracks how much data in "
-"``TSIOBuffer`` has been read. It has an offset number of bytes that is the "
-"current start point of a particular buffer reader (for every read operation "
-"on an ``TSIOBuffer``, you must allocate an ``TSIOBufferReader``)."
-msgstr ""
-"``TSIOBufferReader`` データ構造は ``TSIOBuffer`` に幾つのデータが読み込まれ"
-"たかを追跡します。これは特定のバッファー reader の現在の開始地点のオフセット"
-"バイト数を持ちます。（ ``TSIOBuffer`` の読込み操作ごとに、 "
-"``TSIOBufferReader`` を割り当てる必要があります。）"
-
-#: ../../sdk/io-guide/io-buffers.en.rst:48
-msgid ""
-"Bytes that have already been read may not necessarily be freed within the "
-"``TSIOBuffer``. To consume bytes that have been read, you must call "
-"``TSIOBufferConsume``."
-msgstr ""
-"既に読み込まれたバイト列は ``TSIOBuffer`` 内で絶対に解放してはいけません。読"
-"み込まれたバイト列を消費するには、 ``TSIOBufferConsume`` を呼び出す必要があ"
-"ります。"
 
 #: ../../sdk/io-guide/io-buffers.en.rst:31
 msgid ""
@@ -84,13 +51,26 @@ msgid ""
 "Since only a single writer is allowed, there is no corresponding "
 "``TSIOBufferWriter`` data structure. The writer simply modifies the IO "
 "buffer directly. To see an example that illustrates how to use IOBuffers, "
-"refer to the sample code in the description of :c:func:"
-"`TSIOBufferBlockReadStart`."
+"refer to the sample code in the description of "
+"```TSIOBufferBlockReadStart`` <http://people.apache.org/~amc/ats/doc/html/"
+"ts_8h.html#a367203e6e2cf4349e019952782deb96c>`__."
 msgstr ""
-"IO バッファー抽象構造は一つの writer と複数の reader を提供します。reader が"
-"お互いを知る必要を無くすため、 ``TSIOBufferReader`` データ構造を通して IO "
-"バッファーを操作します。 writer は一つのみしか許可されていないため、"
-"``TSIOBufferWriter`` データ構造に相当するものはありません。 writer は単純に "
-"IO バッファーを直接修正します。 IO バッファーの使用方法を図示した例を確認す"
-"るには :c:func:`TSIOBufferBlockReadStart` の記述のサンプルコードを参照してく"
-"ださい。"
+
+#: ../../sdk/io-guide/io-buffers.en.rst:40
+msgid "Additional information about IO buffer functions:"
+msgstr ""
+
+#: ../../sdk/io-guide/io-buffers.en.rst:42
+msgid ""
+"The ``TSIOBufferReader`` data structure tracks how much data in "
+"``TSIOBuffer`` has been read. It has an offset number of bytes that is the "
+"current start point of a particular buffer reader (for every read operation "
+"on an ``TSIOBuffer``, you must allocate an ``TSIOBufferReader``)."
+msgstr ""
+
+#: ../../sdk/io-guide/io-buffers.en.rst:48
+msgid ""
+"Bytes that have already been read may not necessarily be freed within the "
+"``TSIOBuffer``. To consume bytes that have been read, you must call "
+"``TSIOBufferConsume``."
+msgstr ""

@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#include "ink_mutex.h"
+#include "ts/ink_mutex.h"
 
 /// Generate a debug message with the current capabilities for the process.
 extern void DebugCapabilities(char const *tag ///< Debug message tag.
@@ -64,10 +64,10 @@ public:
     TRACE_PRIVILEGE = 0x2u // Trace other processes with privilege
   } privilege_level;
 
-  ElevateAccess(const bool state, unsigned level = FILE_PRIVILEGE);
+  ElevateAccess(unsigned level = FILE_PRIVILEGE);
   ~ElevateAccess();
 
-  void elevate();
+  void elevate(unsigned level);
   void demote();
 
 private:
@@ -75,8 +75,12 @@ private:
   uid_t saved_uid;
   unsigned level;
 
+  void acquireFileAccessCap(unsigned level);
+  void releaseFileAccessCap();
 #if !TS_USE_POSIX_CAP
   static ink_mutex lock; // only one thread at a time can elevate
+#else
+  void *cap_state; ///< Original capabilities state to restore.
 #endif
 };
 

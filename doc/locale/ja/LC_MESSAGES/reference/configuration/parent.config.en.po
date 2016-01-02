@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -54,7 +55,7 @@ msgstr ""
 #: ../../reference/configuration/parent.config.en.rst:34
 msgid ""
 "After you modify the :file:`parent.config` file, run the :option:"
-"`traffic_line -x` command to apply your changes. When you apply the changes "
+"`traffic_ctl config reload` command to apply your changes. When you apply the changes "
 "to one node in a cluster, Traffic Server automatically applies the changes "
 "to all other nodes in the cluster."
 msgstr ""
@@ -77,6 +78,10 @@ msgstr ""
 
 #: ../../reference/configuration/parent.config.en.rst:53
 msgid "``dest_domain``"
+msgstr ""
+
+#: ../../reference/configuration/parent.config.en.rst:53
+msgid "A requested domain name."
 msgstr ""
 
 #: ../../reference/configuration/parent.config.en.rst:58
@@ -185,16 +190,16 @@ msgstr ""
 msgid "A client IP address."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:122
+#: ../../reference/configuration/parent.config.en.rst:115
 msgid ""
 "The following list shows the possible actions and their allowed values."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:130
+#: ../../reference/configuration/parent.config.en.rst:123
 msgid "``parent``"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:127
+#: ../../reference/configuration/parent.config.en.rst:120
 msgid ""
 "An ordered list of parent servers. If the request cannot be handled by the "
 "last parent server in the list, then it will be routed to the origin "
@@ -202,51 +207,51 @@ msgid ""
 "specify the port number."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:148
+#: ../../reference/configuration/parent.config.en.rst:135
 msgid "``round_robin``"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:135
-#: ../../reference/configuration/parent.config.en.rst:153
+#: ../../reference/configuration/parent.config.en.rst:128
+#: ../../reference/configuration/parent.config.en.rst:140
 msgid "One of the following values:"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:137
+#: ../../reference/configuration/parent.config.en.rst:130
 msgid ""
 "``true`` - Traffic Server goes through the parent cache list in a round "
 "robin-based on client IP address."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:139
+#: ../../reference/configuration/parent.config.en.rst:132
 msgid ""
 "``strict`` - Traffic Server machines serve requests strictly in turn. For "
 "example: machine ``proxy1`` serves the first request, ``proxy2`` serves the "
 "second request, and so on."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:142
+#: ../../reference/configuration/parent.config.en.rst:135
 msgid "``false`` - Round robin selection does not occur."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:157
+#: ../../reference/configuration/parent.config.en.rst:144
 msgid "``go_direct``"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:155
+#: ../../reference/configuration/parent.config.en.rst:142
 msgid ""
 "``true`` - requests bypass parent hierarchies and go directly to the origin "
 "server."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:157
+#: ../../reference/configuration/parent.config.en.rst:144
 msgid "``false`` - requests do not bypass parent hierarchies."
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:160
+#: ../../reference/configuration/parent.config.en.rst:147
 msgid "Examples"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:162
+#: ../../reference/configuration/parent.config.en.rst:149
 msgid ""
 "The following rule configures a parent cache hierarchy consisting of "
 "Traffic Server (which is the child) and two parents, ``p1.x.com`` and ``p2."
@@ -254,7 +259,7 @@ msgid ""
 "servers ``p1.x.com`` and ``p2.x.com`` in a round-robin fashion::"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:173
+#: ../../reference/configuration/parent.config.en.rst:158
 msgid ""
 "The following rule configures Traffic Server to route all requests "
 "containing the regular expression ``politics`` and the path ``/viewpoint`` "
@@ -262,32 +267,8 @@ msgid ""
 "``url_regex=politics prefix=/viewpoint go_direct=true``"
 msgstr ""
 
-#: ../../reference/configuration/parent.config.en.rst:178
+#: ../../reference/configuration/parent.config.en.rst:163
 msgid ""
 "Every line in the :file:`parent.config` file must contain either a "
 "``parent=`` or ``go_direct=`` directive."
-msgstr ""
-
-#: ../../reference/configuration/parent.config.en.rst:120
-msgid "``internal``"
-msgstr ""
-
-#: ../../reference/configuration/parent.config.en.rst:118
-msgid ""
-"A boolean value, ``true`` or ``false``, specifying if the rule should match "
-"(or not match) a transaction originating from an internal API. This is "
-"useful to differentiate transaction originating from an ATS plugin."
-msgstr ""
-
-#: ../../reference/configuration/parent.config.en.rst:53
-msgid "A requested domain name, and its subdomains."
-msgstr ""
-
-#: ../../reference/configuration/parent.config.en.rst:143
-msgid ""
-"``consistent_hash`` - consistent hash of the url so that one parent is "
-"chosen for a given url. If a parent is down, the traffic that would go to "
-"the down parent is rehashed amongst the remaining parents. The other "
-"traffic is unaffected. Once the downed parent becomes available, the "
-"traffic distribution returns to the pre-down state."
 msgstr ""

@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -69,33 +70,33 @@ msgstr ""
 msgid "No urls are disallowed from compression"
 msgstr "どの URL も圧縮を拒否されません"
 
-#: ../../reference/plugins/gzip.en.rst:46
+#: ../../reference/plugins/gzip.en.rst:45
 msgid "Configuration"
 msgstr "設定"
 
-#: ../../reference/plugins/gzip.en.rst:48
+#: ../../reference/plugins/gzip.en.rst:47
 msgid "Alternatively, a configuration can also be specified::"
 msgstr "もしくは、設定を指定することも可能です。"
 
-#: ../../reference/plugins/gzip.en.rst:52
+#: ../../reference/plugins/gzip.en.rst:51
 msgid ""
 "After modifying plugin.config, restart traffic server (sudo traffic_line -"
 "L) the configuration is re-read when a management update is given (sudo "
-"traffic_line -x)"
+"traffic_ctl config reload)"
 msgstr ""
 "plugin.config を修正後、Traffic Server をリスタート (sudo traffic_line -L) "
 "設定ファイルは管理アップデートが行われた際に再読み込みされます。(sudo "
-"traffic_line -x)"
+"traffic_ctl config reload)"
 
-#: ../../reference/plugins/gzip.en.rst:57
+#: ../../reference/plugins/gzip.en.rst:56
 msgid "Options"
 msgstr "オプション"
 
-#: ../../reference/plugins/gzip.en.rst:59
+#: ../../reference/plugins/gzip.en.rst:58
 msgid "Flags and options are:"
 msgstr "フラグとオプションは次のとおりです。"
 
-#: ../../reference/plugins/gzip.en.rst:61
+#: ../../reference/plugins/gzip.en.rst:60
 msgid ""
 "``enabled``: (``true`` or ``false``) Enable or disable compression for a "
 "host."
@@ -103,7 +104,7 @@ msgstr ""
 "``enabled``: (``true`` または ``false``) ホストに対する圧縮を有効化または無"
 "効化します。"
 
-#: ../../reference/plugins/gzip.en.rst:64
+#: ../../reference/plugins/gzip.en.rst:63
 msgid ""
 "``remove-accept-encoding``: (``true`` or ``false``) Sets whether the plugin "
 "should hide the accept encoding from origin servers:"
@@ -111,18 +112,18 @@ msgstr ""
 "``remove-accept-encoding``: (``true`` または ``false``) プラグインが受け付け"
 "るエンコーディングをオリジンサーバーに隠すべきかどうかを設定します。"
 
-#: ../../reference/plugins/gzip.en.rst:67
+#: ../../reference/plugins/gzip.en.rst:66
 msgid "To ease the load on the origins."
 msgstr "オリジンの負荷を軽くするために。"
 
-#: ../../reference/plugins/gzip.en.rst:68
+#: ../../reference/plugins/gzip.en.rst:67
 msgid ""
 "For when the proxy parses responses, and the resulting compression/"
 "decompression is wasteful."
 msgstr ""
 "プロキシーがレスポンスをパースする際に、圧縮/展開が無駄になるときのために。"
 
-#: ../../reference/plugins/gzip.en.rst:71
+#: ../../reference/plugins/gzip.en.rst:70
 msgid ""
 "``cache``: (``true`` or ``false``) When set, the plugin stores the "
 "uncompressed and compressed response as alternates."
@@ -130,7 +131,7 @@ msgstr ""
 "``cache``: (``true`` または ``false``) 設定すると、プラグインは圧縮されてい"
 "ないレスポンスと圧縮されたレスポンスを代替として保存します。"
 
-#: ../../reference/plugins/gzip.en.rst:74
+#: ../../reference/plugins/gzip.en.rst:73
 msgid ""
 "``compressible-content-type``: Wildcard pattern for matching compressible "
 "content types."
@@ -138,28 +139,18 @@ msgstr ""
 "``compressible-content-type``: 圧縮できるコンテントタイプのワイルドカードパ"
 "ターン"
 
-#: ../../reference/plugins/gzip.en.rst:77
+#: ../../reference/plugins/gzip.en.rst:76
 msgid "``disallow``: Wildcard pattern for disabling compression on urls."
 msgstr "``disallow``: 圧縮を無効化する URL のワイルドカードパターン。"
 
-#: ../../reference/plugins/gzip.en.rst:81
+#: ../../reference/plugins/gzip.en.rst:78
 msgid "Options can be set globally or on a per-site basis, as such::"
 msgstr "オプションはこのように大域的にもサイト毎にも設定できます。"
 
-#: ../../reference/plugins/gzip.en.rst:97
+#: ../../reference/plugins/gzip.en.rst:92
 msgid "See example.gzip.config for example configurations."
 msgstr "設定例については example.gzip.config を見てください。"
 
 #: ../../reference/plugins/gzip.en.rst:32
 msgid "Add the following line to :file:`plugin.config`::"
 msgstr "次の行を :file:`plugin.config` に追加してください。"
-
-#: ../../reference/plugins/gzip.en.rst:43
-msgid "Disable flush (flush gzipped content to client)"
-msgstr ""
-
-#: ../../reference/plugins/gzip.en.rst:79
-msgid ""
-"``flush``: (``true`` or ``false``) Enable or disable flushing of gzipped "
-"content."
-msgstr ""

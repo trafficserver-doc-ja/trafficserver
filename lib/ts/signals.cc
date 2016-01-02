@@ -26,9 +26,12 @@
 
 **************************************************************************/
 
-#include "libts.h"
-#include "signals.h"
-#include "ink_stack_trace.h"
+#include "ts/ink_platform.h"
+#include "ts/signals.h"
+#include "ts/ink_stack_trace.h"
+#include "ts/ink_assert.h"
+#include "ts/ink_thread.h"
+#include "ts/Diags.h"
 
 bool
 signal_check_handler(int signal, signal_handler_t handler)
@@ -66,6 +69,7 @@ check_signals(signal_handler_t handler)
   signal_check_handler(SIGTERM, handler);
   signal_check_handler(SIGINT, handler);
   signal_check_handler(SIGUSR1, handler);
+  signal_check_handler(SIGUSR2, handler);
 }
 
 static void

@@ -32,11 +32,11 @@
 #if !defined(_SSLNetVConnection_h_)
 #define _SSLNetVConnection_h_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 #include "P_EventSystem.h"
 #include "P_UnixNetVConnection.h"
 #include "P_UnixNet.h"
-#include "apidefs.h"
+#include "ts/apidefs.h"
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -106,6 +106,16 @@ public:
   setSSLClientConnection(bool state)
   {
     sslClientConnection = state;
+  };
+  virtual void
+  setSSLSessionCacheHit(bool state)
+  {
+    sslSessionCacheHit = state;
+  };
+  virtual bool
+  getSSLSessionCacheHit()
+  {
+    return sslSessionCacheHit;
   };
   int sslServerHandShakeEvent(int &err);
   int sslClientHandShakeEvent(int &err);
@@ -243,6 +253,43 @@ public:
     return eosRcvd;
   }
 
+  bool
+  getSSLTrace() const
+  {
+    return sslTrace || super::origin_trace;
+  };
+
+  void
+  setSSLTrace(bool state)
+  {
+    sslTrace = state;
+  };
+
+  bool computeSSLTrace();
+
+  const char *
+  getSSLProtocol(void) const
+  {
+    if (ssl == NULL)
+      return NULL;
+    return SSL_get_version(ssl);
+  };
+
+  const char *
+  getSSLCipherSuite(void) const
+  {
+    if (ssl == NULL)
+      return NULL;
+    return SSL_get_cipher_name(ssl);
+  }
+
+  /**
+   * Populate the current object based on the socket information in in the
+   * con parameter and the ssl object in the arg parameter
+   * This is logic is invoked when the NetVC object is created in a new thread context
+   */
+  virtual int populate(Connection &con, Continuation *c, void *arg);
+
 private:
   SSLNetVConnection(const SSLNetVConnection &);
   SSLNetVConnection &operator=(const SSLNetVConnection &);
@@ -250,6 +297,7 @@ private:
   bool sslHandShakeComplete;
   bool sslClientConnection;
   bool sslClientRenegotiationAbort;
+  bool sslSessionCacheHit;
   MIOBuffer *handShakeBuffer;
   IOBufferReader *handShakeHolder;
   IOBufferReader *handShakeReader;
@@ -283,6 +331,7 @@ private:
   MIOBuffer *iobuf;
   IOBufferReader *reader;
   bool eosRcvd;
+  bool sslTrace;
 };
 
 typedef int (SSLNetVConnection::*SSLNetVConnHandler)(int, void *);

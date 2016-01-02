@@ -34,12 +34,13 @@
 #ifndef _BASE_MANAGER_H
 #define _BASE_MANAGER_H
 
-#include "ink_thread.h"
-#include "ink_mutex.h"
-#include "ink_llqueue.h"
+#include "ts/ink_thread.h"
+#include "ts/ink_mutex.h"
+#include "ts/ink_llqueue.h"
+#include "ts/ink_hash_table.h"
 
 #include "MgmtDefs.h"
-
+#include "MgmtMarshall.h"
 
 /*******************************************
  * used by LocalManager and in Proxy Main. *
@@ -98,6 +99,8 @@
 #define MGMT_SIGNAL_LIBRECORDS 16
 #define MGMT_SIGNAL_HTTP_CONGESTED_SERVER 20  /* Congestion control -- congested server */
 #define MGMT_SIGNAL_HTTP_ALLEVIATED_SERVER 21 /* Congestion control -- alleviated server */
+
+#define MGMT_SIGNAL_CONFIG_FILE_CHILD 22
 
 #define MGMT_SIGNAL_SAC_SERVER_DOWN 400
 

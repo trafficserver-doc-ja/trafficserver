@@ -23,9 +23,9 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "ink_assert.h"
-#include "ink_platform.h"
-#include "MMH.h"
+#include "ts/ink_assert.h"
+#include "ts/ink_platform.h"
+#include "ts/MMH.h"
 
 #define MMH_X_SIZE 512
 
@@ -95,19 +95,6 @@ ink_init_MMH()
     MMH_x[i] = lrand48();
 }
 #endif /* TEST */
-
-
-#ifndef __GNUC__
-// these are short < 16 bytes, help by permitting inlining
-static inline void
-_memcpy(void *dest, const void *src, int nbytes)
-{
-  for (int i = 0; i < nbytes; i++)
-    ((char *)dest)[i] = ((char *)src)[i];
-}
-
-#define memcpy _memcpy
-#endif
 
 int
 ink_code_incr_MMH_init(MMH_CTX *ctx)

@@ -25,10 +25,11 @@
 #ifndef __NETVCONNECTION_H__
 #define __NETVCONNECTION_H__
 
+#include "ts/ink_inet.h"
 #include "I_Action.h"
 #include "I_VConnection.h"
 #include "I_Event.h"
-#include "List.h"
+#include "ts/List.h"
 #include "I_IOBuffer.h"
 #include "I_Socks.h"
 #include <ts/apidefs.h>
@@ -155,6 +156,8 @@ struct NetVCOptions {
   static uint32_t const SOCK_OPT_KEEP_ALIVE = 2;
   /// Value for linger on for @c sockopt_flags
   static uint32_t const SOCK_OPT_LINGER_ON = 4;
+  /// Value for TCP Fast open @c sockopt_flags
+  static uint32_t const SOCK_OPT_TCP_FAST_OPEN = 8;
 
   uint32_t packet_mark;
   uint32_t packet_tos;

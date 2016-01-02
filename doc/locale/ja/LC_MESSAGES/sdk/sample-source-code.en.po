@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -36,11 +37,11 @@ msgid ""
 "chapters. The following sample plugins are provided:"
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:30
+#: ../../sdk/sample-source-code.en.rst:28
 msgid "blacklist-1.c"
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:32
+#: ../../sdk/sample-source-code.en.rst:30
 msgid ""
 "The sample blacklisting plugin included in the Traffic Server SDK is "
 "``blacklist-1.c``. This plugin checks every incoming HTTP client request "
@@ -49,23 +50,23 @@ msgid ""
 "to the client."
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:38
+#: ../../sdk/sample-source-code.en.rst:36
 msgid "This plugin illustrates:"
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:40
+#: ../../sdk/sample-source-code.en.rst:38
 msgid "An HTTP transaction extension"
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:42
+#: ../../sdk/sample-source-code.en.rst:40
 msgid "How to examine HTTP request headers"
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:44
+#: ../../sdk/sample-source-code.en.rst:42
 msgid "How to use the logging interface"
 msgstr ""
 
-#: ../../sdk/sample-source-code.en.rst:46
+#: ../../sdk/sample-source-code.en.rst:44
 msgid "How to use the plugin configuration management interface"
 msgstr ""
 

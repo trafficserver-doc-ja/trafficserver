@@ -32,7 +32,7 @@
 #ifndef __P_UNIXNETVCONNECTION_H__
 #define __P_UNIXNETVCONNECTION_H__
 
-#include "ink_sock.h"
+#include "ts/ink_sock.h"
 #include "I_NetVConnection.h"
 #include "P_UnixNetState.h"
 #include "P_Connection.h"
@@ -216,6 +216,12 @@ public:
   void readReschedule(NetHandler *nh);
   void writeReschedule(NetHandler *nh);
   void netActivity(EThread *lthread);
+  /**
+   * If the current object's thread does not match the t argument, create a new
+   * NetVC in the thread t context based on the socket and ssl information in the
+   * current NetVC and mark the current NetVC to be closed.
+   */
+  UnixNetVConnection *migrateToCurrentThread(Continuation *c, EThread *t);
 
   Action action_;
   volatile int closed;
@@ -262,10 +268,21 @@ public:
   OOB_callback *oob_ptr;
   bool from_accept_thread;
 
+  // es - origin_trace associated connections
+  bool origin_trace;
+  const sockaddr *origin_trace_addr;
+  int origin_trace_port;
+
   int startEvent(int event, Event *e);
   int acceptEvent(int event, Event *e);
   int mainEvent(int event, Event *e);
   virtual int connectUp(EThread *t, int fd);
+  /**
+   * Populate the current object based on the socket information in in the
+   * con parameter.
+   * This is logic is invoked when the NetVC object is created in a new thread context
+   */
+  virtual int populate(Connection &con, Continuation *c, void *arg);
   virtual void free(EThread *t);
 
   virtual ink_hrtime get_inactivity_timeout();
@@ -277,6 +294,24 @@ public:
   virtual void apply_options();
 
   friend void write_to_net_io(NetHandler *, UnixNetVConnection *, EThread *);
+
+  void
+  setOriginTrace(bool t)
+  {
+    origin_trace = t;
+  }
+
+  void
+  setOriginTraceAddr(const sockaddr *addr)
+  {
+    origin_trace_addr = addr;
+  }
+
+  void
+  setOriginTracePort(int port)
+  {
+    origin_trace_port = port;
+  }
 };
 
 extern ClassAllocator<UnixNetVConnection> netVCAllocator;

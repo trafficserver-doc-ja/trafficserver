@@ -87,13 +87,15 @@
 #ifndef _CONTROL_MATCHER_H_
 #define _CONTROL_MATCHER_H_
 
-#include "DynArray.h"
-#include <ts/IpMap.h>
+#include "ts/DynArray.h"
+#include "ts/ink_hash_table.h"
+#include "ts/IpMap.h"
+#include "ts/MatcherUtils.h"
 
-#include "ink_apidefs.h"
-#include "ink_defs.h"
+#include "ts/ink_apidefs.h"
+#include "ts/ink_defs.h"
 #include "HTTP.h"
-#include "Regex.h"
+#include "ts/Regex.h"
 
 #ifdef HAVE_CTYPE_H
 #include <ctype.h>
@@ -124,18 +126,6 @@ public:
   virtual sockaddr const *get_ip() = 0;
 
   virtual sockaddr const *get_client_ip() = 0;
-
-  enum RD_Type {
-    RD_NULL,
-    RD_HTTP,
-    RD_CONGEST_ENTRY,
-  };
-
-  virtual RD_Type
-  data_type(void)
-  {
-    return RD_NULL;
-  }
 };
 
 class HttpRequestData : public RequestData

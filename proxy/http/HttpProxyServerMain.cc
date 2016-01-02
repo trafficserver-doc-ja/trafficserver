@@ -21,7 +21,7 @@
   limitations under the License.
  */
 
-#include "ink_config.h"
+#include "ts/ink_config.h"
 #include "P_Net.h"
 #include "Main.h"
 #include "Error.h"
@@ -33,7 +33,7 @@
 #include "HttpClientSession.h"
 #include "HttpPages.h"
 #include "HttpTunnel.h"
-#include "Tokenizer.h"
+#include "ts/Tokenizer.h"
 #include "P_SSLNextProtocolAccept.h"
 #include "ProtocolProbeSessionAccept.h"
 #include "SpdySessionAccept.h"
@@ -263,7 +263,7 @@ init_HttpProxyServer(int n_accept_threads)
     plugin_http_transparent_accept->mutex = new_ProxyMutex();
   }
   if (ssl_plugin_mutex == NULL) {
-    ssl_plugin_mutex = new ProxyMutex();
+    ssl_plugin_mutex = mutexAllocator.alloc();
     ssl_plugin_mutex->init("SSL Acceptor List");
   }
 

@@ -27,7 +27,7 @@
   Commonality across all platforms -- move out as required.
 
 **************************************************************************/
-#include "libts.h"
+#include "ts/ink_platform.h"
 
 #include "P_Net.h"
 
@@ -46,10 +46,10 @@
 int
 get_listen_backlog(void)
 {
-  int listen_backlog = 1024;
+  int listen_backlog;
 
   REC_ReadConfigInteger(listen_backlog, "proxy.config.net.listen_backlog");
-  return listen_backlog;
+  return listen_backlog >= 0 ? listen_backlog : ats_tcp_somaxconn();
 }
 
 
@@ -124,6 +124,22 @@ Connection::close()
   }
 }
 
+/**
+ * Move control of the socket from the argument object orig to the current object.
+ * Orig is marked as zombie, so when it is freed, the socket will not be closed
+ */
+void
+Connection::move(Connection &orig)
+{
+  this->is_connected = orig.is_connected;
+  this->is_bound = orig.is_bound;
+  this->fd = orig.fd;
+  // The target has taken ownership of the file descriptor
+  orig.fd = NO_FD;
+  this->addr = orig.addr;
+  this->sock_type = orig.sock_type;
+}
+
 static int
 add_http_filter(int fd ATS_UNUSED)
 {
@@ -138,8 +154,13 @@ int
 Server::setup_fd_for_listen(bool non_blocking, int recv_bufsize, int send_bufsize, bool transparent)
 {
   int res = 0;
-  int sockopt_flag_in;
+  int sockopt_flag_in = 0;
   REC_ReadConfigInteger(sockopt_flag_in, "proxy.config.net.sock_option_flag_in");
+
+#ifdef TCP_FASTOPEN
+  int tfo_queue_length = 0;
+  REC_ReadConfigInteger(tfo_queue_length, "proxy.config.net.sock_option_tfo_queue_size_in");
+#endif
 
   ink_assert(fd != NO_FD);
 
@@ -227,6 +248,13 @@ Server::setup_fd_for_listen(bool non_blocking, int recv_bufsize, int send_bufsiz
       (res = safe_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, SOCKOPT_ON, sizeof(int))) < 0) {
     goto Lerror;
   }
+
+#ifdef TCP_FASTOPEN
+  if ((sockopt_flag_in & NetVCOptions::SOCK_OPT_TCP_FAST_OPEN) &&
+      (res = safe_setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, (char *)&tfo_queue_length, sizeof(int)))) {
+    goto Lerror;
+  }
+#endif
 
   if (transparent) {
 #if TS_USE_TPROXY

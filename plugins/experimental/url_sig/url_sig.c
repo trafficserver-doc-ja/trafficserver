@@ -16,6 +16,7 @@
   limitations under the License.
  */
 
+#include "ts/ink_defs.h"
 #include "url_sig.h"
 
 #include <stdio.h>
@@ -87,7 +88,7 @@ TSRemapInit(TSRemapInterface *api_info, char *errbuf, int errbuf_size)
   return TS_SUCCESS;
 }
 
-// To force a config file reload touch remap.config and do a "traffic_line -x"
+// To force a config file reload touch remap.config and do a "traffic_ctl config reload"
 TSReturnCode
 TSRemapNewInstance(int argc, char *argv[], void **ih, char *errbuf, int errbuf_size)
 {

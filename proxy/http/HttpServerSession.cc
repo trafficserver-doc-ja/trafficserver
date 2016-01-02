@@ -28,8 +28,8 @@
    Description:
 
  ****************************************************************************/
-#include "ink_config.h"
-#include "Allocator.h"
+#include "ts/ink_config.h"
+#include "ts/Allocator.h"
 #include "HttpServerSession.h"
 #include "HttpSessionManager.h"
 #include "HttpSM.h"
@@ -120,7 +120,9 @@ HttpServerSession::do_io_close(int alerrno)
 
   Debug("http_ss", "[%" PRId64 "] session closing, netvc %p", con_id, server_vc);
 
-  server_vc->do_io_close(alerrno);
+  if (server_vc) {
+    server_vc->do_io_close(alerrno);
+  }
   server_vc = NULL;
 
   HTTP_SUM_GLOBAL_DYN_STAT(http_current_server_connections_stat, -1); // Make sure to work on the global stat

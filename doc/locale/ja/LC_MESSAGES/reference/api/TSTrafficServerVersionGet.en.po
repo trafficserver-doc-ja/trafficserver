@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -29,19 +30,19 @@ msgstr ""
 msgid "TSTrafficServerVersionGet"
 msgstr "TSTrafficServerVersionGet"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:26
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:24
 msgid "Synopsis"
 msgstr "概要"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:28
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:26
 msgid "`#include <ts/ts.h>`"
 msgstr "`#include <ts/ts.h>`"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:36
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:34
 msgid "Description"
 msgstr "解説"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:38
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:36
 msgid ""
 ":func:`TSTrafficServerVersionGet` returns a pointer to a string of "
 "characters that indicates the Traffic Server release version. This string "
@@ -50,22 +51,18 @@ msgstr ""
 ":func:`TSTrafficServerVersionGet` は Traffic Server のリリースバージョンを示"
 "す文字列へのポインターを返します。この文字列は変更してはいけません。"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:42
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:40
 msgid "The other APIs return an integer version number."
 msgstr "その他の API は整数のバージョン番号を返します。"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:45
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:43
 msgid "Example"
 msgstr "例"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:98
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:96
 msgid "See also"
 msgstr "参考"
 
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:100
+#: ../../reference/api/TSTrafficServerVersionGet.en.rst:98
 msgid ":manpage:`TSAPI(3ts)`"
 msgstr ":manpage:`TSAPI(3ts)`"
-
-#: ../../reference/api/TSTrafficServerVersionGet.en.rst:23
-msgid "Return Traffic Server version information."
-msgstr ""

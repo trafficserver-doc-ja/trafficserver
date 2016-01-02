@@ -26,6 +26,10 @@
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 
+#include "ts/ink_apidefs.h"
+#include "ts/Diags.h"
+#include "ts/ink_resource.h"
+#include "ts/ink_queue.h"
 #include "ts/X509HostnameValidator.h"
 #include "ts/TestBox.h"
 
@@ -170,7 +174,8 @@ REGRESSION_TEST(middle_label_match)(RegressionTest *t, int /* atype ATS_UNUSED *
 int
 main(int /* argc ATS_UNUSED */, const char ** /* argv ATS_UNUSED */)
 {
-  diags = new Diags(NULL, NULL, stdout);
+  BaseLogFile *blf = new BaseLogFile("stdout");
+  diags = new Diags(NULL, NULL, blf);
   res_track_memory = 1;
 
   SSL_library_init();

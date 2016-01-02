@@ -22,13 +22,14 @@
  */
 
 
-#include "libts.h"
-#include "ink_platform.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_sock.h"
+#include "ts/ink_file.h"
 #include "MgmtUtils.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 #include "LocalManager.h"
 #include "MgmtSocket.h"
-#include "ink_cap.h"
+#include "ts/ink_cap.h"
 #include "FileManager.h"
 #include "ClusterCom.h"
 #include "VMap.h"
@@ -168,7 +169,7 @@ LocalManager::clusterOk()
 bool
 LocalManager::processRunning()
 {
-  if (watched_process_fd != -1 && watched_process_pid != -1) {
+  if (watched_process_fd != ts::NO_FD && watched_process_pid != -1) {
     return true;
   } else {
     return false;
@@ -192,11 +193,6 @@ LocalManager::LocalManager(bool proxy_on) : BaseManager(), run_proxy(proxy_on), 
   mgmt_shutdown_outstanding = MGMT_PENDING_NONE;
   proxy_running = 0;
   RecSetRecordInt("proxy.node.proxy_running", 0, REC_SOURCE_DEFAULT);
-  mgmt_sync_key = REC_readInteger("proxy.config.lm.sem_id", &found);
-  if (!found || mgmt_sync_key <= 0) {
-    mgmt_log("Bad or missing proxy.config.lm.sem_id value; using default id %d\n", MGMT_SEMID_DEFAULT);
-    mgmt_sync_key = MGMT_SEMID_DEFAULT;
-  }
 
   virt_map = NULL;
 
@@ -391,7 +387,6 @@ LocalManager::pollMgmtProcessServer()
 {
   int num;
   struct timeval timeout;
-  struct sockaddr_in clientAddr;
   fd_set fdlist;
 #if TS_HAS_WCCP
   int wccp_fd = wccp_cache.getSocket();
@@ -403,7 +398,7 @@ LocalManager::pollMgmtProcessServer()
     timeout.tv_usec = process_server_timeout_msecs * 1000;
     FD_ZERO(&fdlist);
     FD_SET(process_server_sockfd, &fdlist);
-    if (watched_process_fd != -1)
+    if (watched_process_fd != ts::NO_FD)
       FD_SET(watched_process_fd, &fdlist);
 
 #if TS_HAS_WCCP
@@ -429,10 +424,9 @@ LocalManager::pollMgmtProcessServer()
       }
 #endif
       if (FD_ISSET(process_server_sockfd, &fdlist)) { /* New connection */
-        int clientLen = sizeof(clientAddr);
+        struct sockaddr_in clientAddr;
+        socklen_t clientLen = sizeof(clientAddr);
         int new_sockfd = mgmt_accept(process_server_sockfd, (struct sockaddr *)&clientAddr, &clientLen);
-        MgmtMessageHdr *mh;
-        int data_len;
 
         mgmt_log(stderr, "[LocalManager::pollMgmtProcessServer] New process connecting fd '%d'\n", new_sockfd);
 
@@ -440,16 +434,6 @@ LocalManager::pollMgmtProcessServer()
           mgmt_elog(stderr, errno, "[LocalManager::pollMgmtProcessServer] ==> ");
         } else if (!processRunning()) {
           watched_process_fd = new_sockfd;
-          data_len = sizeof(mgmt_sync_key);
-          mh = (MgmtMessageHdr *)alloca(sizeof(MgmtMessageHdr) + data_len);
-          mh->msg_id = MGMT_EVENT_SYNC_KEY;
-          mh->data_len = data_len;
-          memcpy((char *)mh + sizeof(MgmtMessageHdr), &mgmt_sync_key, data_len);
-          if (mgmt_write_pipe(new_sockfd, (char *)mh, sizeof(MgmtMessageHdr) + data_len) <= 0) {
-            mgmt_elog(errno, "[LocalManager::pollMgmtProcessServer] Error writing sync key message!\n");
-            close_socket(new_sockfd);
-            watched_process_fd = watched_process_pid = -1;
-          }
         } else {
           close_socket(new_sockfd);
         }
@@ -600,7 +584,7 @@ LocalManager::handleMgmtMsgFromProcesses(MgmtMessageHdr *mh)
                 data_raw);
       break;
     }
-  }
+  } break;
   case MGMT_SIGNAL_LOG_FILES_ROLLED: {
     Debug("lm", "Rolling logs %s", (char *)data_raw);
     break;
@@ -620,6 +604,21 @@ LocalManager::handleMgmtMsgFromProcesses(MgmtMessageHdr *mh)
     alarm_keeper->signalAlarm(MGMT_ALARM_PROXY_HTTP_ALLEVIATED_SERVER, data_raw);
     break;
   // Congestion Control - end
+  case MGMT_SIGNAL_CONFIG_FILE_CHILD: {
+    static const MgmtMarshallType fields[] = {MGMT_MARSHALL_STRING, MGMT_MARSHALL_STRING, MGMT_MARSHALL_INT};
+    char *parent = NULL;
+    char *child = NULL;
+    MgmtMarshallInt options = 0;
+    if (mgmt_message_parse(data_raw, mh->data_len, fields, countof(fields), &parent, &child, &options) != -1) {
+      configFiles->configFileChild(parent, child, (unsigned int)options);
+    } else {
+      mgmt_elog(stderr, 0, "[LocalManager::handleMgmtMsgFromProcesses] "
+                           "MGMT_SIGNAL_CONFIG_FILE_CHILD mgmt_message_parse error\n");
+    }
+    // Output pointers are guaranteed to be NULL or valid.
+    ats_free_null(parent);
+    ats_free_null(child);
+  } break;
   case MGMT_SIGNAL_SAC_SERVER_DOWN:
     alarm_keeper->signalAlarm(MGMT_ALARM_SAC_SERVER_DOWN, data_raw);
     break;
@@ -694,9 +693,8 @@ LocalManager::sendMgmtMsgToProcesses(MgmtMessageHdr *mh)
     if (!(configFiles && configFiles->getRollbackObj(fname, &rb)) &&
         (strcmp(data_raw, "proxy.config.cluster.cluster_configuration") != 0) &&
         (strcmp(data_raw, "proxy.config.body_factory.template_sets_dir") != 0)) {
-      mgmt_elog(stderr, 0, "[LocalManager::sendMgmtMsgToProcesses] "
-                           "Invalid 'data_raw' for MGMT_EVENT_CONFIG_FILE_UPDATE\n");
-      ink_assert(false);
+      mgmt_fatal(stderr, 0, "[LocalManager::sendMgmtMsgToProcesses] "
+                            "Invalid 'data_raw' for MGMT_EVENT_CONFIG_FILE_UPDATE\n");
     }
     ats_free(fname);
     break;
@@ -1001,12 +999,10 @@ LocalManager::listenForProxy()
     }
 
     // read backlong configuration value and overwrite the default value if found
-    int backlog = 1024;
     bool found;
-    RecInt config_backlog = REC_readInteger("proxy.config.net.listen_backlog", &found);
-    if (found) {
-      backlog = config_backlog;
-    }
+    RecInt backlog = REC_readInteger("proxy.config.net.listen_backlog", &found);
+    backlog = (found && backlog >= 0) ? backlog : ats_tcp_somaxconn();
+
     if ((listen(p.m_fd, backlog)) < 0) {
       mgmt_fatal(stderr, errno, "[LocalManager::listenForProxy] Unable to listen on port: %d (%s)\n", p.m_port,
                  ats_ip_family_name(p.m_family));

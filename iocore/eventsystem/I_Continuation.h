@@ -36,7 +36,8 @@
 #ifndef _I_Continuation_h_
 #define _I_Continuation_h_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/List.h"
 #include "I_Lock.h"
 
 class Continuation;
@@ -108,7 +109,7 @@ public:
 #endif
 
   /**
-    The Contination's lock.
+    The Continuation's lock.
 
     A reference counted pointer to the Continuation's lock. This
     lock is initialized in the constructor and should not be set

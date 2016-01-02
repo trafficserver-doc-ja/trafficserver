@@ -50,6 +50,9 @@ extern "C" {
 #define TS_RES_MEM_PATH TS_RES_PATH("memory/")
 #endif
 
+#define TM_OPT_BIND_STDOUT "bind_stdout"
+#define TM_OPT_BIND_STDERR "bind_stderr"
+
 /***************************************************************************
  * Error and Return Values
  ***************************************************************************/
@@ -397,6 +400,7 @@ typedef union {/* record value */
 
 typedef struct {
   char *rec_name;        /* record name */
+  TSInt rec_class;       /* record class (RecT) */
   TSRecordT rec_type;    /* record type {TS_REC_INT...} */
   TSRecordValueT valueT; /* record value */
 } TSRecordEle;
@@ -423,6 +427,11 @@ typedef struct {
 
 /* Free (the contents of) a TSConfigRecordDescription */
 tsapi void TSConfigRecordDescriptionFree(TSConfigRecordDescription *val);
+
+/* Heap-allocate a TSConfigRecordDescription. */
+tsapi TSConfigRecordDescription *TSConfigRecordDescriptionCreate(void);
+/* Free and destroy a heap-allocated TSConfigRecordDescription. */
+tsapi void TSConfigRecordDescriptionDestroy(TSConfigRecordDescription *);
 
 /*--- events --------------------------------------------------------------*/
 
@@ -933,7 +942,7 @@ tsapi TSMgmtError TSActionDo(TSActionNeedT action);
  */
 tsapi TSMgmtError TSBounce(unsigned options);
 
-/* TSStorageDeviceOp: Request an operation on a storage device.
+/* TSStorageDeviceCmdOffline: Request to make a cache storage device offline.
  * @arg dev Target device, specified by path to device.
  * @return Success.
  */
@@ -1107,6 +1116,7 @@ tsapi TSMgmtError TSRecordSetString(const char *rec_name, const char *string_val
  * Output: TSMgmtError
  */
 tsapi TSMgmtError TSConfigRecordDescribe(const char *rec_name, unsigned flags, TSConfigRecordDescription *val);
+tsapi TSMgmtError TSConfigRecordDescribeMatchMlt(const char *rec_regex, unsigned flags, TSList list);
 
 /* TSRecordSetMlt: sets a set of records
  * Input:  rec_list     - list of record names the user wants to set;

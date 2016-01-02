@@ -26,6 +26,7 @@
 
 #include "P_Cache.h"
 #include "I_Tasks.h"
+#include "ts/fastlz.h"
 #if TS_HAS_LIBZ
 #include <zlib.h>
 #endif
@@ -40,9 +41,12 @@
 #define LZMA_BASE_MEMLIMIT (64 * 1024 * 1024)
 //#define CHECK_ACOUNTING 1 // very expensive double checking of all sizes
 
-#define REQUEUE_HITS(_h) ((_h) ? 1 : 0)
+#define REQUEUE_HITS(_h) ((_h) ? ((_h)-1) : 0)
 #define CACHE_VALUE_HITS_SIZE(_h, _s) ((float)((_h) + 1) / ((_s) + ENTRY_OVERHEAD))
 #define CACHE_VALUE(_x) CACHE_VALUE_HITS_SIZE((_x)->hits, (_x)->size)
+
+#define AVERAGE_VALUE_OVER 100
+#define REQUEUE_LIMIT 100
 
 struct RamCacheCLFUSEntry {
   INK_MD5 key;
@@ -75,11 +79,13 @@ struct RamCacheCLFUS : public RamCache {
   int get(INK_MD5 *key, Ptr<IOBufferData> *ret_data, uint32_t auxkey1 = 0, uint32_t auxkey2 = 0);
   int put(INK_MD5 *key, IOBufferData *data, uint32_t len, bool copy = false, uint32_t auxkey1 = 0, uint32_t auxkey2 = 0);
   int fixup(const INK_MD5 *key, uint32_t old_auxkey1, uint32_t old_auxkey2, uint32_t new_auxkey1, uint32_t new_auxkey2);
+  int64_t size() const;
 
   void init(int64_t max_bytes, Vol *vol);
 
   // private
   Vol *vol; // for stats
+  double average_value;
   int64_t history;
   int ibuckets;
   int nbuckets;
@@ -96,11 +102,28 @@ struct RamCacheCLFUS : public RamCache {
   void requeue_victims(Que(RamCacheCLFUSEntry, lru_link) & victims);
   void tick(); // move CLOCK on history
   RamCacheCLFUS()
-    : max_bytes(0), bytes(0), objects(0), vol(0), history(0), ibuckets(0), nbuckets(0), bucket(0), seen(0), ncompressed(0),
-      compressed(0)
+    : max_bytes(0), bytes(0), objects(0), vol(0), average_value(0), history(0), ibuckets(0), nbuckets(0), bucket(0), seen(0),
+      ncompressed(0), compressed(0)
   {
   }
 };
+
+int64_t
+RamCacheCLFUS::size() const
+{
+  int64_t s = 0;
+  for (int i = 0; i < 2; i++) {
+    forl_LL(RamCacheCLFUSEntry, e, lru[i])
+    {
+      s += sizeof(*e);
+      if (e->data) {
+        s += sizeof(*e->data);
+        s += e->data->block_size();
+      }
+    }
+  }
+  return s;
+}
 
 class RamCacheCLFUSCompressor : public Continuation
 {
@@ -216,10 +239,13 @@ RamCacheCLFUS::get(INK_MD5 *key, Ptr<IOBufferData> *ret_data, uint32_t auxkey1, 
   while (e) {
     if (e->key == *key && e->auxkey1 == auxkey1 && e->auxkey2 == auxkey2) {
       move_compressed(e);
-      lru[e->flag_bits.lru].remove(e);
-      lru[e->flag_bits.lru].enqueue(e);
       if (!e->flag_bits.lru) { // in memory
+        if (CACHE_VALUE(e) > average_value) {
+          lru[e->flag_bits.lru].remove(e);
+          lru[e->flag_bits.lru].enqueue(e);
+        }
         e->hits++;
+        uint32_t ram_hit_state = RAM_HIT_COMPRESS_NONE;
         if (e->flag_bits.compressed) {
           b = (char *)ats_malloc(e->len);
           switch (e->flag_bits.compressed) {
@@ -229,6 +255,7 @@ RamCacheCLFUS::get(INK_MD5 *key, Ptr<IOBufferData> *ret_data, uint32_t auxkey1, 
             int l = (int)e->len;
             if ((l != (int)fastlz_decompress(e->data->data(), e->compressed_len, b, l)))
               goto Lfailed;
+            ram_hit_state = RAM_HIT_COMPRESS_FASTLZ;
             break;
           }
 #if TS_HAS_LIBZ
@@ -236,6 +263,7 @@ RamCacheCLFUS::get(INK_MD5 *key, Ptr<IOBufferData> *ret_data, uint32_t auxkey1, 
             uLongf l = e->len;
             if (Z_OK != uncompress((Bytef *)b, &l, (Bytef *)e->data->data(), e->compressed_len))
               goto Lfailed;
+            ram_hit_state = RAM_HIT_COMPRESS_LIBZ;
             break;
           }
 #endif
@@ -246,6 +274,7 @@ RamCacheCLFUS::get(INK_MD5 *key, Ptr<IOBufferData> *ret_data, uint32_t auxkey1, 
             if (LZMA_OK != lzma_stream_buffer_decode(&memlimit, 0, NULL, (uint8_t *)e->data->data(), &ipos, e->compressed_len,
                                                      (uint8_t *)b, &opos, l))
               goto Lfailed;
+            ram_hit_state = RAM_HIT_COMPRESS_LIBLZMA;
             break;
           }
 #endif
@@ -272,7 +301,7 @@ RamCacheCLFUS::get(INK_MD5 *key, Ptr<IOBufferData> *ret_data, uint32_t auxkey1, 
         }
         CACHE_SUM_DYN_STAT_THREAD(cache_ram_cache_hits_stat, 1);
         DDebug("ram_cache", "get %X %d %d size %d HIT", key->slice32(3), auxkey1, auxkey2, e->size);
-        return 1;
+        return ram_hit_state;
       } else {
         CACHE_SUM_DYN_STAT_THREAD(cache_ram_cache_misses_stat, 1);
         DDebug("ram_cache", "get %X %d %d HISTORY", key->slice32(3), auxkey1, auxkey2);
@@ -309,6 +338,8 @@ RamCacheCLFUS::tick()
     return;
   e = lru[1].dequeue();
 Lfree:
+  if (!e) // e may be NULL after e= lru[1].dequeue()
+    return;
   e->flag_bits.lru = 0;
   history--;
   uint32_t b = e->key.slice32(3) % nbuckets;
@@ -521,6 +552,7 @@ RamCacheCLFUS::put(INK_MD5 *key, IOBufferData *data, uint32_t len, bool copy, ui
   uint32_t i = key->slice32(3) % nbuckets;
   RamCacheCLFUSEntry *e = bucket[i].head;
   uint32_t size = copy ? len : data->block_size();
+  double victim_value = 0;
   while (e) {
     if (e->key == *key) {
       if (e->auxkey1 == auxkey1 && e->auxkey2 == auxkey2)
@@ -556,11 +588,17 @@ RamCacheCLFUS::put(INK_MD5 *key, IOBufferData *data, uint32_t len, bool copy, ui
       e->flag_bits.compressed = 0;
       DDebug("ram_cache", "put %X %d %d size %d HIT", key->slice32(3), auxkey1, auxkey2, e->size);
       return 1;
-    } else
+    } else {
       lru[1].remove(e);
+      if (CACHE_VALUE(e) < average_value) {
+        lru[1].enqueue(e);
+        return 0;
+      }
+    }
   }
   Que(RamCacheCLFUSEntry, lru_link) victims;
   RamCacheCLFUSEntry *victim = 0;
+  int requeue_limit = REQUEUE_LIMIT;
   if (!lru[1].head) // initial fill
     if (bytes + size <= max_bytes)
       goto Linsert;
@@ -585,6 +623,11 @@ RamCacheCLFUS::put(INK_MD5 *key, IOBufferData *data, uint32_t len, bool copy, ui
       DDebug("ram_cache", "put %X %d %d NO VICTIM", key->slice32(3), auxkey1, auxkey2);
       return 0;
     }
+    average_value = (CACHE_VALUE(victim) + (average_value * (AVERAGE_VALUE_OVER - 1))) / AVERAGE_VALUE_OVER;
+    if (CACHE_VALUE(victim) > average_value && requeue_limit-- > 0) {
+      lru[0].enqueue(victim);
+      continue;
+    }
     bytes -= victim->size + ENTRY_OVERHEAD;
     CACHE_SUM_DYN_STAT_THREAD(cache_ram_cache_bytes_stat, -(int64_t)victim->size);
     victims.enqueue(victim);
@@ -592,13 +635,13 @@ RamCacheCLFUS::put(INK_MD5 *key, IOBufferData *data, uint32_t len, bool copy, ui
       compressed = 0;
     else
       ncompressed--;
-    victim->hits >>= 1;
+    victim_value += CACHE_VALUE(victim);
     tick();
     if (!e)
       goto Lhistory;
     else { // e from history
-      DDebug("ram_cache_compare", "put %f %f", CACHE_VALUE(victim), CACHE_VALUE(e));
-      if (bytes + victim->size + size > max_bytes && CACHE_VALUE(victim) > CACHE_VALUE(e)) {
+      DDebug("ram_cache_compare", "put %f %f", victim_value, CACHE_VALUE(e));
+      if (bytes + victim->size + size > max_bytes && victim_value > CACHE_VALUE(e)) {
         requeue_victims(victims);
         lru[1].enqueue(e);
         DDebug("ram_cache", "put %X %d %d size %d INC %" PRId64 " HISTORY", key->slice32(3), auxkey1, auxkey2, e->size, e->hits);

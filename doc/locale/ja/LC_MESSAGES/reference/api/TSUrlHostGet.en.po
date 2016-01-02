@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -29,19 +30,19 @@ msgstr ""
 msgid "TSUrlHostGet"
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:27
+#: ../../reference/api/TSUrlHostGet.en.rst:25
 msgid "Synopsis"
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:29
+#: ../../reference/api/TSUrlHostGet.en.rst:27
 msgid "`#include <ts/ts.h>`"
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:42
+#: ../../reference/api/TSUrlHostGet.en.rst:40
 msgid "Description"
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:44
+#: ../../reference/api/TSUrlHostGet.en.rst:42
 msgid ""
 "The URL data structure is a parsed version of a standard internet URL. The "
 "Traffic Server URL API provides access to URL data stored in marshal "
@@ -50,7 +51,7 @@ msgid ""
 "scheme information."
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:50
+#: ../../reference/api/TSUrlHostGet.en.rst:48
 msgid ""
 ":func:`TSUrlSchemeGet`, :func:`TSUrlUserGet`, :func:`TSUrlPasswordGet`, :"
 "func:`TSUrlHostGet`, :func:`TSUrlHttpParamsGet`, :func:`TSUrlHttpQueryGet` "
@@ -60,7 +61,7 @@ msgid ""
 "the URL portion is returned."
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:57
+#: ../../reference/api/TSUrlHostGet.en.rst:55
 msgid ""
 ":func:`TSUrlPortGet` retrieves the port number portion of the URL located "
 "at :data:`offset` within the marshal buffer :data:`bufp`. If there is no "
@@ -68,18 +69,18 @@ msgid ""
 "on the URL scheme."
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:63
+#: ../../reference/api/TSUrlHostGet.en.rst:61
 msgid "Return values"
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:65
+#: ../../reference/api/TSUrlHostGet.en.rst:63
 msgid ""
 "All APIs except :func:`TSUrlPortGet` returns a string, which is not "
 "guaranteed to be NULL terminated. You must therefore always use the :data:"
 "`length` value to determine the actual length of the returned string."
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:69
+#: ../../reference/api/TSUrlHostGet.en.rst:67
 msgid ""
 ":func:`TSUrlPortGet` simply returns the port number as an integer, possibly "
 "canonicalized with :data:`80` for HTTP and :data:`443` for HTTPS schemes. "
@@ -87,17 +88,13 @@ msgid ""
 "`0` is returned."
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:75
+#: ../../reference/api/TSUrlHostGet.en.rst:73
 msgid "See also"
 msgstr ""
 
-#: ../../reference/api/TSUrlHostGet.en.rst:77
+#: ../../reference/api/TSUrlHostGet.en.rst:75
 msgid ""
 ":manpage:`TSAPI(3ts)`, :manpage:`TSUrlCreate(3ts)`, :manpage:"
 "`TSUrlHostSet(3ts)`, :manpage:`TSUrlStringGet(3ts)`, :manpage:"
 "`TSUrlPercentEncode(3ts)`"
-msgstr ""
-
-#: ../../reference/api/TSUrlHostGet.en.rst:24
-msgid "Traffic Server URL component retrieval API."
 msgstr ""

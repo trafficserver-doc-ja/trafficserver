@@ -27,12 +27,12 @@
 
 #include <stdarg.h> // for va_list
 
-#include "ink_llqueue.h"
+#include "ts/ink_llqueue.h"
 #include "MgmtDefs.h" // MgmtInt, MgmtFloat, etc
 
 #include "mgmtapi.h"
 #include "CfgContextDefs.h"
-#include "Tokenizer.h"
+#include "ts/Tokenizer.h"
 
 TSMgmtError Init(const char *socket_path = NULL, TSInitOptionT options = TS_MGMT_OPT_DEFAULTS);
 TSMgmtError Terminate();
@@ -66,6 +66,7 @@ TSMgmtError MgmtRecordSetString(const char *rec_name, const char *string_val, TS
 TSMgmtError MgmtRecordGetMatching(const char *regex, TSList rec_vals);
 
 TSMgmtError MgmtConfigRecordDescribe(const char *rec_name, unsigned flags, TSConfigRecordDescription *val);
+TSMgmtError MgmtConfigRecordDescribeMatching(const char *regex, unsigned flags, TSList rec_vals);
 
 /***************************************************************************
  * File Operations

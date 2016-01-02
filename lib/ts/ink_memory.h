@@ -27,7 +27,7 @@
 #include <string.h>
 #include <strings.h>
 
-#include "ink_config.h"
+#include "ts/ink_config.h"
 
 #if HAVE_UNISTD_H
 #include <unistd.h>
@@ -100,7 +100,8 @@ static inline size_t __attribute__((const)) ats_pagesize(void)
     return page_size;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
-  page_size = (size_t)sysconf(_SC_PAGESIZE);
+  long ret = sysconf(_SC_PAGESIZE);
+  page_size = (size_t)((ret > -1) ? ret : 8192);
 #elif defined(HAVE_GETPAGESIZE)
   page_size = (size_t)getpagesize()
 #else

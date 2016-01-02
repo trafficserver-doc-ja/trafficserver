@@ -30,7 +30,7 @@
 
 
  ***************************************************************************/
-#include "libts.h"
+#include "ts/ink_platform.h"
 #include "Error.h"
 #include "LogAccessHttp.h"
 #include "http/HttpSM.h"
@@ -234,7 +234,13 @@ LogAccessHttp::marshal_plugin_identity_tag(char *buf)
 int
 LogAccessHttp::marshal_client_host_ip(char *buf)
 {
-  return marshal_ip(buf, &m_http_sm->t_state.client_info.addr.sa);
+  return marshal_ip(buf, &m_http_sm->t_state.client_info.src_addr.sa);
+}
+
+int
+LogAccessHttp::marshal_host_interface_ip(char *buf)
+{
+  return marshal_ip(buf, &m_http_sm->t_state.client_info.dst_addr.sa);
 }
 
 /*-------------------------------------------------------------------------
@@ -260,7 +266,7 @@ int
 LogAccessHttp::marshal_client_host_port(char *buf)
 {
   if (buf) {
-    uint16_t port = ntohs(m_http_sm->t_state.client_info.addr.port());
+    uint16_t port = ntohs(m_http_sm->t_state.client_info.src_addr.port());
     marshal_int(buf, port);
   }
   return INK_MIN_ALIGN;
@@ -573,6 +579,43 @@ LogAccessHttp::marshal_client_req_http_version(char *buf)
   -------------------------------------------------------------------------*/
 
 int
+LogAccessHttp::marshal_client_req_protocol_version(char *buf)
+{
+  int len = INK_MIN_ALIGN;
+  char const *tag = m_http_sm->plugin_tag;
+
+  if (!tag) {
+    if (m_client_request) {
+      HTTPVersion versionObject = m_client_request->version_get();
+      int64_t major = HTTP_MAJOR(versionObject.m_version);
+      int64_t minor = HTTP_MINOR(versionObject.m_version);
+      if (major == 1 && minor == 1) {
+        tag = "http/1.1";
+      } else if (major == 1 && minor == 0) {
+        tag = "http/1.0";
+      } else if (major == 0 && minor == 9) {
+        tag = "http/0.9";
+      } // else invalid http version
+      len = LogAccess::strlen(tag);
+    } else {
+      tag = "*";
+    }
+  } else {
+    len = LogAccess::strlen(tag);
+  }
+
+  if (buf) {
+    marshal_str(buf, tag, len);
+  }
+
+  return len;
+}
+
+
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+int
 LogAccessHttp::marshal_client_req_header_len(char *buf)
 {
   if (buf) {
@@ -601,6 +644,48 @@ LogAccessHttp::marshal_client_req_body_len(char *buf)
   return INK_MIN_ALIGN;
 }
 
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+int
+LogAccessHttp::marshal_client_req_tcp_reused(char *buf)
+{
+  if (buf) {
+    int64_t tcp_reused;
+    tcp_reused = m_http_sm->client_tcp_reused;
+    marshal_int(buf, tcp_reused);
+  }
+  return INK_MIN_ALIGN;
+}
+
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+int
+LogAccessHttp::marshal_client_req_is_ssl(char *buf)
+{
+  if (buf) {
+    int64_t is_ssl;
+    is_ssl = m_http_sm->client_connection_is_ssl;
+    marshal_int(buf, is_ssl);
+  }
+  return INK_MIN_ALIGN;
+}
+
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+int
+LogAccessHttp::marshal_client_req_ssl_reused(char *buf)
+{
+  if (buf) {
+    int64_t ssl_session_reused;
+    ssl_session_reused = m_http_sm->client_ssl_reused;
+    marshal_int(buf, ssl_session_reused);
+  }
+  return INK_MIN_ALIGN;
+}
+
 int
 LogAccessHttp::marshal_client_finish_status_code(char *buf)
 {
@@ -619,6 +704,34 @@ LogAccessHttp::marshal_client_finish_status_code(char *buf)
     marshal_int(buf, code);
   }
   return INK_MIN_ALIGN;
+}
+
+/*-------------------------------------------------------------------------
+-------------------------------------------------------------------------*/
+int
+LogAccessHttp::marshal_client_security_protocol(char *buf)
+{
+  const char *proto = m_http_sm->client_sec_protocol;
+  int round_len = LogAccess::strlen(proto);
+
+  if (buf) {
+    marshal_str(buf, proto, round_len);
+  }
+
+  return round_len;
+}
+
+int
+LogAccessHttp::marshal_client_security_cipher_suite(char *buf)
+{
+  const char *cipher = m_http_sm->client_cipher_suite;
+  int round_len = LogAccess::strlen(cipher);
+
+  if (buf) {
+    marshal_str(buf, cipher, round_len);
+  }
+
+  return round_len;
 }
 
 /*-------------------------------------------------------------------------
@@ -824,7 +937,31 @@ LogAccessHttp::marshal_proxy_req_server_name(char *buf)
 int
 LogAccessHttp::marshal_proxy_req_server_ip(char *buf)
 {
-  return marshal_ip(buf, m_http_sm->t_state.current.server != NULL ? &m_http_sm->t_state.current.server->addr.sa : 0);
+  return marshal_ip(buf, m_http_sm->t_state.current.server != NULL ? &m_http_sm->t_state.current.server->dst_addr.sa : 0);
+}
+
+int
+LogAccessHttp::marshal_proxy_req_server_port(char *buf)
+{
+  if (buf) {
+    uint16_t port = ntohs(m_http_sm->t_state.current.server != NULL ? m_http_sm->t_state.current.server->dst_addr.port() : 0);
+    marshal_int(buf, port);
+  }
+  return INK_MIN_ALIGN;
+}
+
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+int
+LogAccessHttp::marshal_proxy_req_is_ssl(char *buf)
+{
+  if (buf) {
+    int64_t is_ssl;
+    is_ssl = m_http_sm->server_connection_is_ssl;
+    marshal_int(buf, is_ssl);
+  }
+  return INK_MIN_ALIGN;
 }
 
 /*-------------------------------------------------------------------------
@@ -848,10 +985,10 @@ int
 LogAccessHttp::marshal_server_host_ip(char *buf)
 {
   sockaddr const *ip = 0;
-  ip = &m_http_sm->t_state.server_info.addr.sa;
+  ip = &m_http_sm->t_state.server_info.dst_addr.sa;
   if (!ats_is_ip(ip)) {
     if (m_http_sm->t_state.current.server) {
-      ip = &m_http_sm->t_state.current.server->addr.sa;
+      ip = &m_http_sm->t_state.current.server->dst_addr.sa;
       if (!ats_is_ip(ip))
         ip = 0;
     } else {
@@ -957,7 +1094,7 @@ int
 LogAccessHttp::marshal_server_resp_time_ms(char *buf)
 {
   if (buf) {
-    ink_hrtime elapsed = m_http_sm->milestones.server_close - m_http_sm->milestones.server_connect;
+    ink_hrtime elapsed = m_http_sm->milestones[TS_MILESTONE_SERVER_CLOSE] - m_http_sm->milestones[TS_MILESTONE_SERVER_CONNECT];
     int64_t val = (int64_t)ink_hrtime_to_msec(elapsed);
     marshal_int(buf, val);
   }
@@ -968,9 +1105,23 @@ int
 LogAccessHttp::marshal_server_resp_time_s(char *buf)
 {
   if (buf) {
-    ink_hrtime elapsed = m_http_sm->milestones.server_close - m_http_sm->milestones.server_connect;
+    ink_hrtime elapsed = m_http_sm->milestones[TS_MILESTONE_SERVER_CLOSE] - m_http_sm->milestones[TS_MILESTONE_SERVER_CONNECT];
     int64_t val = (int64_t)ink_hrtime_to_sec(elapsed);
     marshal_int(buf, val);
+  }
+  return INK_MIN_ALIGN;
+}
+
+/*-------------------------------------------------------------------------
+  -------------------------------------------------------------------------*/
+
+int
+LogAccessHttp::marshal_server_transact_count(char *buf)
+{
+  if (buf) {
+    int64_t count;
+    count = m_http_sm->server_transact_count;
+    marshal_int(buf, count);
   }
   return INK_MIN_ALIGN;
 }
@@ -1116,7 +1267,7 @@ int
 LogAccessHttp::marshal_transfer_time_ms(char *buf)
 {
   if (buf) {
-    ink_hrtime elapsed = m_http_sm->milestones.sm_finish - m_http_sm->milestones.sm_start;
+    ink_hrtime elapsed = m_http_sm->milestones[TS_MILESTONE_SM_FINISH] - m_http_sm->milestones[TS_MILESTONE_SM_START];
     int64_t val = (int64_t)ink_hrtime_to_msec(elapsed);
     marshal_int(buf, val);
   }
@@ -1127,7 +1278,7 @@ int
 LogAccessHttp::marshal_transfer_time_s(char *buf)
 {
   if (buf) {
-    ink_hrtime elapsed = m_http_sm->milestones.sm_finish - m_http_sm->milestones.sm_start;
+    ink_hrtime elapsed = m_http_sm->milestones[TS_MILESTONE_SM_FINISH] - m_http_sm->milestones[TS_MILESTONE_SM_START];
     int64_t val = (int64_t)ink_hrtime_to_sec(elapsed);
     marshal_int(buf, val);
   }
@@ -1371,4 +1522,27 @@ LogAccessHttp::marshal_http_header_field_escapify(LogField::Container container,
   }
 
   return (padded_len);
+}
+
+
+int
+LogAccessHttp::marshal_milestone(TSMilestonesType ms, char *buf)
+{
+  if (buf) {
+    int64_t val = ink_hrtime_to_msec(m_http_sm->milestones[ms]);
+    marshal_int(buf, val);
+  }
+  return INK_MIN_ALIGN;
+}
+
+
+int
+LogAccessHttp::marshal_milestone_diff(TSMilestonesType ms1, TSMilestonesType ms2, char *buf)
+{
+  if (buf) {
+    ink_hrtime elapsed = m_http_sm->milestones.elapsed(ms2, ms1);
+    int64_t val = (int64_t)ink_hrtime_to_msec(elapsed);
+    marshal_int(buf, val);
+  }
+  return INK_MIN_ALIGN;
 }

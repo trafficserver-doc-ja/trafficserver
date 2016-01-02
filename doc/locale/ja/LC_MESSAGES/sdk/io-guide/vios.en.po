@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -46,52 +47,74 @@ msgid ""
 "follows:"
 msgstr ""
 
-#: ../../sdk/io-guide/vios.en.rst:44
+#: ../../sdk/io-guide/vios.en.rst:45
 msgid ""
 "The VIO functions below access and modify various parts of the data "
 "structure."
 msgstr ""
 
-#: ../../sdk/io-guide/vios.en.rst:47
-msgid ":c:func:`TSVIOBufferGet`"
-msgstr ""
-
 #: ../../sdk/io-guide/vios.en.rst:48
-msgid ":c:func:`TSVIOVConnGet`"
+msgid ""
+"```TSVIOBufferGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#a55df75b6ba6e9152292a01e0b4e21963>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:49
-msgid ":c:func:`TSVIOContGet`"
+msgid ""
+"```TSVIOVConnGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#a32b9eaaadf2145f98ceb4d64b7c06c2f>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:50
-msgid ":c:func:`TSVIOMutexGet`"
+msgid ""
+"```TSVIOContGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#a071f12b307885c02aceebc41601bbdcf>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:51
-msgid ":c:func:`TSVIONBytesGet`"
+msgid ""
+"```TSVIOMutexGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#ab4e8c755cf230918a14a4411af8b3e63>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:52
-msgid ":c:func:`TSVIONBytesSet`"
+msgid ""
+"```TSVIONBytesGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#af6fc57adc7308864b343b6b7fd30c5ff>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:53
-msgid ":c:func:`TSVIONDoneGet`"
+msgid ""
+"```TSVIONBytesSet`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a27594723f14891ac43da3e1368328d0e>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:54
-msgid ":c:func:`TSVIONDoneSet`"
+msgid ""
+"```TSVIONDoneGet`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#ad71156f68a119c00502ff1fd598824ab>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:55
-msgid ":c:func:`TSVIONTodoGet`"
+msgid ""
+"```TSVIONDoneSet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#af4590966899039571d874e0c090042ad>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:56
-msgid ":c:func:`TSVIOReaderGet`"
+msgid ""
+"```TSVIONTodoGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#a1dd145ddd60822a5f892becf7b8e8f84>`__"
 msgstr ""
 
 #: ../../sdk/io-guide/vios.en.rst:57
-msgid ":c:func:`TSVIOReenable`"
+msgid ""
+"```TSVIOReaderGet`` <http://people.apache.org/~amc/ats/doc/html/"
+"InkIOCoreAPI_8cc.html#a471ee1fde01fbeabce6c39944dfe9da6>`__"
+msgstr ""
+
+#: ../../sdk/io-guide/vios.en.rst:58
+msgid ""
+"```TSVIOReenable`` <http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a792ef9d6962193badad2877a81d8bcff>`__"
 msgstr ""

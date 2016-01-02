@@ -24,8 +24,9 @@
 #ifndef __INK_RESOURCE_H__
 #define __INK_RESOURCE_H__
 
-#include "ink_mutex.h"
+#include "ts/ink_mutex.h"
 #include <map>
+#include <string>
 
 extern volatile int res_track_memory; /* set this to zero to disable resource tracking */
 
@@ -44,6 +45,7 @@ class ResourceTracker
 public:
   ResourceTracker(){};
   static void increment(const char *name, const int64_t size);
+  static void increment(const void *symbol, const int64_t size, const char *name);
   static void dump(FILE *fd);
 
 private:

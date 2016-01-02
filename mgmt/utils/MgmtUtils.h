@@ -34,8 +34,8 @@
 #ifndef _MGMT_UTILS_H
 #define _MGMT_UTILS_H
 
-#include "ink_platform.h"
-#include "Diags.h"
+#include "ts/ink_platform.h"
+#include "ts/Diags.h"
 
 #include "P_RecCore.h"
 
@@ -57,10 +57,10 @@ bool mgmt_getAddrForIntr(char *intrName, sockaddr *addr, int *mtu = 0);
    interface should be used exclusively in the future */
 void mgmt_log(FILE *log, const char *message_format, ...);
 void mgmt_elog(FILE *log, const int lerrno, const char *message_format, ...);
-void mgmt_fatal(FILE *log, const int lerrno, const char *message_format, ...);
+void mgmt_fatal(FILE *log, const int lerrno, const char *message_format, ...) TS_NORETURN;
 void mgmt_log(const char *message_format, ...);
 void mgmt_elog(const int lerrno, const char *message_format, ...);
-void mgmt_fatal(const int lerrno, const char *message_format, ...);
+void mgmt_fatal(const int lerrno, const char *message_format, ...) TS_NORETURN;
 void mgmt_log_output(FILE *stdio_or_null, DiagsLevel type, const char *format, ...);
 void mgmt_log_output_va(FILE *stdio_or_null, DiagsLevel type, const char *format, va_list ap);
 

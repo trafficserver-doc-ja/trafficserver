@@ -21,12 +21,16 @@
   limitations under the License.
  */
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_string.h"
+#include "ts/Tokenizer.h"
+#include "ts/ink_code.h"
+#include "ts/ink_file.h"
 #include "LocalManager.h"
 #include "MgmtUtils.h"
 #include "WebMgmtUtils.h"
 #include "MultiFile.h"
-#include "Regex.h"
+#include "ts/Regex.h"
 
 /****************************************************************************
  *
@@ -792,7 +796,7 @@ varType(const char *varName)
 //  Creates a hash table with name value pairs
 //
 //  CALLEE must deallocate the returned hash table with
-//   ink_hash_table_destroy_and_xfree_values(InkHashTable *ht_ptr)
+//   ink_hash_table_destroy_and_free_values(InkHashTable *ht_ptr)
 //
 
 InkHashTable *
@@ -850,7 +854,7 @@ processFormSubmission(char *submission)
 //  Creates a hash table with name value pairs
 //
 //  CALLEE must deallocate the returned hash table with
-//   ink_hash_table_destroy_and_xfree_values(InkHashTable *ht_ptr)
+//   ink_hash_table_destroy_and_free_values(InkHashTable *ht_ptr)
 //
 //  Note: This function will _not_ substituteUnsafeChars()
 InkHashTable *

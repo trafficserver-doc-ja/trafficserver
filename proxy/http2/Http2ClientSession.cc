@@ -23,6 +23,7 @@
 
 #include "Http2ClientSession.h"
 #include "HttpDebugNames.h"
+#include "ts/ink_base64.h"
 
 #define STATE_ENTER(state_name, event)                                                       \
   do {                                                                                       \
@@ -41,7 +42,8 @@
 
 ClassAllocator<Http2ClientSession> http2ClientSessionAllocator("http2ClientSessionAllocator");
 
-// memcpy the requested bytes from the IOBufferReader, returning how many were actually copied.
+// memcpy the requested bytes from the IOBufferReader, returning how many were
+// actually copied.
 static inline unsigned
 copy_from_buffer_reader(void *dst, IOBufferReader *reader, unsigned nbytes)
 {
@@ -59,7 +61,8 @@ send_connection_event(Continuation *cont, int event, void *edata)
 }
 
 Http2ClientSession::Http2ClientSession()
-  : con_id(0), client_vc(NULL), read_buffer(NULL), sm_reader(NULL), write_buffer(NULL), sm_writer(NULL), upgrade_context()
+  : con_id(0), total_write_len(0), client_vc(NULL), read_buffer(NULL), sm_reader(NULL), write_buffer(NULL), sm_writer(NULL),
+    upgrade_context()
 {
 }
 
@@ -75,6 +78,7 @@ Http2ClientSession::destroy()
   super::destroy();
 
   free_MIOBuffer(this->read_buffer);
+  free_MIOBuffer(this->write_buffer);
   http2ClientSessionAllocator.free(this);
 }
 
@@ -94,7 +98,8 @@ Http2ClientSession::start()
   // 3.5 HTTP/2 Connection Preface. Upon establishment of a TCP connection and
   // determination that HTTP/2 will be used by both peers, each endpoint MUST
   // send a connection preface as a final confirmation ...
-  // this->write_buffer->write(HTTP2_CONNECTION_PREFACE, HTTP2_CONNECTION_PREFACE_LEN);
+  // this->write_buffer->write(HTTP2_CONNECTION_PREFACE,
+  // HTTP2_CONNECTION_PREFACE_LEN);
 
   this->connection_state.init();
   send_connection_event(&this->connection_state, HTTP2_SESSION_EVENT_INIT, this);
@@ -104,12 +109,17 @@ Http2ClientSession::start()
 void
 Http2ClientSession::new_connection(NetVConnection *new_vc, MIOBuffer *iobuf, IOBufferReader *reader, bool backdoor)
 {
+  ink_assert(new_vc->mutex->thread_holding == this_ethread());
+  HTTP2_INCREMENT_THREAD_DYN_STAT(HTTP2_STAT_CURRENT_CLIENT_SESSION_COUNT, new_vc->mutex->thread_holding);
+  HTTP2_INCREMENT_THREAD_DYN_STAT(HTTP2_STAT_TOTAL_CLIENT_CONNECTION_COUNT, new_vc->mutex->thread_holding);
+
   // HTTP/2 for the backdoor connections? Let's not deal woth that yet.
   ink_release_assert(backdoor == false);
 
   // Unique client session identifier.
   this->con_id = ProxyClientSession::next_connection_id();
   this->client_vc = new_vc;
+  client_vc->set_inactivity_timeout(HRTIME_SECONDS(Http2::accept_no_activity_timeout));
   this->mutex = new_vc->mutex;
 
   this->connection_state.mutex = new_ProxyMutex();
@@ -133,6 +143,7 @@ Http2ClientSession::set_upgrade_context(HTTPHdr *h)
   upgrade_context.req_header->copy(h);
 
   MIMEField *settings = upgrade_context.req_header->field_find(MIME_FIELD_HTTP2_SETTINGS, MIME_LEN_HTTP2_SETTINGS);
+  ink_release_assert(settings != NULL);
   int svlen;
   const char *sv = settings->value_get(&svlen);
 
@@ -145,7 +156,8 @@ Http2ClientSession::set_upgrade_context(HTTPHdr *h)
       Http2SettingsParameter param;
       if (!http2_parse_settings_parameter(make_iovec(out_buf + nbytes, HTTP2_SETTINGS_PARAMETER_LEN), param) ||
           !http2_settings_parameter_is_valid(param)) {
-        // TODO ignore incoming invalid parameters and send suitable SETTINGS frame.
+        // TODO ignore incoming invalid parameters and send suitable SETTINGS
+        // frame.
       }
       upgrade_context.client_settings.set((Http2SettingsIdentifier)param.id, param.value);
     }
@@ -181,7 +193,8 @@ Http2ClientSession::do_io_shutdown(ShutdownHowTo_t howto)
   this->client_vc->do_io_shutdown(howto);
 }
 
-// XXX Currently, we don't have a half-closed state, but we will need to implement that. After we send a GOAWAY, there
+// XXX Currently, we don't have a half-closed state, but we will need to
+// implement that. After we send a GOAWAY, there
 // are scenarios where we would like to complete the outstanding streams.
 
 void
@@ -189,9 +202,16 @@ Http2ClientSession::do_io_close(int alerrno)
 {
   DebugHttp2Ssn0("session closed");
 
+  ink_assert(this->mutex->thread_holding == this_ethread());
+  if (client_vc) {
+    // clean up ssl's first byte iobuf
+    SSLNetVConnection *ssl_vc = dynamic_cast<SSLNetVConnection *>(client_vc);
+    if (ssl_vc) {
+      ssl_vc->set_ssl_iobuf(NULL);
+    }
+  }
+  HTTP2_DECREMENT_THREAD_DYN_STAT(HTTP2_STAT_CURRENT_CLIENT_SESSION_COUNT, this->mutex->thread_holding);
   send_connection_event(&this->connection_state, HTTP2_SESSION_EVENT_FINI, this);
-
-
   do_api_callout(TS_HTTP_SSN_CLOSE_HOOK);
 }
 
@@ -213,6 +233,8 @@ Http2ClientSession::main_event_handler(int event, void *edata)
 
   case HTTP2_SESSION_EVENT_XMIT: {
     Http2Frame *frame = (Http2Frame *)edata;
+    total_write_len += frame->size();
+    write_vio->nbytes = total_write_len;
     frame->xmit(this->write_buffer);
     write_reenable();
     return 0;
@@ -225,10 +247,10 @@ Http2ClientSession::main_event_handler(int event, void *edata)
     this->do_io_close();
     return 0;
 
-  case VC_EVENT_WRITE_COMPLETE:
   case VC_EVENT_WRITE_READY:
-    // After sending GOAWAY, close the connection
-    if (this->connection_state.is_state_closed() && write_vio->ntodo() <= 0) {
+    return 0;
+  case VC_EVENT_WRITE_COMPLETE:
+    if (this->connection_state.is_state_closed()) {
       this->do_io_close();
     }
     return 0;
@@ -272,7 +294,7 @@ Http2ClientSession::state_read_connection_preface(int event, void *edata)
     this->sm_reader->consume(nbytes);
     HTTP2_SET_SESSION_HANDLER(&Http2ClientSession::state_start_frame_read);
 
-    // XXX set activity timeouts ...
+    client_vc->set_inactivity_timeout(HRTIME_SECONDS(Http2::no_activity_timeout_in));
 
     // XXX start the write VIO ...
 
@@ -282,8 +304,10 @@ Http2ClientSession::state_read_connection_preface(int event, void *edata)
     }
   }
 
-  // XXX We don't have enough data to check the connection preface. We should reset the accept inactivity
-  // timeout. We should have a maximum timeout to get the session started though.
+  // XXX We don't have enough data to check the connection preface. We should
+  // reset the accept inactivity
+  // timeout. We should have a maximum timeout to get the session started
+  // though.
 
   vio->reenable();
   return 0;
@@ -317,7 +341,11 @@ Http2ClientSession::state_start_frame_read(int event, void *edata)
 
     if (!http2_frame_header_is_valid(this->current_hdr,
                                      this->connection_state.server_settings.get(HTTP2_SETTINGS_MAX_FRAME_SIZE))) {
-      // XXX nuke it with HTTP2_ERROR_PROTOCOL_ERROR!
+      SCOPED_MUTEX_LOCK(lock, this->connection_state.mutex, this_ethread());
+      if (!this->connection_state.is_state_closed()) {
+        this->connection_state.send_goaway_frame(this->current_hdr.streamid, HTTP2_ERROR_PROTOCOL_ERROR);
+      }
+      return 0;
     }
 
     // If we know up front that the payload is too long, nuke this connection.
@@ -339,7 +367,10 @@ Http2ClientSession::state_start_frame_read(int event, void *edata)
     }
 
     // CONTINUATIONs MUST follow behind HEADERS which doesn't have END_HEADERS
-    if (this->connection_state.get_continued_id() != 0 && this->current_hdr.type != HTTP2_FRAME_TYPE_CONTINUATION) {
+    Http2StreamId continued_stream_id = this->connection_state.get_continued_stream_id();
+
+    if (continued_stream_id != 0 &&
+        (continued_stream_id != this->current_hdr.streamid || this->current_hdr.type != HTTP2_FRAME_TYPE_CONTINUATION)) {
       SCOPED_MUTEX_LOCK(lock, this->connection_state.mutex, this_ethread());
       if (!this->connection_state.is_state_closed()) {
         this->connection_state.send_goaway_frame(this->current_hdr.streamid, HTTP2_ERROR_PROTOCOL_ERROR);
@@ -386,4 +417,16 @@ Http2ClientSession::state_complete_frame_read(int event, void *edata)
 
   vio->reenable();
   return 0;
+}
+
+int64_t
+Http2ClientSession::getPluginId() const
+{
+  return con_id;
+}
+
+char const *
+Http2ClientSession::getPluginTag() const
+{
+  return "http/2";
 }

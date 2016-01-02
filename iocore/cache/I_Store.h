@@ -31,7 +31,7 @@
 #ifndef _Store_h_
 #define _Store_h_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 
 #define STORE_BLOCK_SIZE 8192
 #define STORE_BLOCK_SHIFT 13
@@ -240,6 +240,9 @@ struct Store {
   Store();
   ~Store();
 
+  // The number of disks/paths defined in storage.config
+  unsigned n_disks_in_config;
+  // The number of disks/paths we could actually read and parse.
   unsigned n_disks;
   Span **disk;
   //

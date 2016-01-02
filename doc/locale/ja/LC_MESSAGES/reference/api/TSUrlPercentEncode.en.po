@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -29,19 +30,19 @@ msgstr ""
 msgid "TSUrlPercentEncode"
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:27
+#: ../../reference/api/TSUrlPercentEncode.en.rst:25
 msgid "Synopsis"
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:29
+#: ../../reference/api/TSUrlPercentEncode.en.rst:27
 msgid "`#include <ts/ts.h>`"
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:36
+#: ../../reference/api/TSUrlPercentEncode.en.rst:34
 msgid "Description"
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:38
+#: ../../reference/api/TSUrlPercentEncode.en.rst:36
 msgid ""
 "The URL data structure is a parsed version of a standard internet URL. The "
 "Traffic Server URL API provides access to URL data stored in marshal "
@@ -50,7 +51,7 @@ msgid ""
 "scheme information."
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:44
+#: ../../reference/api/TSUrlPercentEncode.en.rst:42
 msgid ""
 ":func:`TSUrlPercentEncode` performs percent-encoding of the URL object, "
 "storing the new string in the :data:`dst` buffer. The :data:`length` "
@@ -60,7 +61,7 @@ msgid ""
 "`NULL`) , it should be a map of characters to encode."
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:51
+#: ../../reference/api/TSUrlPercentEncode.en.rst:49
 msgid ""
 ":func:`TSStringPercentDecode` perform percent-decoding of the string in "
 "the :data:`str` buffer, writing to the :data:`dst` buffer. The source and "
@@ -68,27 +69,23 @@ msgid ""
 "string is always guaranteed to be no longer than the source string."
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:57
+#: ../../reference/api/TSUrlPercentEncode.en.rst:55
 msgid "Return values"
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:59
+#: ../../reference/api/TSUrlPercentEncode.en.rst:57
 msgid ""
 "All these APIs returns a :type:`TSReturnCode`, indicating success (:data:"
 "`TS_SUCCESS`) or failure (:data:`TS_ERROR`) of the operation."
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:63
+#: ../../reference/api/TSUrlPercentEncode.en.rst:61
 msgid "See also"
 msgstr ""
 
-#: ../../reference/api/TSUrlPercentEncode.en.rst:65
+#: ../../reference/api/TSUrlPercentEncode.en.rst:63
 msgid ""
 ":manpage:`TSAPI(3ts)`, :manpage:`TSUrlCreate(3ts)`, :manpage:"
 "`TSUrlHostGet(3ts)`, :manpage:`TSUrlHostSet(3ts)`, :manpage:"
 "`TSUrlStringGet(3ts)`"
-msgstr ""
-
-#: ../../reference/api/TSUrlPercentEncode.en.rst:24
-msgid "Traffic Server URL percent encoding API."
 msgstr ""

@@ -50,7 +50,7 @@
 #ifndef __CONNECTION_H__
 #define __CONNECTION_H__
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 
 struct NetVCOptions;
 
@@ -138,6 +138,16 @@ struct Connection {
 
   /// Default options.
   static NetVCOptions const DEFAULT_OPTIONS;
+
+  /**
+   * Move control of the socket from the argument object orig to the current object.
+   */
+  void move(Connection &);
+
+private:
+  // Don't want copy constructors to avoid having the deconstructor on
+  // temporarly copies close the file descriptor too soon. Use move instead
+  Connection(Connection const &);
 
 protected:
   void _cleanup();

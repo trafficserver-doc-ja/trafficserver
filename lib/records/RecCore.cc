@@ -21,12 +21,14 @@
   limitations under the License.
  */
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_memory.h"
+#include "ts/ink_string.h"
 
 #include "P_RecFile.h"
 #include "P_RecCore.h"
 #include "P_RecUtils.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 
 static bool g_initialized = false;
 
@@ -450,6 +452,36 @@ RecLookupRecord(const char *name, void (*callback)(const RecRecord *, void *), v
   }
 
   return err;
+}
+
+int
+RecLookupMatchingRecords(unsigned rec_type, const char *match, void (*callback)(const RecRecord *, void *), void *data, bool lock)
+{
+  int num_records;
+  DFA regex;
+
+  if (regex.compile(match, RE_CASE_INSENSITIVE | RE_UNANCHORED) != 0) {
+    return REC_ERR_FAIL;
+  }
+
+  num_records = g_num_records;
+  for (int i = 0; i < num_records; i++) {
+    RecRecord *r = &(g_records[i]);
+
+    if ((r->rec_type & rec_type) == 0) {
+      continue;
+    }
+
+    if (regex.match(r->name) < 0) {
+      continue;
+    }
+
+    rec_mutex_acquire(&(r->lock));
+    callback(r, data);
+    rec_mutex_release(&(r->lock));
+  }
+
+  return REC_ERR_OKAY;
 }
 
 int
@@ -926,6 +958,7 @@ debug_record_callback(RecT /* rec_type */, void * /* edata */, int registered, c
     break;
   }
 }
+
 void
 RecDumpRecords(RecT rec_type, RecDumpEntryCb callback, void *edata)
 {
@@ -936,7 +969,7 @@ RecDumpRecords(RecT rec_type, RecDumpEntryCb callback, void *edata)
     RecRecord *r = &(g_records[i]);
     if ((rec_type == RECT_NULL) || (rec_type & r->rec_type)) {
       rec_mutex_acquire(&(r->lock));
-      callback(rec_type, edata, r->registered, r->name, r->data_type, &r->data);
+      callback(r->rec_type, edata, r->registered, r->name, r->data_type, &r->data);
       rec_mutex_release(&(r->lock));
     }
   }

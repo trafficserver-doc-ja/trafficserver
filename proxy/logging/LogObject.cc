@@ -26,9 +26,9 @@
 
 
  ***************************************************************************/
-#include "libts.h"
-
-
+#include "ts/ink_platform.h"
+#include "ts/CryptoHash.h"
+#include "ts/INK_MD5.h"
 #include "Error.h"
 #include "P_EventSystem.h"
 #include "LogUtils.h"
@@ -383,7 +383,6 @@ LogObject::_checkout_write(size_t *write_offset, size_t bytes_needed)
   LogBuffer *buffer;
   LogBuffer *new_buffer;
   bool retry = true;
-  uint32_t count = 0;
 
   do {
     // To avoid a race condition, we keep a count of held references in
@@ -391,15 +390,10 @@ LogObject::_checkout_write(size_t *write_offset, size_t bytes_needed)
     head_p h;
     int result = 0;
     do {
-      ++count;
       INK_QUEUE_LD(h, m_log_buffer);
       head_p new_h;
       SET_FREELIST_POINTER_VERSION(new_h, FREELIST_POINTER(h), FREELIST_VERSION(h) + 1);
-#if TS_HAS_128BIT_CAS
-      result = ink_atomic_cas((__int128_t *)&m_log_buffer.data, h.data, new_h.data);
-#else
-      result = ink_atomic_cas((int64_t *)&m_log_buffer.data, h.data, new_h.data);
-#endif
+      result = ink_atomic_cas(&m_log_buffer.data, h.data, new_h.data);
     } while (!result);
     buffer = (LogBuffer *)FREELIST_POINTER(h);
     result_code = buffer->checkout_write(write_offset, bytes_needed);
@@ -432,11 +426,7 @@ LogObject::_checkout_write(size_t *write_offset, size_t bytes_needed)
         }
         head_p tmp_h;
         SET_FREELIST_POINTER_VERSION(tmp_h, new_buffer, 0);
-#if TS_HAS_128BIT_CAS
-        result = ink_atomic_cas((__int128_t *)&m_log_buffer.data, old_h.data, tmp_h.data);
-#else
-        result = ink_atomic_cas((int64_t *)&m_log_buffer.data, old_h.data, tmp_h.data);
-#endif
+        result = ink_atomic_cas(&m_log_buffer.data, old_h.data, tmp_h.data);
       } while (!result);
       if (FREELIST_POINTER(old_h) == FREELIST_POINTER(h)) {
         ink_atomic_increment(&buffer->m_references, FREELIST_VERSION(old_h) - 1);
@@ -474,11 +464,7 @@ LogObject::_checkout_write(size_t *write_offset, size_t bytes_needed)
           break;
         head_p tmp_h;
         SET_FREELIST_POINTER_VERSION(tmp_h, FREELIST_POINTER(h), FREELIST_VERSION(old_h) - 1);
-#if TS_HAS_128BIT_CAS
-        result = ink_atomic_cas((__int128_t *)&m_log_buffer.data, old_h.data, tmp_h.data);
-#else
-        result = ink_atomic_cas((int64_t *)&m_log_buffer.data, old_h.data, tmp_h.data);
-#endif
+        result = ink_atomic_cas(&m_log_buffer.data, old_h.data, tmp_h.data);
       } while (!result);
       if (FREELIST_POINTER(old_h) != FREELIST_POINTER(h))
         ink_atomic_increment(&buffer->m_references, -1);
@@ -489,9 +475,6 @@ LogObject::_checkout_write(size_t *write_offset, size_t bytes_needed)
   // only to set it as full
   if (result_code == LogBuffer::LB_BUFFER_TOO_SMALL) {
     buffer = NULL;
-  }
-  if (count > 1) {
-    Error("spinning too much in logging %d", count);
   }
   return buffer;
 }
@@ -975,7 +958,7 @@ LogObjectManager::_solve_filename_conflicts(LogObject *log_object, int maxConfli
     // file exists, try to read metafile to get object signature
     //
     uint64_t signature = 0;
-    MetaInfo meta_info(filename);
+    BaseMetaInfo meta_info(filename);
     bool conflicts = true;
 
     if (meta_info.file_open_successful()) {

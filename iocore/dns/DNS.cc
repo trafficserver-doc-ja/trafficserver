@@ -305,9 +305,9 @@ DNSProcessor::dns_init()
     }
     ats_free(ns_list);
   }
-  // The default domain (4th param) and search list (5th param) will
+  // The default domain (5th param) and search list (6th param) will
   // come from /etc/resolv.conf.
-  if (ink_res_init(&l_res, nameserver, nserv, NULL, NULL, dns_resolv_conf) < 0)
+  if (ink_res_init(&l_res, nameserver, nserv, dns_search, NULL, NULL, dns_resolv_conf) < 0)
     Warning("Failed to build DNS res records for the servers (%s).  Using resolv.conf.", dns_ns_list);
 
   // Check for local forced bindings.
@@ -883,6 +883,13 @@ write_dns(DNSHandler *h)
   int max_nscount = h->m_res->nscount;
   if (max_nscount > MAX_NAMED)
     max_nscount = MAX_NAMED;
+  if (max_nscount <= 0) {
+    Warning("There is no name server found in the resolv.conf");
+    if (h->entries.head) {
+      dns_result(h, h->entries.head, NULL, false);
+    }
+    return;
+  }
 
   if (h->in_write_dns)
     return;

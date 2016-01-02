@@ -21,7 +21,7 @@
   limitations under the License.
  */
 
-#include "ink_config.h"
+#include "ts/ink_config.h"
 #include <ctype.h>
 #include <string.h>
 #include "HttpConfig.h"
@@ -1023,7 +1023,7 @@ HttpConfig::startup()
   HttpEstablishStaticConfigLongLong(c.oride.cache_generation_number, "proxy.config.http.cache.generation");
 
   // open write failure retries
-  HttpEstablishStaticConfigLongLong(c.max_cache_open_write_retries, "proxy.config.http.cache.max_open_write_retries");
+  HttpEstablishStaticConfigLongLong(c.oride.max_cache_open_write_retries, "proxy.config.http.cache.max_open_write_retries");
 
   HttpEstablishStaticConfigByte(c.oride.cache_http, "proxy.config.http.cache.http");
   HttpEstablishStaticConfigByte(c.oride.cache_cluster_cache_local, "proxy.config.http.cache.cluster_cache_local");
@@ -1046,7 +1046,7 @@ HttpConfig::startup()
   HttpEstablishStaticConfigByte(c.send_100_continue_response, "proxy.config.http.send_100_continue_response");
   HttpEstablishStaticConfigByte(c.disallow_post_100_continue, "proxy.config.http.disallow_post_100_continue");
   HttpEstablishStaticConfigByte(c.parser_allow_non_http, "proxy.config.http.parse.allow_non_http");
-  HttpEstablishStaticConfigLongLong(c.cache_open_write_fail_action, "proxy.config.http.cache.open_write_fail_action");
+  HttpEstablishStaticConfigLongLong(c.oride.cache_open_write_fail_action, "proxy.config.http.cache.open_write_fail_action");
 
   HttpEstablishStaticConfigByte(c.oride.cache_when_to_revalidate, "proxy.config.http.cache.when_to_revalidate");
   HttpEstablishStaticConfigByte(c.oride.cache_required_headers, "proxy.config.http.cache.required_headers");
@@ -1065,7 +1065,8 @@ HttpConfig::startup()
 
   HttpEstablishStaticConfigStringAlloc(c.reverse_proxy_no_host_redirect, "proxy.config.header.parse.no_host_url_redirect");
   c.reverse_proxy_no_host_redirect_len = -1;
-
+  HttpEstablishStaticConfigStringAlloc(c.oride.body_factory_template_base, "proxy.config.body_factory.template_base");
+  c.oride.body_factory_template_base_len = c.oride.body_factory_template_base ? strlen(c.oride.body_factory_template_base) : 0;
   HttpEstablishStaticConfigByte(c.errors_log_error_pages, "proxy.config.http.errors.log_error_pages");
 
   HttpEstablishStaticConfigLongLong(c.oride.slow_log_threshold, "proxy.config.http.slow.log.threshold");
@@ -1101,14 +1102,16 @@ HttpConfig::startup()
   //# Redirection
   //#
   //# 1. redirection_enabled: if set to 1, redirection is enabled.
-  //# 2. number_of_redirections: The maximum number of redirections YTS permits
-  //# 3. post_copy_size: The maximum POST data size YTS permits to copy
-  //# 4. redirection_host_no_port: do not include default port in host header during redirection
+  //# 2. redirect_use_orig_cache_key: if set to 1, use original request cache key.
+  //# 3. number_of_redirections: The maximum number of redirections YTS permits
+  //# 4. post_copy_size: The maximum POST data size YTS permits to copy
+  //# 5. redirection_host_no_port: do not include default port in host header during redirection
   //#
   //##############################################################################
-  HttpEstablishStaticConfigByte(c.redirection_enabled, "proxy.config.http.redirection_enabled");
+  HttpEstablishStaticConfigByte(c.oride.redirection_enabled, "proxy.config.http.redirection_enabled");
+  HttpEstablishStaticConfigByte(c.oride.redirect_use_orig_cache_key, "proxy.config.http.redirect_use_orig_cache_key");
   HttpEstablishStaticConfigByte(c.redirection_host_no_port, "proxy.config.http.redirect_host_no_port");
-  HttpEstablishStaticConfigLongLong(c.number_of_redirections, "proxy.config.http.number_of_redirections");
+  HttpEstablishStaticConfigLongLong(c.oride.number_of_redirections, "proxy.config.http.number_of_redirections");
   HttpEstablishStaticConfigLongLong(c.post_copy_size, "proxy.config.http.post_copy_size");
 
   // Local Manager
@@ -1207,6 +1210,7 @@ HttpConfig::reconfigure()
   }
 
   params->oride.server_session_sharing_match = m_master.oride.server_session_sharing_match;
+  params->server_session_sharing_pool = m_master.server_session_sharing_pool;
   params->oride.keep_alive_post_out = m_master.oride.keep_alive_post_out;
 
   params->oride.keep_alive_no_activity_timeout_in = m_master.oride.keep_alive_no_activity_timeout_in;
@@ -1284,7 +1288,7 @@ HttpConfig::reconfigure()
   params->oride.cache_generation_number = m_master.oride.cache_generation_number;
 
   // open write failure retries
-  params->max_cache_open_write_retries = m_master.max_cache_open_write_retries;
+  params->oride.max_cache_open_write_retries = m_master.oride.max_cache_open_write_retries;
 
   params->oride.cache_http = INT_TO_BOOL(m_master.oride.cache_http);
   params->oride.cache_cluster_cache_local = INT_TO_BOOL(m_master.oride.cache_cluster_cache_local);
@@ -1306,7 +1310,7 @@ HttpConfig::reconfigure()
   params->send_100_continue_response = INT_TO_BOOL(m_master.send_100_continue_response);
   params->disallow_post_100_continue = INT_TO_BOOL(m_master.disallow_post_100_continue);
   params->parser_allow_non_http = INT_TO_BOOL(m_master.parser_allow_non_http);
-  params->cache_open_write_fail_action = m_master.cache_open_write_fail_action;
+  params->oride.cache_open_write_fail_action = m_master.oride.cache_open_write_fail_action;
 
   params->oride.cache_when_to_revalidate = m_master.oride.cache_when_to_revalidate;
   params->max_post_size = m_master.max_post_size;
@@ -1333,6 +1337,9 @@ HttpConfig::reconfigure()
   params->oride.default_buffer_size_index = m_master.oride.default_buffer_size_index;
   params->oride.default_buffer_water_mark = m_master.oride.default_buffer_water_mark;
   params->enable_http_info = INT_TO_BOOL(m_master.enable_http_info);
+  params->oride.body_factory_template_base = ats_strdup(m_master.oride.body_factory_template_base);
+  params->oride.body_factory_template_base_len =
+    params->oride.body_factory_template_base ? strlen(params->oride.body_factory_template_base) : 0;
   params->reverse_proxy_no_host_redirect = ats_strdup(m_master.reverse_proxy_no_host_redirect);
   params->reverse_proxy_no_host_redirect_len =
     params->reverse_proxy_no_host_redirect ? strlen(params->reverse_proxy_no_host_redirect) : 0;
@@ -1355,15 +1362,17 @@ HttpConfig::reconfigure()
   //# Redirection
   //#
   //# 1. redirection_enabled: if set to 1, redirection is enabled.
-  //# 2. number_of_redirections: The maximum number of redirections YTS permits
-  //# 3. post_copy_size: The maximum POST data size YTS permits to copy
-  //# 4. redirection_host_no_port: do not include default port in host header during redirection
+  //# 2. redirect_use_orig_cache_key: if set to 1, use original request cache key.
+  //# 3. number_of_redirections: The maximum number of redirections YTS permits
+  //# 4. post_copy_size: The maximum POST data size YTS permits to copy
+  //# 5. redirection_host_no_port: do not include default port in host header during redirection
   //#
   //##############################################################################
 
-  params->redirection_enabled = INT_TO_BOOL(m_master.redirection_enabled);
+  params->oride.redirection_enabled = INT_TO_BOOL(m_master.oride.redirection_enabled);
+  params->oride.redirect_use_orig_cache_key = INT_TO_BOOL(m_master.oride.redirect_use_orig_cache_key);
   params->redirection_host_no_port = INT_TO_BOOL(m_master.redirection_host_no_port);
-  params->number_of_redirections = m_master.number_of_redirections;
+  params->oride.number_of_redirections = m_master.oride.number_of_redirections;
   params->post_copy_size = m_master.post_copy_size;
 
   // Local Manager

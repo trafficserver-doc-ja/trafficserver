@@ -22,12 +22,14 @@
  */
 
 #include "traffic_crashlog.h"
-#include "ink_args.h"
-#include "ink_cap.h"
-#include "I_Version.h"
-#include "I_Layout.h"
+#include "ts/ink_args.h"
+#include "ts/ink_cap.h"
+#include "ts/I_Version.h"
+#include "ts/I_Layout.h"
+#include "ts/ink_syslog.h"
 #include "I_RecProcess.h"
 #include "RecordsConfig.h"
+#include "ts/BaseLogFile.h"
 
 static int syslog_mode = false;
 static int debug_mode = false;
@@ -88,8 +90,9 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   char *logname;
   TSMgmtError mgmterr;
   crashlog_target target;
+  pid_t parent = getppid();
 
-  diags = new Diags("" /* tags */, "" /* actions */, stderr);
+  diags = new Diags("" /* tags */, "" /* actions */, new BaseLogFile("stderr"));
 
   appVersionInfo.setup(PACKAGE_NAME, "traffic_crashlog", PACKAGE_VERSION, __DATE__, __TIME__, BUILD_MACHINE, BUILD_PERSON, "");
 
@@ -99,6 +102,12 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   if (wait_mode) {
     EnableDeathSignal(SIGKILL);
     kill(getpid(), SIGSTOP);
+  }
+
+  // If our parent changed, then we were woken after traffic_server exited. There's no point trying to
+  // emit a crashlog because traffic_server is gone.
+  if (getppid() != parent) {
+    return 0;
   }
 
   // XXX This is a hack. traffic_manager starts traffic_server with the euid of the admin user. We are still

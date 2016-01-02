@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -40,13 +41,13 @@ msgstr ""
 msgid "The general form of an Internet URL is:"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:32
+#: ../../sdk/http-headers/urls.en.rst:33
 msgid ""
 "The URL data structure includes support for two specific types of internet "
 "URLs. HTTP URLs have the form:"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:39
+#: ../../sdk/http-headers/urls.en.rst:41
 msgid ""
 "The URL port is stored as integer. All remaining parts of the URL (scheme, "
 "user, etc.) are stored as strings. Traffic Server URL functions are named "
@@ -55,101 +56,101 @@ msgid ""
 "``TSUrlHostGet``."
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:45
+#: ../../sdk/http-headers/urls.en.rst:47
 msgid ""
 "To facilitate fast comparisons and reduce storage size, Traffic Server "
 "defines several preallocated scheme names."
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:50
+#: ../../sdk/http-headers/urls.en.rst:52
 msgid "``TS_URL_SCHEME_FILE``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:49
+#: ../../sdk/http-headers/urls.en.rst:51
 msgid "\"file\" ``TS_URL_LEN_FILE``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:54
+#: ../../sdk/http-headers/urls.en.rst:56
 msgid "``TS_URL_SCHEME_FTP``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:53
+#: ../../sdk/http-headers/urls.en.rst:55
 msgid "\"ftp\" ``TS_URL_LEN_FTP``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:58
+#: ../../sdk/http-headers/urls.en.rst:60
 msgid "``TS_URL_SCHEME_GOPHER``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:57
+#: ../../sdk/http-headers/urls.en.rst:59
 msgid "\"gopher\" ``TS_URL_LEN_GOPHER``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:62
+#: ../../sdk/http-headers/urls.en.rst:64
 msgid "``TS_URL_SCHEME_HTTP``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:61
+#: ../../sdk/http-headers/urls.en.rst:63
 msgid "\"http\" ``TS_URL_LEN_HTTP``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:66
+#: ../../sdk/http-headers/urls.en.rst:68
 msgid "``TS_URL_SCHEME_HTTPS``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:65
+#: ../../sdk/http-headers/urls.en.rst:67
 msgid "\"https\" ``TS_URL_LEN_HTTPS``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:70
+#: ../../sdk/http-headers/urls.en.rst:72
 msgid "``TS_URL_SCHEME_MAILTO``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:69
+#: ../../sdk/http-headers/urls.en.rst:71
 msgid "\"mailto\" ``TS_URL_LEN_MAILTO``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:74
+#: ../../sdk/http-headers/urls.en.rst:76
 msgid "``TS_URL_SCHEME_NEWS``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:73
+#: ../../sdk/http-headers/urls.en.rst:75
 msgid "\"news\" ``TS_URL_LEN_NEWS``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:78
+#: ../../sdk/http-headers/urls.en.rst:80
 msgid "``TS_URL_SCHEME_NNTP``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:77
+#: ../../sdk/http-headers/urls.en.rst:79
 msgid "\"nntp\" ``TS_URL_LEN_NNTP``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:82
+#: ../../sdk/http-headers/urls.en.rst:84
 msgid "``TS_URL_SCHEME_PROSPERO``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:81
+#: ../../sdk/http-headers/urls.en.rst:83
 msgid "\"prospero\" ``TS_URL_LEN_PROSPERO``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:86
+#: ../../sdk/http-headers/urls.en.rst:88
 msgid "``TS_URL_SCHEME_TELNET``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:85
+#: ../../sdk/http-headers/urls.en.rst:87
 msgid "\"telnet\" ``TS_URL_LEN_TELNET``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:90
+#: ../../sdk/http-headers/urls.en.rst:92
 msgid "``TS_URL_SCHEME_WAIS``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:89
+#: ../../sdk/http-headers/urls.en.rst:91
 msgid "\"wais\" ``TS_URL_LEN_WAIS``"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:92
+#: ../../sdk/http-headers/urls.en.rst:94
 msgid ""
 "The scheme names above are defined in ``ts.h`` as ``const`` ``char*`` "
 "strings. When Traffic Server sets the scheme portion of the URL (or any "
@@ -163,20 +164,66 @@ msgid ""
 "prevent the possibility of spelling errors."
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:103
+#: ../../sdk/http-headers/urls.en.rst:105
 msgid "Traffic Server **URL functions** are listed below:"
 msgstr ""
 
-#: ../../sdk/http-headers/urls.en.rst:105
+#: ../../sdk/http-headers/urls.en.rst:107
 msgid ""
-":c:func:`TSUrlClone` :c:func:`TSUrlCopy` :c:func:`TSUrlCreate` :c:func:"
-"`TSUrlDestroy` :c:func:`TSUrlPrint` :c:func:`TSUrlFtpTypeGet` :c:func:"
-"`TSUrlFtpTypeSet` :c:func:`TSUrlHostGet` :c:func:`TSUrlHostSet` :c:func:"
-"`TSUrlHttpFragmentGet` :c:func:`TSUrlHttpFragmentSet` :c:func:"
-"`TSUrlHttpParamsGet` :c:func:`TSUrlHttpParamsSet` :c:func:"
-"`TSUrlHttpQueryGet` :c:func:`TSUrlHttpQuerySet` :c:func:`TSUrlLengthGet` :c:"
-"func:`TSUrlParse` :c:func:`TSUrlPasswordGet` :c:func:`TSUrlPasswordSet` :c:"
-"func:`TSUrlPathGet` :c:func:`TSUrlPathSet` :c:func:`TSUrlPortGet` :c:func:"
-"`TSUrlPortSet` :c:func:`TSUrlSchemeGet` :c:func:`TSUrlSchemeSet` :c:func:"
-"`TSUrlStringGet` :c:func:`TSUrlUserGet` :c:func:`TSUrlUserSet`"
+"```TSUrlClone`` <http://people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#acb775f48f1da5f6c5bf32c833a236574>`__ ```TSUrlCopy`` <http://people."
+"apache.org/~amc/ats/doc/html/ts_8h."
+"html#aa2b8d5f9289a23ab985210914a6301a7>`__ ```TSUrlCreate`` <http://people."
+"apache.org/~amc/ats/doc/html/ts_8h."
+"html#ad3518ea3bca6a6f2d899b859c6fbbede>`__ ```TSUrlDestroy`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a87559aac42f4f9439399ba2bd32693fa>`__ ```TSUrlPrint`` <http://people."
+"apache.org/~amc/ats/doc/html/ts_8h."
+"html#adec26f5a4afe62b4308dd86f97ae08fd>`__ ```TSUrlFtpTypeGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a5cd15d2c288a48b832f0fc096ed6fb80>`__ ```TSUrlFtpTypeSet`` <http://"
+"people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a66df700e23085cabf945e92eb1e22890>`__ ```TSUrlHostGet`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a48e626d9497d4d81c0b9d2781f86066b>`__ ```TSUrlHostSet`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a7e550dac573f5780f7ba39509aa881f3>`__ ```TSUrlHttpFragmentGet`` "
+"<http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a316696ad964cb6c6afb7e3028da3ef84>`__ ```TSUrlHttpFragmentSet`` "
+"<http://people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a45f7b216882c4517b92929145adf5424>`__ ```TSUrlHttpParamsGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a9395d5d794078c8ec0f17f27dc8d8498>`__ ```TSUrlHttpParamsSet`` <http://"
+"people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a566f2996d36663e3eb8ed4a8fda738c3>`__ ```TSUrlHttpQueryGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a74a6c51ea9f472cf29514facbf897785>`__ ```TSUrlHttpQuerySet`` <http://"
+"people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a9846aaf11accd8c817fff48bfaa784e0>`__ ```TSUrlLengthGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a96ded2567985b187c0a8274d76d12c17>`__ ```TSUrlParse`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a17f785697773b62b1f5094c06896cac5>`__ ```TSUrlPasswordGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#a14614f77e0c15b206bab8fd6fdfa7bd1>`__ ```TSUrlPasswordSet`` <http://"
+"people.apache.org/~amc/ats/doc/html/ts_8h."
+"html#abb4d983b9d47ba5a254c2b9dd9ad835e>`__ ```TSUrlPathGet`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#aa064a2d5256d839819d1ec8f252c01a9>`__ ```TSUrlPathSet`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#ad73274cb5b7e98a64d53f992681110b7>`__ ```TSUrlPortGet`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#ad99bfb408a46f47c4aa9478fc1b95e0c>`__ ```TSUrlPortSet`` <http://people."
+"apache.org/~amc/ats/doc/html/ts_8h."
+"html#aab07c0482fc3c3aae1b545fb0104e3aa>`__ ```TSUrlSchemeGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a24c660b5b46f17b24d7a1cc9aa9a4930>`__ ```TSUrlSchemeSet`` <http://"
+"people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a03b1a806ea8d79806dfff39bfe138934>`__ ```TSUrlStringGet`` <http://"
+"people.apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a1cda3103d8dd59372609aed6c9c47417>`__ ```TSUrlUserGet`` <http://people."
+"apache.org/~amc/ats/doc/html/ts_8h."
+"html#a3c4d7ffcbbda447c3b665dc857a3226b>`__ ```TSUrlUserSet`` <http://people."
+"apache.org/~amc/ats/doc/html/InkAPI_8cc."
+"html#a3175e9c89c2bbea5ed50e2a7f52d7f9f>`__"
 msgstr ""

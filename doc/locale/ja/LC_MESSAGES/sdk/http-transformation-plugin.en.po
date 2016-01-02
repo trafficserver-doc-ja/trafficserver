@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -59,11 +60,11 @@ msgid ""
 "examples are discussed in detail:"
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:48
+#: ../../sdk/http-transformation-plugin.en.rst:46
 msgid "Writing Content Transform Plugins"
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:50
+#: ../../sdk/http-transformation-plugin.en.rst:48
 msgid ""
 "Content transformation plugins transform HTTP response content (such as "
 "images or HTML documents) and HTTP request content (such as client ``POST`` "
@@ -74,7 +75,7 @@ msgid ""
 "virtual IO descriptors (``VIO``\\ s)."
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:58
+#: ../../sdk/http-transformation-plugin.en.rst:56
 msgid ""
 "A ``VConnection`` is an abstraction for a data pipe that allows its users "
 "to perform asynchronous reads and writes without knowing the underlying "
@@ -83,7 +84,7 @@ msgid ""
 "this feature enables it to view and modify all the data passing through it."
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:65
+#: ../../sdk/http-transformation-plugin.en.rst:63
 msgid ""
 "Transformations can be chained together, one after the other, so that "
 "multiple transformations can be performed on the same content. The "
@@ -94,7 +95,46 @@ msgid ""
 "writing, or that the end of a data stream is reached."
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:106
+#: ../../sdk/http-transformation-plugin.en.rst:71
+msgid ""
+"A ``VIO`` is a description of an IO operation that is in progress. Every "
+"``VConnection`` has an associated *input VIO* and an associated *output "
+"VIO*. When ``VConnection``\\ s are transferring data to one another, one "
+"``VConnection``'s input ``VIO`` is another ``VConnection``'s output "
+"``VIO``. A ``VConnection``'s input ``VIO`` is also called its **write "
+"``VIO``** because the input ``VIO`` refers to a write operation performed "
+"on the ``VConnection`` itself. Similarly, the outpt ``VIO`` is also called "
+"the **read ``VIO``**. For transformations, which are designed to pass data "
+"in one direction, you can picture the relationship between the "
+"transformation ``VConnection`` and its ``VIO``\\ s as follows:"
+msgstr ""
+
+#: ../../sdk/http-transformation-plugin.en.rst:83
+msgid "**Transformation and its ``VIO``\\ s** {#TransformationAndVIOs}"
+msgstr ""
+
+#: ../../sdk/http-transformation-plugin.en.rst:88
+msgid "A Transformation and its VIOs"
+msgstr ""
+
+#: ../../sdk/http-transformation-plugin.en.rst:90
+msgid ""
+"Because the Traffic Server API places transformations directly in the "
+"response or request data stream, the transformation ``VConnection`` is "
+"responsible only for reading the data from the input buffer, transforming "
+"it, and then writing it to the output buffer. The upstream ``VConnection`` "
+"writes the incoming data to the transformation's input buffer. In the "
+"figure above, `A Transformation and its ``VIO``\\ s "
+"<#TransformationAndVIOs>`__, the input ``VIO`` describes the progress of "
+"the upstream ``VConnection``'s write operation on the transformation, while "
+"the output ``VIO`` describes the progress of the transformation's write "
+"operation on the output (downstream) ``VConnection``. The **nbytes** value "
+"in the ``VIO`` is the total number of bytes to be written. The **ndone** "
+"value is the current progress, or the number of bytes that have been "
+"written at a specific point in time."
+msgstr ""
+
+#: ../../sdk/http-transformation-plugin.en.rst:104
 msgid ""
 "When writing a transformation plugin, you must understand implementation as "
 "well as the use of ``VConnection``\\ s. The *implementor's side* refers to "
@@ -106,15 +146,15 @@ msgid ""
 "output (write) data."
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:118
+#: ../../sdk/http-transformation-plugin.en.rst:114
 msgid "Transformations"
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:121
+#: ../../sdk/http-transformation-plugin.en.rst:117
 msgid "VIOs"
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:123
+#: ../../sdk/http-transformation-plugin.en.rst:119
 msgid ""
 "A ``VIO``*or virtual IO is a description of an in progress IO operation. "
 "The ``VIO`` data structure is used by ``VConnection`` users to determine "
@@ -125,17 +165,17 @@ msgid ""
 "continuation to call back when progress on the IO operation is made."
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:132
+#: ../../sdk/http-transformation-plugin.en.rst:128
 msgid ""
 "The ``TSVIO`` data structure itself is opaque, but it might have been "
 "defined as follows:"
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:147
+#: ../../sdk/http-transformation-plugin.en.rst:143
 msgid "IO Buffers"
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:149
+#: ../../sdk/http-transformation-plugin.en.rst:145
 msgid ""
 "The **IO buffer** data structure is the building block of the "
 "``VConnection`` abstraction. An IO buffer is composed of a list of buffer "
@@ -148,7 +188,7 @@ msgid ""
 "actually copying any data)."
 msgstr ""
 
-#: ../../sdk/http-transformation-plugin.en.rst:159
+#: ../../sdk/http-transformation-plugin.en.rst:155
 msgid ""
 "The IO buffer abstraction provides for a single writer and multiple "
 "readers. In order for the readers to have no knowledge of each other, they "
@@ -156,82 +196,4 @@ msgid ""
 "Since only a single writer is allowed, there is no corresponding "
 "``TSIOBufferWriter`` data structure. The writer simply modifies the IO "
 "buffer directly."
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:73
-msgid ""
-"A ``VIO`` is a description of an IO operation that is in progress. Every "
-"``VConnection`` has an associated *input VIO* and an associated *output "
-"VIO*. When ``VConnection``\\ s are transferring data to one another, one "
-"``VConnection``'s input ``VIO`` is another ``VConnection``'s output "
-"``VIO``. A ``VConnection``'s input ``VIO`` is also called its **write "
-"``VIO``** because the input ``VIO`` refers to a write operation performed "
-"on the ``VConnection`` itself. Similarly, the output ``VIO`` is also called "
-"the **read ``VIO``**. For transformations, which are designed to pass data "
-"in one direction, you can picture the relationship between the "
-"transformation ``VConnection`` and its ``VIO``\\ s as follows:"
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:91
-msgid "**A Transformation and its VIOs**"
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:93
-msgid ""
-"Because the Traffic Server API places transformations directly in the "
-"response or request data stream, the transformation ``VConnection`` is "
-"responsible only for reading the data from the input buffer, transforming "
-"it, and then writing it to the output buffer. The upstream ``VConnection`` "
-"writes the incoming data to the transformation's input buffer. In the "
-"figure above, :ref:`TransformationAndItsVIOs`, the input ``VIO`` describes "
-"the progress of the upstream ``VConnection``'s write operation on the "
-"transformation, while the output ``VIO`` describes the progress of the "
-"transformation's write operation on the output (downstream) "
-"``VConnection``. The **nbytes** value in the ``VIO`` is the total number of "
-"bytes to be written. The **ndone** value is the current progress, or the "
-"number of bytes that have been written at a specific point in time."
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:167
-msgid "Transaction Data Sink"
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:169
-msgid ""
-"The hook `TS_HTTP_RESPONSE_CLIENT_HOOK` is a hook that supports a special "
-"type of transformation, one with only input and no output. Although the "
-"transformation doesn't provide data back to Traffic Server it can do "
-"anything else with the data, such as writing it to another output device or "
-"process. It must, however, consume all the data for the transaction. There "
-"are two primary use cases."
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:173
-msgid "Tap in to the transaction to provide the data for external processing."
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:174
-msgid "Maintain the transaction."
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:176
-msgid ""
-"For the latter it is important to note that if all consumers of a "
-"transaction (primarily the user agent) shut down the transaction is also "
-"terminated, including the connection to the origin server. A data sink "
-"transform, unlike a standard transform, is considered to be a consumer and "
-"will keep the transaction and the origin server connection up. This is "
-"useful when the transaction is in some way expensive and should run to "
-"completion even if the user agent disconnects. Examples would be a standard "
-"transform that is expensive to initiate, or expensive origin server "
-"connections that should be :ts:cv:`shared <proxy.config.http."
-"server_session_sharing.match>`."
-msgstr ""
-
-#: ../../sdk/http-transformation-plugin.en.rst:182
-msgid ""
-"There is an `example plugin <https://github.com/apache/trafficserver/blob/"
-"master/example/txn-data-sink/txn-data-sink.c>`_ that demonstrates this used "
-"as a pure data sink to keep the transaction up regardless of whether the "
-"user agent disconnects."
 msgstr ""

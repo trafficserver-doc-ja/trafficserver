@@ -31,7 +31,7 @@
 #ifndef CONGESTION_H_
 #define CONGESTION_H_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 #include "P_EventSystem.h"
 #include "ControlBase.h"
 #include "ControlMatcher.h"
@@ -224,11 +224,6 @@ struct CongestionEntry : public RequestData {
   get_client_ip()
   {
     return NULL;
-  }
-  virtual RD_Type
-  data_type(void)
-  {
-    return RD_CONGEST_ENTRY;
   }
 
   /* print the entry into the congested list output buffer */

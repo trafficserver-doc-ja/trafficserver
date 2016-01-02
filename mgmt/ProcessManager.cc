@@ -22,15 +22,16 @@
  */
 
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+
 #undef HTTP_CACHE
 #include "InkAPIInternal.h"
 #include "MgmtUtils.h"
 #include "ProcessManager.h"
 
-#include "ink_apidefs.h"
+#include "ts/ink_apidefs.h"
 #include "MgmtSocket.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 
 /*
  * Global ProcessManager
@@ -65,7 +66,7 @@ startProcessManager(void *arg)
   return ret;
 } /* End startProcessManager */
 
-ProcessManager::ProcessManager(bool rlm) : BaseManager(), require_lm(rlm), mgmt_sync_key(0), local_manager_sockfd(0), cbtable(NULL)
+ProcessManager::ProcessManager(bool rlm) : BaseManager(), require_lm(rlm), local_manager_sockfd(0), cbtable(NULL)
 {
   mgmt_signal_queue = create_queue();
 
@@ -87,6 +88,20 @@ ProcessManager::reconfigure()
   return;
 } /* End ProcessManager::reconfigure */
 
+void
+ProcessManager::signalConfigFileChild(const char *parent, const char *child, unsigned int options)
+{
+  static const MgmtMarshallType fields[] = {MGMT_MARSHALL_STRING, MGMT_MARSHALL_STRING, MGMT_MARSHALL_INT};
+
+  MgmtMarshallInt mgmtopt = options;
+  size_t len = mgmt_message_length(fields, countof(fields), &parent, &child, &mgmtopt);
+  void *buffer = ats_malloc(len);
+
+  mgmt_message_marshall(buffer, len, fields, countof(fields), &parent, &child, &mgmtopt);
+  signalManager(MGMT_SIGNAL_CONFIG_FILE_CHILD, (const char *)buffer, len);
+
+  ats_free(buffer);
+}
 
 void
 ProcessManager::signalManager(int msg_id, const char *data_str)
@@ -165,10 +180,8 @@ ProcessManager::initLMConnection()
   ats_scoped_str rundir(RecConfigReadRuntimeDir());
   ats_scoped_str sockpath(Layout::relative_to(rundir, LM_CONNECTION_SERVER));
 
-  MgmtMessageHdr mh_hdr;
   MgmtMessageHdr *mh_full;
   int data_len;
-  char *sync_key_raw = NULL;
 
   int servlen;
   struct sockaddr_un serv_addr;
@@ -204,24 +217,6 @@ ProcessManager::initLMConnection()
   if (mgmt_write_pipe(local_manager_sockfd, (char *)mh_full, sizeof(MgmtMessageHdr) + data_len) <= 0) {
     mgmt_fatal(stderr, errno, "[ProcessManager::initLMConnection] Error writing message!\n");
   }
-
-  /* Read SYNC_KEY from manager */
-  if (mgmt_read_pipe(local_manager_sockfd, (char *)&mh_hdr, sizeof(MgmtMessageHdr)) <= 0) {
-    mgmt_fatal(stderr, errno, "[ProcessManager::initLMConnection] Error reading sem message!\n");
-  } else {
-    // coverity[uninit_use]
-    mh_full = (MgmtMessageHdr *)alloca(sizeof(MgmtMessageHdr) + mh_hdr.data_len);
-    memcpy(mh_full, &mh_hdr, sizeof(MgmtMessageHdr));
-    sync_key_raw = (char *)mh_full + sizeof(MgmtMessageHdr);
-    if (mgmt_read_pipe(local_manager_sockfd, sync_key_raw, mh_hdr.data_len) < 0) {
-      mgmt_fatal(stderr, errno, "[ProcessManager::initLMConnection] Error reading sem message!\n");
-    }
-  }
-
-
-  if (sync_key_raw)
-    memcpy(&mgmt_sync_key, sync_key_raw, sizeof(mgmt_sync_key));
-  Debug("pmgmt", "[ProcessManager::initLMConnection] Received key: %d\n", mgmt_sync_key);
 
 } /* End ProcessManager::initLMConnection */
 

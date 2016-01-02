@@ -38,9 +38,9 @@
 
 #include "MgmtUtils.h"
 #include "BaseManager.h"
-#include "ink_sock.h"
+#include "ts/ink_sock.h"
 
-#include "ink_apidefs.h"
+#include "ts/ink_apidefs.h"
 
 class ConfigUpdateCbTable;
 
@@ -72,6 +72,7 @@ public:
     close_socket(local_manager_sockfd);
   }
 
+  inkcoreapi void signalConfigFileChild(const char *parent, const char *child, unsigned int options);
   inkcoreapi void signalManager(int msg_id, const char *data_str);
   inkcoreapi void signalManager(int msg_id, const char *data_raw, int data_len);
 
@@ -91,7 +92,6 @@ public:
 
   bool require_lm;
   time_t timeout;
-  int mgmt_sync_key;
 
   LLQ *mgmt_signal_queue;
 

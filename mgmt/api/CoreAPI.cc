@@ -29,15 +29,17 @@
  *
  ***************************************************************************/
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_file.h"
+#include "ts/ParseRules.h"
 #include "MgmtUtils.h"
 #include "LocalManager.h"
 #include "ClusterCom.h"
 #include "FileManager.h"
 #include "Rollback.h"
 #include "WebMgmtUtils.h"
-#include "Diags.h"
-#include "ink_hash_table.h"
+#include "ts/Diags.h"
+#include "ts/ink_hash_table.h"
 #include "ExpandingArray.h"
 //#include "I_AccCrypto.h"
 
@@ -45,8 +47,8 @@
 #include "CoreAPIShared.h"
 #include "CfgContextUtils.h"
 #include "EventCallback.h"
-#include "I_Layout.h"
-#include "ink_cap.h"
+#include "ts/I_Layout.h"
+#include "ts/ink_cap.h"
 
 // global variable
 CallbackTable *local_event_callbacks;
@@ -360,7 +362,7 @@ ServerBacktrace(unsigned /* options */, char **trace)
   // Unfortunately, we need to be privileged here. We either need to be root or to be holding
   // the CAP_SYS_PTRACE capability. Even though we are the parent traffic_manager, it is not
   // traceable without privilege because the process credentials do not match.
-  ElevateAccess access(true, ElevateAccess::TRACE_PRIVILEGE);
+  ElevateAccess access(ElevateAccess::TRACE_PRIVILEGE);
   threadlist threads(threads_for_process(lmgmt->watched_process_pid));
   textBuffer text(0);
 
@@ -559,6 +561,12 @@ MgmtRecordGetMatching(const char * /* regex */, TSList /* rec_vals */)
 
 TSMgmtError
 MgmtConfigRecordDescribe(const char * /* rec_name */, unsigned /* flags */, TSConfigRecordDescription * /* val */)
+{
+  return TS_ERR_NOT_SUPPORTED;
+}
+
+TSMgmtError
+MgmtConfigRecordDescribeMatching(const char *, unsigned, TSList)
 {
   return TS_ERR_NOT_SUPPORTED;
 }
