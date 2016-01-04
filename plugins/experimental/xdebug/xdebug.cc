@@ -16,14 +16,20 @@
  * limitations under the License.
  */
 
-#include <ts/ts.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
-#include "ink_defs.h"
+#include <string.h>
+#include <getopt.h>
 
-// The name of the debug request header. This should probably be configurable.
-#define X_DEBUG_HEADER "X-Debug"
+#include "ts/ts.h"
+#include "ts/ink_defs.h"
+
+static struct {
+  const char *str;
+  int len;
+} xDebugHeader = {NULL, 0};
+
 
 #define XHEADER_X_CACHE_KEY 0x0004u
 #define XHEADER_X_MILESTONES 0x0008u
@@ -169,8 +175,10 @@ InjectMilestonesHeader(TSHttpTxn txn, TSMBuffer buffer, TSMLoc hdr)
   // this hook, so we skip those ...
   static const milestone milestones[] = {
     {TS_MILESTONE_UA_BEGIN, "UA-BEGIN"},
+    {TS_MILESTONE_UA_FIRST_READ, "UA-FIRST-READ"},
     {TS_MILESTONE_UA_READ_HEADER_DONE, "UA-READ-HEADER-DONE"},
     {TS_MILESTONE_UA_BEGIN_WRITE, "UA-BEGIN-WRITE"},
+    {TS_MILESTONE_UA_CLOSE, "UA-CLOSE"},
     {TS_MILESTONE_SERVER_FIRST_CONNECT, "SERVER-FIRST-CONNECT"},
     {TS_MILESTONE_SERVER_CONNECT, "SERVER-CONNECT"},
     {TS_MILESTONE_SERVER_CONNECT_END, "SERVER-CONNECT-END"},
@@ -184,6 +192,9 @@ InjectMilestonesHeader(TSHttpTxn txn, TSMBuffer buffer, TSMLoc hdr)
     {TS_MILESTONE_CACHE_OPEN_WRITE_END, "CACHE-OPEN-WRITE-END"},
     {TS_MILESTONE_DNS_LOOKUP_BEGIN, "DNS-LOOKUP-BEGIN"},
     {TS_MILESTONE_DNS_LOOKUP_END, "DNS-LOOKUP-END"},
+    // SM_START is deliberately excluded because as all the times are printed relative to it
+    // it would always be zero.
+    {TS_MILESTONE_SM_FINISH, "SM-FINISH"},
     {TS_MILESTONE_PLUGIN_ACTIVE, "PLUGIN-ACTIVE"},
     {TS_MILESTONE_PLUGIN_TOTAL, "PLUGIN-TOTAL"},
   };
@@ -281,10 +292,10 @@ XScanRequestHeaders(TSCont /* contp */, TSEvent event, void *edata)
     goto done;
   }
 
-  TSDebug("xdebug", "scanning for %s header values", X_DEBUG_HEADER);
+  TSDebug("xdebug", "scanning for %s header values", xDebugHeader.str);
 
   // Walk the X-Debug header values and determine what to inject into the response.
-  field = TSMimeHdrFieldFind(buffer, hdr, X_DEBUG_HEADER, lengthof(X_DEBUG_HEADER));
+  field = TSMimeHdrFieldFind(buffer, hdr, xDebugHeader.str, xDebugHeader.len);
   while (field != TS_NULL_MLOC) {
     int count = TSMimeHdrFieldValuesCount(buffer, hdr, field);
 
@@ -310,6 +321,9 @@ XScanRequestHeaders(TSCont /* contp */, TSEvent event, void *edata)
       } else if (header_field_eq("via", value, vsize)) {
         // If the client requests the Via header, enable verbose Via debugging for this transaction.
         TSHttpTxnConfigIntSet(txn, TS_CONFIG_HTTP_INSERT_RESPONSE_VIA_STR, 3);
+      } else if (header_field_eq("diags", value, vsize)) {
+        // Enable diagnostics for DebugTxn()'s only
+        TSHttpTxnDebugSet(txn, 1);
       } else {
         TSDebug("xdebug", "ignoring unrecognized debug tag '%.*s'", vsize, value);
       }
@@ -342,8 +356,10 @@ done:
 }
 
 void
-TSPluginInit(int /* argc */, const char * /*argv */ [])
+TSPluginInit(int argc, const char *argv[])
 {
+  static const struct option longopt[] = {{const_cast<char *>("header"), required_argument, NULL, 'h'},
+                                          {NULL, no_argument, NULL, '\0'}};
   TSPluginRegistrationInfo info;
 
   info.plugin_name = (char *)"xdebug";
@@ -354,10 +370,32 @@ TSPluginInit(int /* argc */, const char * /*argv */ [])
     TSError("[xdebug] Plugin registration failed");
   }
 
+  optind = 0;
+
+  // Parse the arguments
+  while (true) {
+    int opt = getopt_long(argc, (char *const *)argv, "", longopt, NULL);
+
+    switch (opt) {
+    case 'h':
+      xDebugHeader.str = TSstrdup(optarg);
+      break;
+    }
+
+    if (opt == -1) {
+      break;
+    }
+  }
+
+  if (NULL == xDebugHeader.str) {
+    xDebugHeader.str = TSstrdup("X-Debug"); // We malloc this, for consistency for future plugin unload events
+  }
+  xDebugHeader.len = strlen(xDebugHeader.str);
+
+
+  // Setup the global hook
   TSReleaseAssert(TSHttpArgIndexReserve("xdebug", "xdebug header requests", &XArgIndex) == TS_SUCCESS);
-
   TSReleaseAssert(XInjectHeadersCont = TSContCreate(XInjectResponseHeaders, NULL));
-
   TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, TSContCreate(XScanRequestHeaders, NULL));
 }
 

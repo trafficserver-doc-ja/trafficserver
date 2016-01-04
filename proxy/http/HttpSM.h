@@ -33,7 +33,7 @@
 #ifndef _HTTP_SM_H_
 #define _HTTP_SM_H_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 #include "P_EventSystem.h"
 #include "HttpCacheSM.h"
 #include "HttpTransact.h"
@@ -249,7 +249,7 @@ public:
   get_tunnel()
   {
     return &tunnel;
-  };
+  }
 
   // Debugging routines to dump the SM history, hdrs
   void dump_state_on_assert();
@@ -493,6 +493,15 @@ public:
   int64_t cache_response_body_bytes;
   int pushed_response_hdr_bytes;
   int64_t pushed_response_body_bytes;
+  bool client_tcp_reused;
+  // Info about client's SSL connection.
+  bool client_ssl_reused;
+  bool client_connection_is_ssl;
+  const char *client_sec_protocol;
+  const char *client_cipher_suite;
+  int server_transact_count;
+  bool server_connection_is_ssl;
+
   TransactionMilestones milestones;
   ink_hrtime api_timer;
   // The next two enable plugins to tag the state machine for

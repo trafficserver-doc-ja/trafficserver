@@ -34,7 +34,7 @@
 #include "ProxyConfig.h"
 #include "StatPages.h"
 #include "HTTP.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 
 // defines
 
@@ -730,22 +730,4 @@ http_trans_stats_time_useconds_cb(void *data, void *res)
   }
   *(float *)res = r;
   return res;
-}
-
-int64_t
-milestone_difference_msec(const ink_hrtime start, const ink_hrtime end)
-{
-  if (end == 0) {
-    return -1;
-  }
-  return (end - start) / 1000000;
-}
-
-double
-milestone_difference(const ink_hrtime start, const ink_hrtime end)
-{
-  if (end == 0) {
-    return -1;
-  }
-  return (double)(end - start) / 1000000000;
 }

@@ -202,9 +202,16 @@ ServerSessionPool::eventHandler(int event, void *data)
 
   HttpConfig::release(http_config_params);
   if (!found) {
-    // We failed to find our session.  This can only be the result
-    //  of a programming flaw
-    Warning("Connection leak from http keep-alive system");
+    // We failed to find our session.  This can only be the result of a programming flaw. Since we only ever keep
+    // UnixNetVConnections and SSLNetVConnections in the session pool, the dynamic cast won't fail.
+    UnixNetVConnection *unix_net_vc = dynamic_cast<UnixNetVConnection *>(net_vc);
+    if (unix_net_vc) {
+      char peer_ip[INET6_ADDRPORTSTRLEN];
+      ats_ip_nptop(unix_net_vc->get_remote_addr(), peer_ip, sizeof(peer_ip));
+
+      Warning("Connection leak from http keep-alive system fd=%d closed=%d peer_ip_port=%s", unix_net_vc->con.fd,
+              unix_net_vc->closed, peer_ip);
+    }
     ink_assert(0);
   }
   return 0;
@@ -263,33 +270,63 @@ HttpSessionManager::acquire_session(Continuation * /* cont ATS_UNUSED */, sockad
     to_return = NULL;
   }
 
-  // Now check to see if we have a connection in our shared connection pool
-  EThread *ethread = this_ethread();
+  // TS-3797 Adding another scope so the pool lock is dropped after it is removed from the pool and
+  // potentially moved to the current thread.  At the end of this scope, either the original
+  // pool selected VC is on the current thread or its content has been moved to a new VC on the
+  // current thread and the original has been deleted. This should adequately cover TS-3266 so we
+  // don't have to continue to hold the pool thread while we initialize the server session in the
+  // client session
+  {
+    // Now check to see if we have a connection in our shared connection pool
+    EThread *ethread = this_ethread();
+    ProxyMutex *pool_mutex = (TS_SERVER_SESSION_SHARING_POOL_THREAD == sm->t_state.http_config_param->server_session_sharing_pool) ?
+                               ethread->server_session_pool->mutex :
+                               m_g_pool->mutex;
+    MUTEX_TRY_LOCK(lock, pool_mutex, ethread);
+    if (lock.is_locked()) {
+      if (TS_SERVER_SESSION_SHARING_POOL_THREAD == sm->t_state.http_config_param->server_session_sharing_pool) {
+        retval = ethread->server_session_pool->acquireSession(ip, hostname_hash, match_style, to_return);
+        Debug("http_ss", "[acquire session] thread pool search %s", to_return ? "successful" : "failed");
+      } else {
+        retval = m_g_pool->acquireSession(ip, hostname_hash, match_style, to_return);
+        Debug("http_ss", "[acquire session] global pool search %s", to_return ? "successful" : "failed");
+        // At this point to_return has been removed from the pool. Do we need to move it
+        // to the same thread?
+        if (to_return) {
+          UnixNetVConnection *server_vc = dynamic_cast<UnixNetVConnection *>(to_return->get_netvc());
+          if (server_vc) {
+            UnixNetVConnection *new_vc = server_vc->migrateToCurrentThread(sm, ethread);
+            // The VC moved, free up the original one
+            if (new_vc != server_vc) {
+              ink_assert(new_vc == NULL || new_vc->nh != NULL);
+              to_return->set_netvc(new_vc);
+              if (!new_vc) {
+                // Close out to_return, we were't able to get a connection
+                to_return->do_io_close();
+                to_return = NULL;
+                retval = HSM_NOT_FOUND;
+              } else {
+                // Keep things from timing out on us
+                new_vc->set_inactivity_timeout(new_vc->get_inactivity_timeout());
+              }
+            } else {
+              // Keep things from timing out on us
+              server_vc->set_inactivity_timeout(server_vc->get_inactivity_timeout());
+            }
+          }
+        }
+      }
+    } else { // Didn't get the lock.  to_return is still NULL
+      retval = HSM_RETRY;
+    }
+  }
 
-  ProxyMutex *pool_mutex = (TS_SERVER_SESSION_SHARING_POOL_THREAD == sm->t_state.http_config_param->server_session_sharing_pool) ?
-                             ethread->server_session_pool->mutex :
-                             m_g_pool->mutex;
-  MUTEX_TRY_LOCK(lock, pool_mutex, ethread);
-  if (lock.is_locked()) {
-    if (TS_SERVER_SESSION_SHARING_POOL_THREAD == sm->t_state.http_config_param->server_session_sharing_pool) {
-      retval = ethread->server_session_pool->acquireSession(ip, hostname_hash, match_style, to_return);
-      Debug("http_ss", "[acquire session] thread pool search %s", to_return ? "successful" : "failed");
-    } else {
-      retval = m_g_pool->acquireSession(ip, hostname_hash, match_style, to_return);
-      Debug("http_ss", "[acquire session] global pool search %s", to_return ? "successful" : "failed");
-    }
-    if (to_return) {
-      Debug("http_ss", "[%" PRId64 "] [acquire session] return session from shared pool", to_return->con_id);
-      to_return->state = HSS_ACTIVE;
-      // Holding the pool lock and the sm lock
-      // the attach_server_session will issue the do_io_read under the sm lock
-      // Must be careful to transfer the lock for the read vio because
-      // the server VC may be moving between threads TS-3266
-      sm->attach_server_session(to_return);
-      retval = HSM_DONE;
-    }
-  } else {
-    retval = HSM_RETRY;
+  if (to_return) {
+    Debug("http_ss", "[%" PRId64 "] [acquire session] return session from shared pool", to_return->con_id);
+    to_return->state = HSS_ACTIVE;
+    // the attach_server_session will issue the do_io_read under the sm lock
+    sm->attach_server_session(to_return);
+    retval = HSM_DONE;
   }
   return retval;
 }

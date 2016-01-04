@@ -31,7 +31,7 @@
 #if !defined(_HttpTransactCache_h_)
 #define _HttpTransactCache_h_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 
 // This is needed since txn_conf->cache_guaranteed_max_lifetime is currently not
 // readily available in the cache. ToDo: We should fix this with TS-1919
@@ -129,7 +129,8 @@ public:
                                        HTTPHdr *obj_origin_server_response                                 // in
                                        );
 
-  static HTTPStatus match_response_to_request_conditionals(HTTPHdr *ua_request, HTTPHdr *c_response);
+  static HTTPStatus match_response_to_request_conditionals(HTTPHdr *ua_request, HTTPHdr *c_response,
+                                                           ink_time_t response_received_time);
 };
 
 #endif

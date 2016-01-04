@@ -27,7 +27,9 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
-#include "ink_config.h"
+#include "ts/ink_config.h"
+#include "ts/ink_sprintf.h"
+#include "ts/ink_file.h"
 #include <sys/types.h>
 
 #include <errno.h>
@@ -38,7 +40,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "Regression.h"
+#include "ts/Regression.h"
 #include "api/ts/ts.h"
 #include "api/ts/experimental.h"
 #include "I_RecCore.h"
@@ -296,6 +298,8 @@ server_handler(TSCont contp, TSEvent event, void *data)
     SDK_RPRINT(params->test, params->api, "ServerEvent EOS", TC_PASS, "ok");
     *params->pstatus = REGRESSION_TEST_PASSED;
     delete params;
+  } else if (event == TS_EVENT_VCONN_READ_READY) {
+    SDK_RPRINT(params->test, params->api, "ServerEvent READ_READY", TC_PASS, "ok");
   } else {
     SDK_RPRINT(params->test, params->api, "ServerEvent", TC_FAIL, "received unexpected event %d", event);
     *params->pstatus = REGRESSION_TEST_FAILED;
@@ -319,9 +323,15 @@ client_handler(TSCont contp, TSEvent event, void *data)
     // Fix me: how to deal with server side cont?
     TSContDestroy(contp);
     return 1;
-  } else {
+  } else if (TS_EVENT_NET_CONNECT == event) {
     sockaddr const *addr = TSNetVConnRemoteAddrGet(static_cast<TSVConn>(data));
     uint16_t input_server_port = ats_ip_port_host_order(addr);
+
+    // If DEFER_ACCEPT is enabled in the OS then the user space accept() doesn't
+    // happen until data arrives on the socket. Because we're just testing the accept()
+    // we write a small amount of ignored data to make sure this gets triggered.
+    UnixNetVConnection *vc = static_cast<UnixNetVConnection *>(data);
+    ink_release_assert(::write(vc->con.fd, "Bob's your uncle", 16) != 0);
 
     sleep(1); // XXX this sleep ensures the server end gets the accept event.
 
@@ -2177,6 +2187,7 @@ checkHttpTxnServerRespGet(SocketTest *test, void *data)
 
 // This func is called both by us when scheduling EVENT_IMMEDIATE
 // And by HTTP SM for registered hooks
+// Depending on the timing of the DNS response, OS_DNS can happen before or after CACHE_LOOKUP.
 static int
 mytest_handler(TSCont contp, TSEvent event, void *data)
 {
@@ -2213,7 +2224,7 @@ mytest_handler(TSCont contp, TSEvent event, void *data)
     break;
 
   case TS_EVENT_HTTP_OS_DNS:
-    if (test->hook_mask == 7) {
+    if (test->hook_mask == 3 || test->hook_mask == 7) {
       test->hook_mask |= 8;
     }
 
@@ -2228,7 +2239,7 @@ mytest_handler(TSCont contp, TSEvent event, void *data)
     break;
 
   case TS_EVENT_HTTP_CACHE_LOOKUP_COMPLETE:
-    if (test->hook_mask == 3) {
+    if (test->hook_mask == 3 || test->hook_mask == 11) {
       test->hook_mask |= 4;
     }
     TSHttpTxnReenable((TSHttpTxn)data, TS_EVENT_HTTP_CONTINUE);
@@ -6978,7 +6989,7 @@ cont_test_handler(TSCont contp, TSEvent event, void *edata)
   TSReleaseAssert(data->magic == MAGIC_ALIVE);
   TSReleaseAssert((data->test_case == TEST_CASE_CONNECT_ID1) || (data->test_case == TEST_CASE_CONNECT_ID2));
 
-  TSDebug(UTDBG_TAG, "Calling cont_test_handler with event %d", event);
+  TSDebug(UTDBG_TAG, "Calling cont_test_handler with event %s (%d)", TSHttpEventNameLookup(event), event);
 
   switch (event) {
   case TS_EVENT_HTTP_READ_REQUEST_HDR:
@@ -7204,7 +7215,10 @@ const char *SDK_Overridable_Configs[TS_CONFIG_LAST_ENTRY] = {
   "proxy.config.ssl.hsts_max_age", "proxy.config.ssl.hsts_include_subdomains", "proxy.config.http.cache.open_read_retry_time",
   "proxy.config.http.cache.max_open_read_retries", "proxy.config.http.cache.range.write",
   "proxy.config.http.post.check.content_length.enabled", "proxy.config.http.global_user_agent_header",
-  "proxy.config.http.auth_server_session_private", "proxy.config.http.slow.log.threshold", "proxy.config.http.cache.generation"};
+  "proxy.config.http.auth_server_session_private", "proxy.config.http.slow.log.threshold", "proxy.config.http.cache.generation",
+  "proxy.config.body_factory.template_base", "proxy.config.http.cache.open_write_fail_action",
+  "proxy.config.http.redirection_enabled", "proxy.config.http.number_of_redirections",
+  "proxy.config.http.cache.max_open_write_retries", "proxy.config.http.redirect_use_orig_cache_key"};
 
 REGRESSION_TEST(SDK_API_OVERRIDABLE_CONFIGS)(RegressionTest *test, int /* atype ATS_UNUSED */, int *pstatus)
 {
@@ -7286,6 +7300,60 @@ REGRESSION_TEST(SDK_API_OVERRIDABLE_CONFIGS)(RegressionTest *test, int /* atype 
     SDK_RPRINT(test, "TSHttpTxnConfigIntSet", "TestCase1", TC_PASS, "ok");
     SDK_RPRINT(test, "TSHttpTxnConfigFloatSet", "TestCase1", TC_PASS, "ok");
     SDK_RPRINT(test, "TSHttpTxnConfigStringSet", "TestCase1", TC_PASS, "ok");
+  } else {
+    *pstatus = REGRESSION_TEST_FAILED;
+  }
+
+  return;
+}
+
+////////////////////////////////////////////////
+// SDK_API_TXN_HTTP_INFO_INFO_GET
+//
+// Unit Test for API: TSHttpTxnInfoIntGet
+////////////////////////////////////////////////
+
+REGRESSION_TEST(SDK_API_TXN_HTTP_INFO_GET)(RegressionTest *test, int /* atype ATS_UNUSED */, int *pstatus)
+{
+  HttpSM *s = HttpSM::allocate();
+  bool success = true;
+  TSHttpTxn txnp = reinterpret_cast<TSHttpTxn>(s);
+  TSMgmtInt ival_read;
+
+
+  s->init();
+
+  *pstatus = REGRESSION_TEST_INPROGRESS;
+  HttpCacheSM *c_sm = &(s->get_cache_sm());
+  c_sm->set_readwhilewrite_inprogress(true);
+  c_sm->set_open_read_tries(5);
+  c_sm->set_open_write_tries(8);
+
+  TSHttpTxnInfoIntGet(txnp, TS_TXN_INFO_CACHE_HIT_RWW, &ival_read);
+  if (ival_read == 0) {
+    SDK_RPRINT(test, "TSHttpTxnInfoIntGet", "TestCase1", TC_FAIL, "Failed on %d, %d != %d", TS_TXN_INFO_CACHE_HIT_RWW, ival_read,
+               1);
+    success = false;
+  }
+
+  TSHttpTxnInfoIntGet(txnp, TS_TXN_INFO_CACHE_OPEN_READ_TRIES, &ival_read);
+  if (ival_read != 5) {
+    SDK_RPRINT(test, "TSHttpTxnInfoIntGet", "TestCase1", TC_FAIL, "Failed on %d, %d != %d", TS_TXN_INFO_CACHE_HIT_RWW, ival_read,
+               5);
+    success = false;
+  }
+
+  TSHttpTxnInfoIntGet(txnp, TS_TXN_INFO_CACHE_OPEN_WRITE_TRIES, &ival_read);
+  if (ival_read != 8) {
+    SDK_RPRINT(test, "TSHttpTxnInfoIntGet", "TestCase1", TC_FAIL, "Failed on %d, %d != %d", TS_TXN_INFO_CACHE_HIT_RWW, ival_read,
+               8);
+    success = false;
+  }
+
+  s->destroy();
+  if (success) {
+    *pstatus = REGRESSION_TEST_PASSED;
+    SDK_RPRINT(test, "TSHttpTxnInfoIntGet", "TestCase1", TC_PASS, "ok");
   } else {
     *pstatus = REGRESSION_TEST_FAILED;
   }

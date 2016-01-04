@@ -20,7 +20,11 @@
   See the License for the specific language governing permissions and
   limitations under the License.
  */
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_memory.h"
+#include "ts/ink_defs.h"
+#include "ts/ink_stack_trace.h"
+#include "ts/Diags.h"
 
 #include <assert.h>
 #if defined(linux)
@@ -187,22 +191,10 @@ ats_msync(caddr_t addr, size_t len, caddr_t end, int flags)
 int
 ats_madvise(caddr_t addr, size_t len, int flags)
 {
-#if defined(linux)
-  (void)addr;
-  (void)len;
-  (void)flags;
-  return 0;
-#else
-  size_t pagesize = ats_pagesize();
-  caddr_t a = (caddr_t)(((uintptr_t)addr) & ~(pagesize - 1));
-  size_t l = (len + (addr - a) + pagesize - 1) & ~(pagesize - 1);
-  int res = 0;
 #if HAVE_POSIX_MADVISE
-  res = posix_madvise(a, l, flags);
+  return posix_madvise(addr, len, flags);
 #else
-  res = madvise(a, l, flags);
-#endif
-  return res;
+  return madvise(addr, len, flags);
 #endif
 }
 

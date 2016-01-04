@@ -19,12 +19,13 @@
   limitations under the License.
  */
 
-#include "ink_config.h"
+#include "ts/ink_platform.h"
+#include "ts/SimpleTokenizer.h"
 #include "records/I_RecHttp.h"
-#include "libts.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 #include "P_Net.h"
-#include "ink_cap.h"
+#include "ts/ink_cap.h"
+#include "ts/ink_mutex.h"
 #include "P_OCSPStapling.h"
 #include "SSLSessionCache.h"
 #include "SSLDynlock.h"
@@ -121,7 +122,7 @@ static int ssl_session_ticket_index = -1;
 #endif
 
 
-static pthread_mutex_t *mutex_buf = NULL;
+static ink_mutex *mutex_buf = NULL;
 static bool open_ssl_initialized = false;
 
 RecRawStatBlock *ssl_rsb = NULL;
@@ -152,9 +153,9 @@ SSL_locking_callback(int mode, int type, const char *file, int line)
 #endif
 
   if (mode & CRYPTO_LOCK) {
-    pthread_mutex_lock(&mutex_buf[type]);
+    ink_mutex_acquire(&mutex_buf[type]);
   } else if (mode & CRYPTO_UNLOCK) {
-    pthread_mutex_unlock(&mutex_buf[type]);
+    ink_mutex_release(&mutex_buf[type]);
   } else {
     Debug("ssl", "invalid SSL locking mode 0x%x", mode);
     ink_assert(0);
@@ -209,13 +210,24 @@ ssl_get_cached_session(SSL *ssl, unsigned char *id, int len, int *copy)
   SSL_SESSION *session = NULL;
 
   if (session_cache->getSession(sid, &session)) {
+    ink_assert(session);
+
     // Double check the timeout
-    if (session && ssl_session_timed_out(session)) {
-      // Due to bug in openssl, the timeout is checked, but only removed
-      // from the openssl built-in hash table.  The external remove cb is not called
+    if (ssl_session_timed_out(session)) {
+      SSL_INCREMENT_DYN_STAT(ssl_session_cache_miss);
+// Due to bug in openssl, the timeout is checked, but only removed
+// from the openssl built-in hash table.  The external remove cb is not called
+#if 0 // This is currently eliminated, since it breaks things in odd ways (see TS-3710)
       ssl_rm_cached_session(SSL_get_SSL_CTX(ssl), session);
       session = NULL;
+#endif
+    } else {
+      SSLNetVConnection *netvc = (SSLNetVConnection *)SSL_get_app_data(ssl);
+      SSL_INCREMENT_DYN_STAT(ssl_session_cache_hit);
+      netvc->setSSLSessionCacheHit(true);
     }
+  } else {
+    SSL_INCREMENT_DYN_STAT(ssl_session_cache_miss);
   }
   return session;
 }
@@ -271,6 +283,12 @@ set_context_cert(SSL *ssl)
   int retval = 1;
 
   Debug("ssl", "set_context_cert ssl=%p server=%s handshake_complete=%d", ssl, servername, netvc->getSSLHandShakeComplete());
+  // set SSL trace (we do this a little later in the USE_TLS_SNI case so we can get the servername
+  if (SSLConfigParams::ssl_wire_trace_enabled) {
+    bool trace = netvc->computeSSLTrace();
+    Debug("ssl", "sslnetvc. setting trace to=%s", trace ? "true" : "false");
+    netvc->setSSLTrace(trace);
+  }
 
   // catch the client renegotiation early on
   if (SSLConfigParams::ssl_allow_client_renegotiation == false && netvc->getSSLHandShakeComplete()) {
@@ -544,10 +562,11 @@ ssl_context_enable_tickets(SSL_CTX *ctx, const char *ticket_key_path)
   // with any key (for rotation purposes).
   for (unsigned i = 0; i < num_ticket_keys; ++i) {
     const char *data = (const char *)ticket_key_data + (i * sizeof(ssl_ticket_key_t));
-    memcpy(keyblock->keys[i].key_name, data, sizeof(ssl_ticket_key_t::key_name));
-    memcpy(keyblock->keys[i].hmac_secret, data + sizeof(ssl_ticket_key_t::key_name), sizeof(ssl_ticket_key_t::hmac_secret));
-    memcpy(keyblock->keys[i].aes_key, data + sizeof(ssl_ticket_key_t::key_name) + sizeof(ssl_ticket_key_t::hmac_secret),
-           sizeof(ssl_ticket_key_t::aes_key));
+
+    memcpy(keyblock->keys[i].key_name, data, sizeof(keyblock->keys[i].key_name));
+    memcpy(keyblock->keys[i].hmac_secret, data + sizeof(keyblock->keys[i].key_name), sizeof(keyblock->keys[i].hmac_secret));
+    memcpy(keyblock->keys[i].aes_key, data + sizeof(keyblock->keys[i].key_name) + sizeof(keyblock->keys[i].hmac_secret),
+           sizeof(keyblock->keys[i].aes_key));
   }
 
   // Setting the callback can only fail if OpenSSL does not recognize the
@@ -788,10 +807,10 @@ SSLInitializeLibrary()
     Debug("ssl", "FIPS_mode: %d", mode);
 #endif
 
-    mutex_buf = (pthread_mutex_t *)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
+    mutex_buf = (ink_mutex *)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(ink_mutex));
 
     for (int i = 0; i < CRYPTO_num_locks(); i++) {
-      pthread_mutex_init(&mutex_buf[i], NULL);
+      ink_mutex_init(&mutex_buf[i], NULL);
     }
 
     CRYPTO_set_locking_callback(SSL_locking_callback);
@@ -1175,6 +1194,7 @@ SSLPrivateKeyHandler(SSL_CTX *ctx, const SSLConfigParams *params, const ats_scop
       SSLError("failed to load server private key from %s", (const char *)completeServerKeyPath);
       return false;
     }
+    SSLConfigParams::load_ssl_file_cb(completeServerKeyPath, CONFIG_FLAG_UNVERSIONED);
   } else {
     SSLError("empty SSL private key path in records.config");
     return false;
@@ -1189,10 +1209,9 @@ SSLPrivateKeyHandler(SSL_CTX *ctx, const SSLConfigParams *params, const ats_scop
 }
 
 static int
-SSLCheckServerCertNow(X509 *myCert, char *certname)
+SSLCheckServerCertNow(X509 *cert, const char *certname)
 {
   int timeCmpValue;
-  time_t currentTime;
 
   // SSLCheckServerCertNow() -  returns 0 on OK or negative value on failure
   // and update log as appropriate.
@@ -1202,34 +1221,37 @@ SSLCheckServerCertNow(X509 *myCert, char *certname)
   // - current time is between notBefore and notAfter dates of certificate
   // if anything is not kosher, a negative value is returned and appropriate error logged.
 
-  if (!myCert) {
+  if (!cert) {
     // a truncated certificate would fall into here
-    Error("Checking NULL certificate from %s", certname);
+    Error("invalid certificate %s: file is truncated or corrupted", certname);
     return -3;
   }
 
-  time(&currentTime);
-  if (!(timeCmpValue = X509_cmp_time(X509_get_notBefore(myCert), &currentTime))) {
+  // XXX we should log the notBefore and notAfter dates in the errors ...
+
+  timeCmpValue = X509_cmp_current_time(X509_get_notBefore(cert));
+  if (timeCmpValue == 0) {
     // an error occured parsing the time, which we'll call a bogosity
-    Error("Error occured while parsing server certificate notBefore time. %s", certname);
+    Error("invalid certificate %s: unable to parse notBefore time", certname);
     return -3;
-  } else if (0 < timeCmpValue) {
+  } else if (timeCmpValue > 0) {
     // cert contains a date before the notBefore
-    Error("Server certificate notBefore date is in the future - INVALID CERTIFICATE %s", certname);
+    Error("invalid certificate %s: notBefore date is in the future", certname);
     return -4;
   }
 
-  if (!(timeCmpValue = X509_cmp_time(X509_get_notAfter(myCert), &currentTime))) {
+  timeCmpValue = X509_cmp_current_time(X509_get_notAfter(cert));
+  if (timeCmpValue == 0) {
     // an error occured parsing the time, which we'll call a bogosity
-    Error("Error occured while parsing server certificate notAfter time.");
+    Error("invalid certificate %s: unable to parse notAfter time", certname);
     return -3;
-  } else if (0 > timeCmpValue) {
+  } else if (timeCmpValue < 0) {
     // cert is expired
-    Error("Server certificate EXPIRED - INVALID CERTIFICATE %s", certname);
+    Error("invalid certificate %s: certificate expired", certname);
     return -5;
   }
 
-  Debug("ssl", "Server certificate %s passed accessibility and date checks", certname);
+  Debug("ssl", "server certificate %s passed accessibility and date checks", certname);
   return 0; // all good
 
 } /* CheckServerCertNow() */
@@ -1355,6 +1377,7 @@ SSLInitServerContext(const SSLConfigParams *params, const ssl_user_config &sslMu
         goto fail;
       }
       certList.push_back(cert);
+      SSLConfigParams::load_ssl_file_cb(completeServerCertPath, CONFIG_FLAG_UNVERSIONED);
       // Load up any additional chain certificates
       X509 *ca;
       while ((ca = PEM_read_bio_X509(bio.get(), NULL, 0, NULL))) {
@@ -1377,6 +1400,7 @@ SSLInitServerContext(const SSLConfigParams *params, const ssl_user_config &sslMu
         SSLError("failed to load global certificate chain from %s", (const char *)completeServerCertChainPath);
         goto fail;
       }
+      SSLConfigParams::load_ssl_file_cb(completeServerCertChainPath, CONFIG_FLAG_UNVERSIONED);
     }
 
     // Now, load any additional certificate chains specified in this entry.
@@ -1386,6 +1410,7 @@ SSLInitServerContext(const SSLConfigParams *params, const ssl_user_config &sslMu
         SSLError("failed to load certificate chain from %s", (const char *)completeServerCertChainPath);
         goto fail;
       }
+      SSLConfigParams::load_ssl_file_cb(completeServerCertChainPath, CONFIG_FLAG_UNVERSIONED);
     }
   }
 
@@ -1521,7 +1546,7 @@ asn1_strdup(ASN1_STRING *s)
 // table aliases for subject CN and subjectAltNames DNS without wildcard,
 // insert trie aliases for those with wildcard.
 static bool
-ssl_index_certificate(SSLCertLookup *lookup, SSLCertContext const &cc, X509 *cert, char *certname)
+ssl_index_certificate(SSLCertLookup *lookup, SSLCertContext const &cc, X509 *cert, const char *certname)
 {
   X509_NAME *subject = NULL;
   bool inserted = false;
@@ -1649,13 +1674,13 @@ ssl_store_ssl_context(const SSLConfigParams *params, SSLCertLookup *lookup, cons
 #if TS_USE_TLS_ALPN
   SSL_CTX_set_alpn_select_cb(ctx, SSLNetVConnection::select_next_protocol, NULL);
 #endif /* TS_USE_TLS_ALPN */
-  char *certname = sslMultCertSettings.cert.get();
 
+  const char *certname = sslMultCertSettings.cert.get();
   for (unsigned i = 0; i < cert_list.length(); ++i) {
     if (0 > SSLCheckServerCertNow(cert_list[i], certname)) {
       /* At this point, we know cert is bad, and we've already printed a
          descriptive reason as to why cert is bad to the log file */
-      Debug("ssl", "Marking certificate as NOT VALID: %s", (certname) ? (const char *)certname : "(null)");
+      Debug("ssl", "Marking certificate as NOT VALID: %s", certname);
       lookup->is_valid = false;
     }
   }
@@ -1929,19 +1954,19 @@ ssl_callback_session_ticket(SSL *ssl, unsigned char *keyname, unsigned char *iv,
 
   if (enc == 1) {
     const ssl_ticket_key_t &most_recent_key = keyblock->keys[0];
-    memcpy(keyname, most_recent_key.key_name, sizeof(ssl_ticket_key_t::key_name));
+    memcpy(keyname, most_recent_key.key_name, sizeof(most_recent_key.key_name));
     RAND_pseudo_bytes(iv, EVP_MAX_IV_LENGTH);
     EVP_EncryptInit_ex(cipher_ctx, EVP_aes_128_cbc(), NULL, most_recent_key.aes_key, iv);
-    HMAC_Init_ex(hctx, most_recent_key.hmac_secret, sizeof(ssl_ticket_key_t::hmac_secret), evp_md_func, NULL);
+    HMAC_Init_ex(hctx, most_recent_key.hmac_secret, sizeof(most_recent_key.hmac_secret), evp_md_func, NULL);
 
     Debug("ssl", "create ticket for a new session.");
     SSL_INCREMENT_DYN_STAT(ssl_total_tickets_created_stat);
     return 0;
   } else if (enc == 0) {
     for (unsigned i = 0; i < keyblock->num_keys; ++i) {
-      if (memcmp(keyname, keyblock->keys[i].key_name, sizeof(ssl_ticket_key_t::key_name)) == 0) {
+      if (memcmp(keyname, keyblock->keys[i].key_name, sizeof(keyblock->keys[i].key_name)) == 0) {
         EVP_DecryptInit_ex(cipher_ctx, EVP_aes_128_cbc(), NULL, keyblock->keys[i].aes_key, iv);
-        HMAC_Init_ex(hctx, keyblock->keys[i].hmac_secret, sizeof(ssl_ticket_key_t::hmac_secret), evp_md_func, NULL);
+        HMAC_Init_ex(hctx, keyblock->keys[i].hmac_secret, sizeof(keyblock->keys[i].hmac_secret), evp_md_func, NULL);
 
         Debug("ssl", "verify the ticket for an existing session.");
         // Increase the total number of decrypted tickets.
@@ -1950,6 +1975,8 @@ ssl_callback_session_ticket(SSL *ssl, unsigned char *keyname, unsigned char *iv,
         if (i != 0) // The number of tickets decrypted with "older" keys.
           SSL_INCREMENT_DYN_STAT(ssl_total_tickets_verified_old_key_stat);
 
+        SSLNetVConnection *netvc = (SSLNetVConnection *)SSL_get_app_data(ssl);
+        netvc->setSSLSessionCacheHit(true);
         // When we decrypt with an "older" key, encrypt the ticket again with the most recent key.
         return (i == 0) ? 1 : 2;
       }

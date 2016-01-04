@@ -21,7 +21,8 @@
   limitations under the License.
  */
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_string.h"
 #include "GenericParser.h"
 
 /***************************************************************************
@@ -622,6 +623,7 @@ Rule::socksParse(char *rule)
         // Every token must have a '=' sign
         if (numSubRuleTok < 2) {
           setErrorHint("'=' is expected in space-delimited token");
+          delete m_tokenList;
           return NULL;
         }
 

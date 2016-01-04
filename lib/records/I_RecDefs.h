@@ -24,8 +24,8 @@
 #ifndef _I_REC_DEFS_H_
 #define _I_REC_DEFS_H_
 
-#include "ink_mutex.h"
-#include "ink_rwlock.h"
+#include "ts/ink_mutex.h"
+#include "ts/ink_rwlock.h"
 #include "I_RecMutex.h"
 
 #define STAT_PROCESSOR
@@ -108,7 +108,7 @@ namespace detail
 
 enum RecUpdateT {
   RECU_NULL,       // default: don't know the behavior
-  RECU_DYNAMIC,    // config can be updated dynamically w/ traffic_line -x
+  RECU_DYNAMIC,    // config can be updated dynamically w/ "traffic_ctl config reload"
   RECU_RESTART_TS, // config requires TS to be restarted to take effect
   RECU_RESTART_TM, // config requires TM/TS to be restarted to take effect
   RECU_RESTART_TC  // config requires TC/TM/TS to be restarted to take effect

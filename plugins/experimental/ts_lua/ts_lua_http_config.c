@@ -76,12 +76,43 @@ typedef enum {
   TS_LUA_CONFIG_HTTP_CACHE_FUZZ_TIME = TS_CONFIG_HTTP_CACHE_FUZZ_TIME,
   TS_LUA_CONFIG_HTTP_CACHE_FUZZ_MIN_TIME = TS_CONFIG_HTTP_CACHE_FUZZ_MIN_TIME,
   TS_LUA_CONFIG_HTTP_DOC_IN_CACHE_SKIP_DNS = TS_CONFIG_HTTP_DOC_IN_CACHE_SKIP_DNS,
+  TS_LUA_CONFIG_HTTP_BACKGROUND_FILL_ACTIVE_TIMEOUT = TS_CONFIG_HTTP_BACKGROUND_FILL_ACTIVE_TIMEOUT,
   TS_LUA_CONFIG_HTTP_RESPONSE_SERVER_STR = TS_CONFIG_HTTP_RESPONSE_SERVER_STR,
   TS_LUA_CONFIG_HTTP_CACHE_HEURISTIC_LM_FACTOR = TS_CONFIG_HTTP_CACHE_HEURISTIC_LM_FACTOR,
   TS_LUA_CONFIG_HTTP_CACHE_FUZZ_PROBABILITY = TS_CONFIG_HTTP_CACHE_FUZZ_PROBABILITY,
+  TS_LUA_CONFIG_HTTP_BACKGROUND_FILL_COMPLETED_THRESHOLD = TS_CONFIG_HTTP_BACKGROUND_FILL_COMPLETED_THRESHOLD,
   TS_LUA_CONFIG_NET_SOCK_PACKET_MARK_OUT = TS_CONFIG_NET_SOCK_PACKET_MARK_OUT,
   TS_LUA_CONFIG_NET_SOCK_PACKET_TOS_OUT = TS_CONFIG_NET_SOCK_PACKET_TOS_OUT,
+  TS_LUA_CONFIG_HTTP_INSERT_AGE_IN_RESPONSE = TS_CONFIG_HTTP_INSERT_AGE_IN_RESPONSE,
+  TS_LUA_CONFIG_HTTP_CHUNKING_SIZE = TS_CONFIG_HTTP_CHUNKING_SIZE,
+  TS_LUA_CONFIG_HTTP_FLOW_CONTROL_ENABLED = TS_CONFIG_HTTP_FLOW_CONTROL_ENABLED,
+  TS_LUA_CONFIG_HTTP_FLOW_CONTROL_LOW_WATER_MARK = TS_CONFIG_HTTP_FLOW_CONTROL_LOW_WATER_MARK,
+  TS_LUA_CONFIG_HTTP_FLOW_CONTROL_HIGH_WATER_MARK = TS_CONFIG_HTTP_FLOW_CONTROL_HIGH_WATER_MARK,
+  TS_LUA_CONFIG_HTTP_CACHE_RANGE_LOOKUP = TS_CONFIG_HTTP_CACHE_RANGE_LOOKUP,
+  TS_LUA_CONFIG_HTTP_NORMALIZE_AE_GZIP = TS_CONFIG_HTTP_NORMALIZE_AE_GZIP,
+  TS_LUA_CONFIG_HTTP_DEFAULT_BUFFER_SIZE = TS_CONFIG_HTTP_DEFAULT_BUFFER_SIZE,
+  TS_LUA_CONFIG_HTTP_DEFAULT_BUFFER_WATER_MARK = TS_CONFIG_HTTP_DEFAULT_BUFFER_WATER_MARK,
+  TS_LUA_CONFIG_HTTP_REQUEST_HEADER_MAX_SIZE = TS_CONFIG_HTTP_REQUEST_HEADER_MAX_SIZE,
+  TS_LUA_CONFIG_HTTP_RESPONSE_HEADER_MAX_SIZE = TS_CONFIG_HTTP_RESPONSE_HEADER_MAX_SIZE,
+  TS_LUA_CONFIG_HTTP_NEGATIVE_REVALIDATING_ENABLED = TS_CONFIG_HTTP_NEGATIVE_REVALIDATING_ENABLED,
+  TS_LUA_CONFIG_HTTP_NEGATIVE_REVALIDATING_LIFETIME = TS_CONFIG_HTTP_NEGATIVE_REVALIDATING_LIFETIME,
+  TS_LUA_CONFIG_HTTP_ACCEPT_ENCODING_FILTER_ENABLED = TS_CONFIG_HTTP_ACCEPT_ENCODING_FILTER_ENABLED,
+  TS_LUA_CONFIG_SSL_HSTS_MAX_AGE = TS_CONFIG_SSL_HSTS_MAX_AGE,
+  TS_LUA_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS = TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS,
+  TS_LUA_CONFIG_HTTP_CACHE_OPEN_READ_RETRY_TIME = TS_CONFIG_HTTP_CACHE_OPEN_READ_RETRY_TIME,
+  TS_LUA_CONFIG_HTTP_CACHE_MAX_OPEN_READ_RETRIES = TS_CONFIG_HTTP_CACHE_MAX_OPEN_READ_RETRIES,
+  TS_LUA_CONFIG_HTTP_CACHE_RANGE_WRITE = TS_CONFIG_HTTP_CACHE_RANGE_WRITE,
+  TS_LUA_CONFIG_HTTP_POST_CHECK_CONTENT_LENGTH_ENABLED = TS_CONFIG_HTTP_POST_CHECK_CONTENT_LENGTH_ENABLED,
+  TS_LUA_CONFIG_HTTP_GLOBAL_USER_AGENT_HEADER = TS_CONFIG_HTTP_GLOBAL_USER_AGENT_HEADER,
+  TS_LUA_CONFIG_HTTP_AUTH_SERVER_SESSION_PRIVATE = TS_CONFIG_HTTP_AUTH_SERVER_SESSION_PRIVATE,
   TS_LUA_CONFIG_HTTP_SLOW_LOG_THRESHOLD = TS_CONFIG_HTTP_SLOW_LOG_THRESHOLD,
+  TS_LUA_CONFIG_HTTP_CACHE_GENERATION = TS_CONFIG_HTTP_CACHE_GENERATION,
+  TS_LUA_CONFIG_BODY_FACTORY_TEMPLATE_BASE = TS_CONFIG_BODY_FACTORY_TEMPLATE_BASE,
+  TS_LUA_CONFIG_HTTP_CACHE_OPEN_WRITE_FAIL_ACTION = TS_CONFIG_HTTP_CACHE_OPEN_WRITE_FAIL_ACTION,
+  TS_LUA_CONFIG_HTTP_ENABLE_REDIRECTION = TS_CONFIG_HTTP_ENABLE_REDIRECTION,
+  TS_LUA_CONFIG_HTTP_NUMBER_OF_REDIRECTIONS = TS_CONFIG_HTTP_NUMBER_OF_REDIRECTIONS,
+  TS_LUA_CONFIG_HTTP_CACHE_MAX_OPEN_WRITE_RETRIES = TS_CONFIG_HTTP_CACHE_MAX_OPEN_WRITE_RETRIES,
+  TS_LUA_CONFIG_HTTP_REDIRECT_USE_ORIG_CACHE_KEY = TS_CONFIG_HTTP_REDIRECT_USE_ORIG_CACHE_KEY,
   TS_LUA_CONFIG_LAST_ENTRY = TS_CONFIG_LAST_ENTRY,
 } TSLuaOverridableConfigKey;
 
@@ -139,11 +170,38 @@ ts_lua_var_item ts_lua_http_config_vars[] = {
   TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_DOWN_SERVER_CACHE_TIME),
   TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_DOWN_SERVER_ABORT_THRESHOLD), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_FUZZ_TIME),
   TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_FUZZ_MIN_TIME), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_DOC_IN_CACHE_SKIP_DNS),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_BACKGROUND_FILL_ACTIVE_TIMEOUT),
   TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_RESPONSE_SERVER_STR), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_HEURISTIC_LM_FACTOR),
-  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_FUZZ_PROBABILITY), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_NET_SOCK_PACKET_MARK_OUT),
-  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_NET_SOCK_PACKET_TOS_OUT), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_LAST_ENTRY),
-  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_SLOW_LOG_THRESHOLD),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_FUZZ_PROBABILITY),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_BACKGROUND_FILL_COMPLETED_THRESHOLD),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_NET_SOCK_PACKET_MARK_OUT), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_NET_SOCK_PACKET_TOS_OUT),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_INSERT_AGE_IN_RESPONSE), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CHUNKING_SIZE),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_FLOW_CONTROL_ENABLED),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_FLOW_CONTROL_LOW_WATER_MARK),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_FLOW_CONTROL_HIGH_WATER_MARK),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_RANGE_LOOKUP), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_NORMALIZE_AE_GZIP),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_DEFAULT_BUFFER_SIZE), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_DEFAULT_BUFFER_WATER_MARK),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_REQUEST_HEADER_MAX_SIZE),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_RESPONSE_HEADER_MAX_SIZE),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_NEGATIVE_REVALIDATING_ENABLED),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_NEGATIVE_REVALIDATING_LIFETIME),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_ACCEPT_ENCODING_FILTER_ENABLED), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_SSL_HSTS_MAX_AGE),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_OPEN_READ_RETRY_TIME),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_MAX_OPEN_READ_RETRIES), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_RANGE_WRITE),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_POST_CHECK_CONTENT_LENGTH_ENABLED),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_GLOBAL_USER_AGENT_HEADER),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_AUTH_SERVER_SESSION_PRIVATE), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_SLOW_LOG_THRESHOLD),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_GENERATION), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_BODY_FACTORY_TEMPLATE_BASE),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_OPEN_WRITE_FAIL_ACTION),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_ENABLE_REDIRECTION), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_NUMBER_OF_REDIRECTIONS),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_CACHE_MAX_OPEN_WRITE_RETRIES),
+  TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_HTTP_REDIRECT_USE_ORIG_CACHE_KEY), TS_LUA_MAKE_VAR_ITEM(TS_LUA_CONFIG_LAST_ENTRY),
 };
+
+// Needed to make sure we have the latest list of overridable http config vars when compiling
+#define NUM_HTTP_CONFIG_VARS (sizeof(ts_lua_http_config_vars) / sizeof(ts_lua_http_config_vars[0]))
+extern char __ts_lua_http_config_vars_static_assert[NUM_HTTP_CONFIG_VARS == TS_CONFIG_LAST_ENTRY + 1 ? 0 : -1];
 
 ts_lua_var_item ts_lua_http_timeout_vars[] = {
   TS_LUA_MAKE_VAR_ITEM(TS_LUA_TIMEOUT_ACTIVE), TS_LUA_MAKE_VAR_ITEM(TS_LUA_TIMEOUT_CONNECT),
@@ -165,6 +223,8 @@ static int ts_lua_http_client_packet_tos_set(lua_State *L);
 static int ts_lua_http_server_packet_tos_set(lua_State *L);
 static int ts_lua_http_client_packet_dscp_set(lua_State *L);
 static int ts_lua_http_server_packet_dscp_set(lua_State *L);
+static int ts_lua_http_enable_redirect(lua_State *L);
+static int ts_lua_http_set_debug(lua_State *L);
 
 void
 ts_lua_inject_http_config_api(lua_State *L)
@@ -209,6 +269,12 @@ ts_lua_inject_http_config_api(lua_State *L)
 
   lua_pushcfunction(L, ts_lua_http_server_packet_dscp_set);
   lua_setfield(L, -2, "server_packet_dscp_set");
+
+  lua_pushcfunction(L, ts_lua_http_enable_redirect);
+  lua_setfield(L, -2, "enable_redirect");
+
+  lua_pushcfunction(L, ts_lua_http_set_debug);
+  lua_setfield(L, -2, "set_debug");
 }
 
 static void
@@ -234,7 +300,7 @@ ts_lua_http_config_int_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
   value = luaL_checkinteger(L, 2);
@@ -251,7 +317,7 @@ ts_lua_http_config_int_get(lua_State *L)
   int64_t value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
 
@@ -269,7 +335,7 @@ ts_lua_http_config_float_set(lua_State *L)
   float value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
   value = luaL_checknumber(L, 2);
@@ -286,7 +352,7 @@ ts_lua_http_config_float_get(lua_State *L)
   float value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
 
@@ -305,7 +371,7 @@ ts_lua_http_config_string_set(lua_State *L)
   size_t value_len;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
   value = luaL_checklstring(L, 2, &value_len);
@@ -323,7 +389,7 @@ ts_lua_http_config_string_get(lua_State *L)
   int value_len;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
 
@@ -341,7 +407,7 @@ ts_lua_http_timeout_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   conf = luaL_checkinteger(L, 1);
   value = luaL_checkinteger(L, 2);
@@ -381,7 +447,7 @@ ts_lua_http_client_packet_mark_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   value = luaL_checkinteger(L, 1);
 
@@ -397,7 +463,7 @@ ts_lua_http_server_packet_mark_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   value = luaL_checkinteger(L, 1);
 
@@ -413,7 +479,7 @@ ts_lua_http_client_packet_tos_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   value = luaL_checkinteger(L, 1);
 
@@ -424,12 +490,44 @@ ts_lua_http_client_packet_tos_set(lua_State *L)
 }
 
 static int
+ts_lua_http_enable_redirect(lua_State *L)
+{
+  int value;
+  ts_lua_http_ctx *http_ctx;
+
+  GET_HTTP_CONTEXT(http_ctx, L);
+
+  value = luaL_checkinteger(L, 1);
+
+  TSDebug(TS_LUA_DEBUG_TAG, "enable redirect");
+  TSHttpTxnFollowRedirect(http_ctx->txnp, value);
+
+  return 0;
+}
+
+static int
+ts_lua_http_set_debug(lua_State *L)
+{
+  int value;
+  ts_lua_http_ctx *http_ctx;
+
+  GET_HTTP_CONTEXT(http_ctx, L);
+
+  value = luaL_checkinteger(L, 1);
+
+  TSDebug(TS_LUA_DEBUG_TAG, "set debug");
+  TSHttpTxnDebugSet(http_ctx->txnp, value);
+
+  return 0;
+}
+
+static int
 ts_lua_http_server_packet_tos_set(lua_State *L)
 {
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   value = luaL_checkinteger(L, 1);
 
@@ -445,7 +543,7 @@ ts_lua_http_client_packet_dscp_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   value = luaL_checkinteger(L, 1);
 
@@ -461,7 +559,7 @@ ts_lua_http_server_packet_dscp_set(lua_State *L)
   int value;
   ts_lua_http_ctx *http_ctx;
 
-  http_ctx = ts_lua_get_http_ctx(L);
+  GET_HTTP_CONTEXT(http_ctx, L);
 
   value = luaL_checkinteger(L, 1);
 

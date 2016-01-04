@@ -28,7 +28,9 @@
 
  ****************************************************************************/
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_sprintf.h"
+#include "ts/ink_file.h"
 #include "HttpBodyFactory.h"
 #include <unistd.h>
 #include <dirent.h>
@@ -39,7 +41,7 @@
 #include <logging/LogAccess.h>
 #include <logging/LogAccessHttp.h>
 #include "HttpCompat.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 
 //////////////////////////////////////////////////////////////////////
 // The HttpBodyFactory creates HTTP response page bodies, supported //
@@ -145,6 +147,7 @@ HttpBodyFactory::fabricate_with_old_api(const char *type, HttpTransact::State *c
     buffer = fabricate(&acpt_language_list, &acpt_charset_list, "default", context, resulting_buffer_length, &lang_ptr,
                        &charset_ptr, &set);
   }
+
   ///////////////////////////////////
   // enforce the max buffer length //
   ///////////////////////////////////
@@ -395,9 +398,11 @@ HttpBodyFactory::fabricate(StrList *acpt_language_list, StrList *acpt_charset_li
                            const char **set_return)
 {
   char *buffer;
+  const char *pType = context->txn_conf->body_factory_template_base;
   const char *set;
   HttpBodyTemplate *t;
   HttpBodySet *body_set;
+  char template_base[PATH_NAME_MAX];
 
   if (set_return)
     *set_return = "???";
@@ -417,17 +422,26 @@ HttpBodyFactory::fabricate(StrList *acpt_language_list, StrList *acpt_charset_li
     Debug("body_factory", "  customization disabled, returning NULL template");
     return (NULL);
   }
+
   // what set should we use (language target if enable_customizations == 2)
   if (enable_customizations == 2)
     set = determine_set_by_language(acpt_language_list, acpt_charset_list);
-  else
+  else if (enable_customizations == 3) {
+    set = determine_set_by_host(context);
+  } else
     set = "default";
 
   if (set_return)
     *set_return = set;
-
+  if (pType != NULL && 0 != *pType && 0 != strncmp(pType, "NONE", 4)) {
+    sprintf(template_base, "%s_%s", pType, type);
+  } else {
+    sprintf(template_base, "%s", type);
+  }
   // see if we have a custom error page template
-  t = find_template(set, type, &body_set);
+  t = find_template(set, template_base, &body_set);
+  if (t == NULL)
+    t = find_template(set, type, &body_set); // this executes if the template_base is wrong and doesn't exist
   if (t == NULL) {
     Debug("body_factory", "  can't find template, returning NULL template");
     return (NULL);
@@ -441,6 +455,24 @@ HttpBodyFactory::fabricate(StrList *acpt_language_list, StrList *acpt_charset_li
   return (buffer);
 }
 
+
+// LOCKING: must be called with lock taken
+const char *
+HttpBodyFactory::determine_set_by_host(HttpTransact::State *context)
+{
+  const char *set;
+  RawHashTable_Value v;
+  int host_len = context->hh_info.host_len;
+  char host_buffer[host_len + 1];
+  strncpy(host_buffer, context->hh_info.request_host, host_len);
+  host_buffer[host_len] = '\0';
+  if (table_of_sets->getValue((RawHashTable_Key)host_buffer, &v)) {
+    set = table_of_sets->getKeyFromBinding(table_of_sets->getCurrentBinding((RawHashTable_Key)host_buffer));
+  } else {
+    set = "default";
+  }
+  return set;
+}
 
 // LOCKING: must be called with lock taken
 const char *

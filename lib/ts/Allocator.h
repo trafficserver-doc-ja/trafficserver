@@ -40,10 +40,12 @@
 #ifndef _Allocator_h_
 #define _Allocator_h_
 
+#include <new>
 #include <stdlib.h>
-#include "ink_queue.h"
-#include "ink_defs.h"
-#include "ink_resource.h"
+#include "ts/ink_queue.h"
+#include "ts/ink_defs.h"
+#include "ts/ink_resource.h"
+#include <execinfo.h>
 
 #define RND16(_x) (((_x) + 15) & ~15)
 
@@ -192,14 +194,63 @@ public:
   */
   ClassAllocator(const char *name, unsigned int chunk_size = 128, unsigned int alignment = 16)
   {
+    ::new ((void *)&proto.typeObject) C();
     ink_freelist_init(&this->fl, name, RND16(sizeof(C)), chunk_size, RND16(alignment));
   }
 
   struct {
-    C typeObject;
+    uint8_t typeObject[sizeof(C)];
     int64_t space_holder;
   } proto;
 };
 
+template <class C> class TrackerClassAllocator : public ClassAllocator<C>
+{
+public:
+  TrackerClassAllocator(const char *name, unsigned int chunk_size = 128, unsigned int alignment = 16)
+    : ClassAllocator<C>(name, chunk_size, alignment), allocations(0), trackerLock(PTHREAD_MUTEX_INITIALIZER)
+  {
+  }
+
+  C *
+  alloc()
+  {
+    void *callstack[3];
+    int frames = backtrace(callstack, 3);
+    C *ptr = ClassAllocator<C>::alloc();
+
+    const void *symbol = NULL;
+    if (frames == 3 && callstack[2] != NULL) {
+      symbol = callstack[2];
+    }
+
+    tracker.increment(symbol, (int64_t)sizeof(C), this->fl->name);
+    ink_mutex_acquire(&trackerLock);
+    reverse_lookup[ptr] = symbol;
+    ++allocations;
+    ink_mutex_release(&trackerLock);
+
+    return ptr;
+  }
+
+  void
+  free(C *ptr)
+  {
+    ink_mutex_acquire(&trackerLock);
+    std::map<void *, const void *>::iterator it = reverse_lookup.find(ptr);
+    if (it != reverse_lookup.end()) {
+      tracker.increment((const void *)it->second, (int64_t)sizeof(C) * -1, NULL);
+      reverse_lookup.erase(it);
+    }
+    ink_mutex_release(&trackerLock);
+    ClassAllocator<C>::free(ptr);
+  }
+
+private:
+  ResourceTracker tracker;
+  std::map<void *, const void *> reverse_lookup;
+  uint64_t allocations;
+  ink_mutex trackerLock;
+};
 
 #endif // _Allocator_h_

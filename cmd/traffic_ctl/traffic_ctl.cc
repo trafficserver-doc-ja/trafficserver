@@ -37,6 +37,12 @@ CtrlMgmtRecord::type() const
   return this->ele->rec_type;
 }
 
+int
+CtrlMgmtRecord::rclass() const
+{
+  return this->ele->rec_class;
+}
+
 int64_t
 CtrlMgmtRecord::as_int() const
 {
@@ -92,7 +98,11 @@ CtrlMgmtRecordValue::init(TSRecordT _t, TSRecordValueT _v)
     snprintf(this->fmt.nbuf, sizeof(this->fmt.nbuf), "%f", _v.float_val);
     break;
   case TS_REC_STRING:
-    this->fmt.str = _v.string_val;
+    if (strcmp(_v.string_val, "") == 0) {
+      this->fmt.str = "\"\"";
+    } else {
+      this->fmt.str = _v.string_val;
+    }
     break;
   default:
     rec_type = TS_REC_STRING;
@@ -199,7 +209,6 @@ CtrlGenericSubcommand(const char *name, const subcommand *cmds, unsigned ncmds, 
 int
 main(int argc, const char **argv)
 {
-  TSMgmtError status;
   CtrlCommandLine cmdline;
   int debug = false;
 
@@ -219,7 +228,8 @@ main(int argc, const char **argv)
     {subcommand_storage, "storage", "Manipulate cache storage"},
   };
 
-  diags = new Diags("" /* tags */, "" /* actions */, stderr);
+  BaseLogFile *base_log_file = new BaseLogFile("stderr");
+  diags = new Diags("" /* tags */, "" /* actions */, base_log_file);
 
   // Process command line arguments and dump into variables
   if (!CtrlProcessArguments(argc, argv, argument_descriptions, countof(argument_descriptions))) {
@@ -238,11 +248,10 @@ main(int argc, const char **argv)
     return CtrlSubcommandUsage(NULL, commands, countof(commands), argument_descriptions, countof(argument_descriptions));
   }
 
-  status = TSInit(NULL, static_cast<TSInitOptionT>(TS_MGMT_OPT_NO_EVENTS | TS_MGMT_OPT_NO_SOCK_TESTS));
-  if (status != TS_ERR_OKAY) {
-    CtrlMgmtError(status, "failed to attach to the API server");
-    return CTRL_EX_UNAVAILABLE;
-  }
+  // Make a best effort to connect the control socket. If it turns out we are just displaying help or something then it
+  // doesn't matter that we failed. If we end up performing some operation then that operation will fail and display the
+  // error.
+  TSInit(NULL, static_cast<TSInitOptionT>(TS_MGMT_OPT_NO_EVENTS | TS_MGMT_OPT_NO_SOCK_TESTS));
 
   for (unsigned i = 0; i < countof(commands); ++i) {
     if (strcmp(file_arguments[0], commands[i].name) == 0) {

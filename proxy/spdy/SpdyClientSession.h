@@ -38,25 +38,26 @@ class SpdyRequest
 {
 public:
   SpdyRequest()
-    : spdy_sm(NULL), stream_id(-1), fetch_sm(NULL), has_submitted_data(false), need_resume_data(false), fetch_data_len(0),
-      delta_window_size(0), fetch_body_completed(false)
+    : event(0), spdy_sm(NULL), stream_id(-1), start_time(0), fetch_sm(NULL), has_submitted_data(false), need_resume_data(false),
+      fetch_data_len(0), delta_window_size(0), fetch_body_completed(false)
   {
   }
 
   SpdyRequest(SpdyClientSession *sm, int id)
-    : spdy_sm(NULL), stream_id(-1), fetch_sm(NULL), has_submitted_data(false), need_resume_data(false), fetch_data_len(0),
-      delta_window_size(0), fetch_body_completed(false)
+    : event(0), spdy_sm(NULL), stream_id(-1), start_time(0), fetch_sm(NULL), has_submitted_data(false), need_resume_data(false),
+      fetch_data_len(0), delta_window_size(0), fetch_body_completed(false)
   {
     init(sm, id);
   }
 
-  ~SpdyRequest() { clear(); }
-
   void init(SpdyClientSession *sm, int id);
   void clear();
 
+  static SpdyRequest *alloc();
+  void destroy();
+
   void
-  append_nv(const char *const *nv)
+  append_nv(char **nv)
   {
     for (int i = 0; nv[i]; i += 2) {
       headers.push_back(make_pair(nv[i], nv[i + 1]));
@@ -89,13 +90,16 @@ public:
 extern ClassAllocator<SpdyRequest> spdyRequestAllocator;
 
 // class SpdyClientSession : public Continuation, public PluginIdentity
-class SpdyClientSession : public ProxyClientSession
+class SpdyClientSession : public ProxyClientSession, public PluginIdentity
 {
 public:
   typedef ProxyClientSession super; ///< Parent type.
-  SpdyClientSession() {}
+  SpdyClientSession()
+    : sm_id(0), version(spdy::SessionVersion::SESSION_VERSION_3_1), total_size(0), start_time(0), vc(NULL), req_buffer(NULL),
+      req_reader(NULL), resp_buffer(NULL), resp_reader(NULL), read_vio(NULL), write_vio(NULL), event(0), session(NULL)
+  {
+  }
 
-  ~SpdyClientSession() { clear(); }
 
   void init(NetVConnection *netvc);
   void clear();
@@ -117,11 +121,13 @@ public:
     ink_release_assert(false);
     return NULL;
   }
+
   void
   start()
   {
     ink_release_assert(false);
   }
+
   void do_io_close(int lerrno = -1);
   void
   do_io_shutdown(ShutdownHowTo_t howto)
@@ -176,8 +182,7 @@ public:
   {
     SpdyRequest *req = this->find_request(streamId);
     if (req) {
-      req->clear();
-      spdyRequestAllocator.free(req);
+      req->destroy();
       this->req_map.erase(streamId);
     }
     if (req_map.empty() == true) {

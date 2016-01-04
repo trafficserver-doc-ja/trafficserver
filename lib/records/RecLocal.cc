@@ -21,9 +21,9 @@
   limitations under the License.
  */
 
-#include "libts.h"
+#include "ts/ink_platform.h"
 #include "Rollback.h"
-#include "ParseRules.h"
+#include "ts/ParseRules.h"
 #include "P_RecCore.h"
 #include "P_RecLocal.h"
 #include "P_RecMessage.h"
@@ -209,9 +209,14 @@ RecLocalInitMessage()
 int
 RecLocalStart(FileManager *configFiles)
 {
-  ink_thread_create(sync_thr, configFiles);
-  ink_thread_create(config_update_thr, NULL);
-
+  RecInt disable_modification = 0;
+  RecGetRecordInt("proxy.config.disable_configuration_modification", &disable_modification);
+  if (disable_modification == 1) {
+    RecDebug(DL_Debug, "Disable configuration modification");
+  } else {
+    ink_thread_create(sync_thr, configFiles);
+    ink_thread_create(config_update_thr, NULL);
+  }
   return REC_ERR_OKAY;
 }
 

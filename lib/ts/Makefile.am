@@ -43,6 +43,8 @@ libtsutil_la_SOURCES = \
   Allocator.h \
   Arena.cc \
   Arena.h \
+  BaseLogFile.cc \
+  BaseLogFile.h \
   Bitops.cc \
   Bitops.h \
   ConsistentHash.cc \
@@ -117,8 +119,6 @@ libtsutil_la_SOURCES = \
   ink_assert.cc \
   ink_assert.h \
   ink_atomic.h \
-  ink_auth_api.cc \
-  ink_auth_api.h \
   ink_base64.cc \
   ink_base64.h \
   ink_cap.cc \
@@ -176,7 +176,6 @@ libtsutil_la_SOURCES = \
   ink_thread.h \
   ink_time.cc \
   ink_time.h \
-  libts.h \
   llqueue.cc \
   lockfile.cc \
   signals.cc \

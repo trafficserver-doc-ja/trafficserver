@@ -25,10 +25,8 @@
 #ifndef _ink_platform_h
 #define _ink_platform_h
 
-#include "ink_config.h"
+#include "ts/ink_config.h"
 
-#include <stdio.h>
-#include <stdarg.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -179,11 +177,10 @@ typedef unsigned int in_addr_t;
 #include <sys/sysinfo.h>
 #endif
 
-#if !defined(darwin)
 #ifdef HAVE_SYS_SYSCTL_H
 #include <sys/sysctl.h>
 #endif
-#endif
+
 #ifdef HAVE_SYS_SYSTEMINFO_H
 #include <sys/systeminfo.h>
 #endif

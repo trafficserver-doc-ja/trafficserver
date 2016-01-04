@@ -32,16 +32,21 @@
 # Version number is calculated as MAJOR * 1000000 + MINOR * 1000 + MICRO
 # Version string is in the form of MAJOR.MINOR.MICRO[sufix]
 #
-m4_define([TS_VERSION_S],[6.0.0])
-m4_define([TS_VERSION_N],[6000000])
+m4_define([TS_VERSION_S],[6.2.0])
+m4_define([TS_VERSION_N],[6002000])
 
 AC_INIT([Apache Traffic Server], TS_VERSION_S(), [dev@trafficserver.apache.org], [trafficserver],[http://trafficserver.apache.org])
 AC_PREREQ([2.59])
 AC_CONFIG_AUX_DIR([build/aux])
 AC_CONFIG_SRCDIR([proxy/Main.cc])
 AC_CONFIG_MACRO_DIR([build])
+
 AM_INIT_AUTOMAKE([-Wall -Werror tar-ustar foreign no-installinfo no-installman subdir-objects 1.9.2])
-AC_CONFIG_HEADERS([lib/ts/ink_autoconf.h])
+
+# See discussion at https://autotools.io/automake/maintainer.html.
+AM_MAINTAINER_MODE([enable])
+
+AC_CONFIG_HEADERS([lib/ink_autoconf.h])
 
 # Configure with --disable-silent-rules to get verbose output. For more info, see
 # http://www.gnu.org/software/automake/manual/html_node/Automake-silent_002drules-Option.html
@@ -134,9 +139,9 @@ AC_ARG_WITH([build-number],
 #
 # Build environment
 #
-build_person="`id -nu`"
-build_group="`id -ng`"
-build_machine="`uname -n`"
+build_person="`id -nu | sed -e 's/\\\\/\\\\\\\\/g'`"
+build_group="`id -ng | sed -e 's/\\\\/\\\\\\\\/g'`"
+build_machine="`uname -n | sed -e 's/\\\\/\\\\\\\\/g'`"
 AC_SUBST([build_machine])
 AC_SUBST([build_person])
 AC_SUBST([build_group])
@@ -339,21 +344,6 @@ AC_ARG_ENABLE([tproxy],
 AC_MSG_RESULT([$enable_tproxy])
 
 #
-# Disable our freelist implementation, reverting it to whatever
-# allocator (malloc, tcmalloc or jemalloc) that is in use. This is
-# useful for debugging.
-#
-AC_MSG_CHECKING([whether to disable freelist])
-AC_ARG_ENABLE([freelist],
-  [AS_HELP_STRING([--disable-freelist],[turn off freelist and use allocators])],
-  [],
-  [enable_freelist="yes"]
-)
-AC_MSG_RESULT([$enable_freelist])
-TS_ARG_ENABLE_VAR([use], [freelist])
-AC_SUBST(use_freelist)
-
-#
 # Options for SPDY
 #
 AC_MSG_CHECKING([whether to enable spdy])
@@ -416,6 +406,12 @@ AC_ARG_ENABLE([experimental-plugins],
 )
 AC_MSG_RESULT([$enable_experimental_plugins])
 AM_CONDITIONAL([BUILD_EXPERIMENTAL_PLUGINS], [ test "x${enable_experimental_plugins}" = "xyes" ])
+
+#
+# Enable experimental/memcached_remap plugin
+#
+PKG_CHECK_MODULES([LIBMEMCACHED], [libmemcached >= 1.0], [have_libmemcached=yes], [have_libmemcached=no])
+AM_CONDITIONAL([BUILD_MEMCACHED_REMAP_PLUGIN], [test "x${have_libmemcached}" = "xyes"])
 
 #
 # Example plugins. The example plugins are always built, but not always installed. Installing
@@ -671,6 +667,7 @@ AM_PATH_PYTHON([2.4], [
   :
 ])
 
+AC_ARG_VAR(RPATH, [path to be added to rpath])
 AC_ARG_VAR(SPHINXBUILD, [the sphinx-build documentation generator])
 AC_ARG_VAR(SPHINXOPTS, [additional sphinx-build options])
 AC_CHECK_PROG([SPHINXBUILD], [sphinx-build], [sphinx-build], [false])
@@ -801,7 +798,7 @@ case $host_os_def in
       debug_opt="-ggdb3 $common_opt -Qunused-arguments"
       release_opt="-g $common_opt $optimizing_flags -fno-strict-aliasing -Qunused-arguments"
       cxx_opt="-Wno-invalid-offsetof"
-      luajit_cflags="-Wno-parentheses-equality -Wno-tautological-compare"
+      lua_cflags="-Wno-parentheses-equality -Wno-tautological-compare"
     ])
 
     AS_IF([test "x$ax_cv_c_compiler_vendor" = "xgnu"], [
@@ -823,7 +820,7 @@ case $host_os_def in
       debug_opt="-g $common_opt"
       release_opt="-g $common_opt $optimizing_flags -fno-strict-aliasing"
       cxx_opt="-Wno-invalid-offsetof"
-      luajit_cflags="-Wno-parentheses-equality -Wno-tautological-compare"
+      lua_cflags="-Wno-parentheses-equality -Wno-tautological-compare"
     ], [
       AC_MSG_WARN([clang is the only supported compiler on Darwin])
     ])
@@ -844,7 +841,7 @@ case $host_os_def in
       debug_opt="-ggdb3 $common_opt"
       release_opt="-g $common_opt $optimizing_flags -fno-strict-aliasing"
       cxx_opt="-Wno-invalid-offsetof"
-      luajit_cflags="-Wno-parentheses-equality -Wno-tautological-compare"
+      lua_cflags="-Wno-parentheses-equality -Wno-tautological-compare"
     ])
 
     AS_IF([test "x$ax_cv_c_compiler_vendor" = "xgnu"], [
@@ -915,7 +912,10 @@ AC_SUBST(AM_CXXFLAGS)
 
 # Special compiler flag hacks for various pieces of the code
 AC_SUBST([FLEX_CFLAGS], $flex_cflags)
-AC_SUBST([LUAJIT_CFLAGS], $luajit_cflags)
+
+# Flags for buildit LuaJIT itself.
+AC_SUBST(LUA_LDFLAGS)
+AC_SUBST([LUA_CFLAGS], $lua_cflags)
 
 SHARED_CFLAGS=-fPIC
 SHARED_LDFLAGS=-shared
@@ -1052,15 +1052,18 @@ fi
 
 AC_SEARCH_LIBS([exc_capture_context], [exc], [], [])
 AC_SEARCH_LIBS([MLD_demangle_string], [mld], [], [])
-AC_SEARCH_LIBS([dlopen], [dl], [], [])
 AC_SEARCH_LIBS([socket], [socket], [], [])
 AC_SEARCH_LIBS([gethostbyname], [nsl], [], [])
 AC_SEARCH_LIBS([clock_gettime], [rt], [], [])
 AC_SEARCH_LIBS([clock_gettime], [posix4], [], [])
 
-dnl Linux has pthread symbol stubss in both libc ad libpthread, so it's important to test
-dnl specifically for pthread_create() here.
-AC_SEARCH_LIBS([pthread_create], [pthread],[AC_SUBST([LIBPTHREAD],["-lpthread"])], [])
+dnl We check for dlsym here instead of e.g. dlopen() because ASAN hijacks the latter.
+AC_SEARCH_LIBS([dlsym], [dl], [], [])
+
+dnl Linux has pthread symbol stubss in both libc and libpthread, so it's important to test
+dnl specifically for pthread_yield() here. In addition, ASAN hijacks pthread_create() so
+dnl we can't use that anymore.
+AC_SEARCH_LIBS([pthread_yield], [pthread], [], [])
 
 dnl XXX The following check incorrectly causes the build to succeed
 dnl on Darwin. We should be using AC_SEARCH_LIBS, but rest_init is
@@ -1150,7 +1153,7 @@ if test "x${enable_xml}" != "xyes"; then
 fi
 
 AC_CHECK_FUNCS([clock_gettime kqueue epoll_ctl posix_memalign posix_fadvise posix_madvise posix_fallocate inotify_init])
-AC_CHECK_FUNCS([lrand48_r srand48_r port_create strlcpy strlcat sysconf getpagesize])
+AC_CHECK_FUNCS([lrand48_r srand48_r port_create strlcpy strlcat sysconf sysctlbyname getpagesize])
 AC_CHECK_FUNCS([getreuid getresuid getresgid setreuid setresuid getpeereid getpeerucred])
 AC_CHECK_FUNCS([strsignal psignal psiginfo])
 
@@ -1394,12 +1397,15 @@ AX_LIB_READLINE
 # http://luajit.org/install.html.
 case $host_os_def in
   darwin)
-    TS_LUAJIT_LDFLAGS="-Wl,-pagezero_size,10000 -Wl,-image_base,100000000"
+    LUAJIT_LDFLAGS="-Wl,-pagezero_size,10000 -Wl,-image_base,100000000"
     ;;
 esac
 
-AC_SUBST(TS_LUAJIT_LDFLAGS)
-AC_SUBST(LUA_LDFLAGS)
+# Flags for building and linking against our internal copy of LuaJIT.
+AC_SUBST([LUAJIT_LDFLAGS])
+AC_SUBST([LUAJIT_CPPFLAGS], ['-I$(top_srcdir)/lib/luajit/src'])
+AC_SUBST([LUAJIT_LIBS], ['$(top_builddir)/lib/luajit/src/libluajit.a'])
+
 
 # We should be able to build http_load if epoll(2) is available.
 AM_CONDITIONAL([BUILD_HTTP_LOAD], [test x"$ac_cv_func_epoll_ctl" = x"yes"])
@@ -1794,9 +1800,6 @@ iocore_include_dirs="-I\$(top_srcdir)/iocore/eventsystem \
 -I\$(top_srcdir)/iocore/utils \
 -I\$(top_srcdir)/iocore/dns"
 
-# Testing Framework suffix generation hack
-TFW_PACKAGE_SUFFIX=$os_type
-
 AC_SUBST([CC])
 AC_SUBST([CFLAGS])
 AC_SUBST([CXX])
@@ -1811,7 +1814,10 @@ AC_SUBST([SHARED_CFLAGS])
 AC_SUBST([SHARED_CXXFLAGS])
 AC_SUBST([SHARED_CXXLINKFLAGS])
 AC_SUBST([SHARED_LDFLAGS])
-AC_SUBST([TFW_PACKAGE_SUFFIX])
+
+AS_IF([test "x$RPATH" != "x"], [
+       TS_ADDTO_RPATH([$RPATH])
+])
 
 # -----------------------------------------------------------------------------
 # 6. OUTPUT FILES
@@ -1858,6 +1864,7 @@ AC_CONFIG_FILES([
   plugins/conf_remap/Makefile
   plugins/gzip/Makefile
   plugins/header_rewrite/Makefile
+  plugins/healthchecks/Makefile
   plugins/libloader/Makefile
   plugins/regex_remap/Makefile
   plugins/stats_over_http/Makefile
@@ -1901,6 +1908,7 @@ AS_IF([test "x$enable_experimental_plugins" = "xyes"], [
     plugins/experimental/buffer_upload/Makefile
     plugins/experimental/cache_range_requests/Makefile
     plugins/experimental/channel_stats/Makefile
+    plugins/experimental/cachekey/Makefile
     plugins/experimental/cache_promote/Makefile
     plugins/experimental/collapsed_connection/Makefile
     plugins/experimental/custom_redirect/Makefile
@@ -1910,9 +1918,11 @@ AS_IF([test "x$enable_experimental_plugins" = "xyes"], [
     plugins/experimental/generator/Makefile
     plugins/experimental/geoip_acl/Makefile
     plugins/experimental/header_normalize/Makefile
-    plugins/experimental/healthchecks/Makefile
     plugins/experimental/hipes/Makefile
+    plugins/experimental/memcache/Makefile
+    plugins/experimental/memcached_remap/Makefile
     plugins/experimental/metalink/Makefile
+    plugins/experimental/multiplexer/Makefile
     plugins/experimental/mysql_remap/Makefile
     plugins/experimental/regex_revalidate/Makefile
     plugins/experimental/remap_stats/Makefile

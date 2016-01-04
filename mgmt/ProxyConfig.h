@@ -31,7 +31,8 @@
 #ifndef _Proxy_Config_h
 #define _Proxy_Config_h
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_memory.h"
 #include "ProcessManager.h"
 #include "I_EventSystem.h"
 
@@ -42,6 +43,10 @@ void *config_long_long_cb(void *data, void *value);
 void *config_float_cb(void *data, void *value);
 void *config_string511_cb(void *data, void *value);
 void *config_string_alloc_cb(void *data, void *value);
+
+// Configuration file flags shared by proxy configuration and mgmt.
+#define CONFIG_FLAG_NONE 0u
+#define CONFIG_FLAG_UNVERSIONED 1u // Don't version this config file
 
 //
 // Macros that spin waiting for the data to be bound

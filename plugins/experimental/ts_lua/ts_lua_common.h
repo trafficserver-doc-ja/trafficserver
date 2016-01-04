@@ -31,7 +31,7 @@
 #include <ts/ts.h>
 #include <ts/experimental.h>
 #include <ts/remap.h>
-#include "ink_defs.h"
+#include "ts/ink_defs.h"
 #include "ts_lua_coroutine.h"
 
 #define TS_LUA_FUNCTION_REMAP "do_remap"
@@ -128,6 +128,8 @@ typedef struct {
 
   int remap;
   int has_hook;
+
+  TSRemapRequestInfo *rri;
 
 } ts_lua_http_ctx;
 

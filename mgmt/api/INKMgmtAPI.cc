@@ -29,9 +29,11 @@
  *
  *
  ***************************************************************************/
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_code.h"
+#include "ts/ParseRules.h"
 #include <limits.h>
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 
 #include "mgmtapi.h"
 #include "CfgContextManager.h"
@@ -40,7 +42,7 @@
 #include "CoreAPI.h"
 #include "CoreAPIShared.h"
 
-#include "TextBuffer.h"
+#include "ts/TextBuffer.h"
 
 // forward declarations
 void init_pdss_format(TSPdSsFormat &info);
@@ -2356,6 +2358,24 @@ TSIsValid(TSCfgEle *ele)
   return (ele_obj->isValid());
 }
 
+TSConfigRecordDescription *
+TSConfigRecordDescriptionCreate(void)
+{
+  TSConfigRecordDescription *val = (TSConfigRecordDescription *)ats_malloc(sizeof(TSConfigRecordDescription));
+
+  ink_zero(*val);
+  val->rec_type = TS_REC_UNDEFINED;
+
+  return val;
+}
+
+void
+TSConfigRecordDescriptionDestroy(TSConfigRecordDescription *val)
+{
+  TSConfigRecordDescriptionFree(val);
+  ats_free(val);
+}
+
 void
 TSConfigRecordDescriptionFree(TSConfigRecordDescription *val)
 {
@@ -2381,4 +2401,14 @@ TSConfigRecordDescribe(const char *rec_name, unsigned flags, TSConfigRecordDescr
 
   TSConfigRecordDescriptionFree(val);
   return MgmtConfigRecordDescribe(rec_name, flags, val);
+}
+
+TSMgmtError
+TSConfigRecordDescribeMatchMlt(const char *rec_regex, unsigned flags, TSList rec_vals)
+{
+  if (!rec_regex || !rec_vals) {
+    return TS_ERR_PARAMS;
+  }
+
+  return MgmtConfigRecordDescribeMatching(rec_regex, flags, rec_vals);
 }

@@ -30,8 +30,8 @@
 
  ****************************************************************************/
 
-#include "ink_config.h"
-#include "Allocator.h"
+#include "ts/ink_config.h"
+#include "ts/Allocator.h"
 #include "HttpClientSession.h"
 #include "HttpSM.h"
 #include "HttpDebugNames.h"
@@ -313,7 +313,7 @@ HttpClientSession::do_io_close(int alerrno)
     if (ssl_vc) {
       ssl_vc->set_ssl_iobuf(NULL);
     }
-    if (upgrade_to_h2c) {
+    if (upgrade_to_h2c && this->current_reader) {
       Http2ClientSession *h2_session = http2ClientSessionAllocator.alloc();
 
       h2_session->set_upgrade_context(&current_reader->t_state.hdr_info.client_request);
@@ -529,9 +529,9 @@ HttpClientSession::release(IOBufferReader *r)
     SET_HANDLER(&HttpClientSession::state_keep_alive);
     ka_vio = this->do_io_read(this, INT64_MAX, read_buffer);
     ink_assert(slave_ka_vio != ka_vio);
-    client_vc->add_to_keep_alive_queue();
     client_vc->set_inactivity_timeout(HRTIME_SECONDS(ka_in));
     client_vc->cancel_active_timeout();
+    client_vc->add_to_keep_alive_queue();
   }
 }
 

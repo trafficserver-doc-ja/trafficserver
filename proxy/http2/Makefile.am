@@ -20,9 +20,7 @@ AM_CPPFLAGS = \
   $(iocore_include_dirs) \
   -I$(top_srcdir)/proxy/api/ts \
   -I$(top_srcdir)/lib \
-  -I$(top_builddir)/lib \
   -I$(top_srcdir)/lib/records \
-  -I$(top_srcdir)/lib/ts \
   -I$(top_srcdir)/mgmt \
   -I$(top_srcdir)/mgmt/utils \
   -I$(top_srcdir)/proxy \
@@ -42,7 +40,27 @@ libhttp2_a_SOURCES = \
   Http2ClientSession.h \
   Http2ConnectionState.cc \
   Http2ConnectionState.h \
+  Http2Stream.cc \
+  Http2Stream.h \
   Http2SessionAccept.cc \
   Http2SessionAccept.h \
+  HuffmanCodec.cc \
+  HuffmanCodec.h
+
+if BUILD_TESTS
+  libhttp2_a_SOURCES += \
+	  RegressionHPACK.cc
+endif
+
+noinst_PROGRAMS = \
+  test_Huffmancode
+
+TESTS = test_Huffmancode
+
+test_Huffmancode_LDADD = \
+  $(top_builddir)/lib/ts/libtsutil.la
+
+test_Huffmancode_SOURCES = \
+  test_Huffmancode.cc \
   HuffmanCodec.cc \
   HuffmanCodec.h

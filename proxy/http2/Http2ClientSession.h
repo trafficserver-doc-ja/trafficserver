@@ -25,6 +25,7 @@
 #define __HTTP2_CLIENT_SESSION_H__
 
 #include "HTTP2.h"
+#include "Plugin.h"
 #include "ProxyClientSession.h"
 #include "Http2ConnectionState.h"
 
@@ -130,6 +131,16 @@ public:
     }
   }
 
+  int64_t
+  size()
+  {
+    if (ioblock) {
+      return ioblock->size();
+    } else {
+      return sizeof(this->hdr.raw);
+    }
+  }
+
 private:
   Http2Frame(Http2Frame &);                  // noncopyable
   Http2Frame &operator=(const Http2Frame &); // noncopyable
@@ -143,7 +154,7 @@ private:
   } hdr;
 };
 
-class Http2ClientSession : public ProxyClientSession
+class Http2ClientSession : public ProxyClientSession, public PluginIdentity
 {
 public:
   typedef ProxyClientSession super; ///< Parent type.
@@ -198,6 +209,8 @@ public:
     return upgrade_context;
   }
 
+  virtual char const *getPluginTag() const;
+  virtual int64_t getPluginId() const;
 
 private:
   Http2ClientSession(Http2ClientSession &);                  // noncopyable
@@ -210,6 +223,7 @@ private:
   int state_complete_frame_read(int, void *);
 
   int64_t con_id;
+  int64_t total_write_len;
   SessionHandler session_handler;
   NetVConnection *client_vc;
   MIOBuffer *read_buffer;

@@ -138,6 +138,7 @@ HOSTDB_CLIENT_IP_HASH(sockaddr const *lhs, sockaddr const *rhs)
 // period to wait for a remote probe...
 #define HOST_DB_CLUSTER_TIMEOUT HRTIME_MSECONDS(5000)
 #define HOST_DB_RETRY_PERIOD HRTIME_MSECONDS(20)
+#define HOST_DB_ITERATE_PERIOD HRTIME_MSECONDS(5)
 
 //#define TEST(_x) _x
 #define TEST(_x)
@@ -190,6 +191,18 @@ extern RecRawStatBlock *hostdb_rsb;
 #define HOSTDB_DECREMENT_THREAD_DYN_STAT(_s, _t) RecIncrRawStatSum(hostdb_rsb, _t, (int)_s, -1);
 
 
+struct CmpConstBuffferCaseInsensitive {
+  bool operator()(ts::ConstBuffer a, ts::ConstBuffer b) const { return ptr_len_casecmp(a._ptr, a._size, b._ptr, b._size) < 0; }
+};
+
+// Our own typedef for the host file mapping
+typedef std::map<ts::ConstBuffer, HostDBInfo, CmpConstBuffferCaseInsensitive> HostsFileMap;
+// A to hold a ref-counted map
+struct RefCountedHostsFileMap : public RefCountObj {
+  HostsFileMap hosts_file_map;
+  ats_scoped_str HostFileText;
+};
+
 //
 // HostDBCache (Private)
 //
@@ -209,6 +222,11 @@ struct HostDBCache : public MultiCache<HostDBInfo> {
   {
     return sizeof(HostDBInfo) * 2 + 512 * hostdb_srv_enabled;
   }
+
+  // Map to contain all of the host file overrides, initialize it to empty
+  Ptr<RefCountedHostsFileMap> hosts_file_ptr;
+  // Double buffer the hosts file becase it's small and it solves dangling reference problems.
+  Ptr<RefCountedHostsFileMap> prev_hosts_file_ptr;
 
   Queue<HostDBContinuation, Continuation::Link_link> pending_dns[MULTI_CACHE_PARTITIONS];
   Queue<HostDBContinuation, Continuation::Link_link> &pending_dns_for_hash(INK_MD5 &md5);
@@ -454,6 +472,7 @@ struct HostDBContinuation : public Continuation {
   Continuation *from_cont;
   HostDBApplicationInfo app;
   int probe_depth;
+  int current_iterate_pos;
   ClusterMachine *past_probes[CONFIGURATION_HISTORY_PROBE_DEPTH];
   //  char name[MAXDNAME];
   //  int namelen;
@@ -467,6 +486,7 @@ struct HostDBContinuation : public Continuation {
   unsigned int round_robin : 1;
 
   int probeEvent(int event, Event *e);
+  int iterateEvent(int event, Event *e);
   int clusterEvent(int event, Event *e);
   int clusterResponseEvent(int event, Event *e);
   int dnsEvent(int event, HostEnt *e);
@@ -520,7 +540,8 @@ struct HostDBContinuation : public Continuation {
 
   HostDBContinuation()
     : Continuation(NULL), ttl(0), host_res_style(DEFAULT_OPTIONS.host_res_style), dns_lookup_timeout(DEFAULT_OPTIONS.timeout),
-      timeout(0), from(0), from_cont(0), probe_depth(0), missing(false), force_dns(DEFAULT_OPTIONS.force_dns), round_robin(false)
+      timeout(0), from(0), from_cont(0), probe_depth(0), current_iterate_pos(0), missing(false),
+      force_dns(DEFAULT_OPTIONS.force_dns), round_robin(false)
   {
     ink_zero(md5_host_name_store);
     ink_zero(md5.hash);

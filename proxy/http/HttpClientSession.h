@@ -32,7 +32,8 @@
 #ifndef _HTTP_CLIENT_SESSION_H_
 #define _HTTP_CLIENT_SESSION_H_
 
-#include "libts.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_resolver.h"
 #include "P_Net.h"
 #include "InkAPIInternal.h"
 #include "HTTP.h"
@@ -78,23 +79,23 @@ public:
   set_half_close_flag()
   {
     half_close = true;
-  };
+  }
   void
   clear_half_close_flag()
   {
     half_close = false;
-  };
+  }
   bool
   get_half_close_flag() const
   {
     return half_close;
-  };
+  }
   virtual void release(IOBufferReader *r);
   virtual NetVConnection *
   get_netvc() const
   {
     return client_vc;
-  };
+  }
   virtual void
   release_netvc()
   {
@@ -106,7 +107,7 @@ public:
   get_server_session() const
   {
     return bound_ss;
-  };
+  }
 
   // Used for the cache authenticated HTTP content feature
   HttpServerSession *get_bound_ss();

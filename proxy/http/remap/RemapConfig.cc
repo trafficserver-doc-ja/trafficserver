@@ -24,11 +24,13 @@
 #include "RemapConfig.h"
 #include "UrlRewrite.h"
 #include "ReverseProxy.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 #include "HTTP.h"
-#include "libts.h"
-#include "ink_cap.h"
-#include "ink_file.h"
+#include "ts/ink_platform.h"
+#include "ts/List.h"
+#include "ts/ink_cap.h"
+#include "ts/ink_file.h"
+#include "ts/Tokenizer.h"
 
 #define modulePrefix "[ReverseProxy]"
 
@@ -784,9 +786,6 @@ remap_load_plugin(const char **argv, int argc, url_mapping *mp, char *errbuf, in
       if (!pi->fp_tsremap_init) {
         snprintf(errbuf, errbufsize, "Can't find \"%s\" function in remap plugin \"%s\"", TSREMAP_FUNCNAME_INIT, c);
         retcode = -10;
-      } else if (!pi->fp_tsremap_new_instance) {
-        snprintf(errbuf, errbufsize, "Can't find \"%s\" function in remap plugin \"%s\"", TSREMAP_FUNCNAME_NEW_INSTANCE, c);
-        retcode = -11;
       } else if (!pi->fp_tsremap_do_remap) {
         snprintf(errbuf, errbufsize, "Can't find \"%s\" function in remap plugin \"%s\"", TSREMAP_FUNCNAME_DO_REMAP, c);
         retcode = -12;
@@ -856,12 +855,14 @@ remap_load_plugin(const char **argv, int argc, url_mapping *mp, char *errbuf, in
     Debug("url_rewrite", "Argument %d: %s", k, parv[k]);
   }
 
-  void *ih;
 
   Debug("remap_plugin", "creating new plugin instance");
 
-  TSReturnCode res = TS_ERROR;
-  res = pi->fp_tsremap_new_instance(parc, parv, &ih, tmpbuf, sizeof(tmpbuf) - 1);
+  void *ih = NULL;
+  TSReturnCode res = TS_SUCCESS;
+  if (pi->fp_tsremap_new_instance) {
+    res = pi->fp_tsremap_new_instance(parc, parv, &ih, tmpbuf, sizeof(tmpbuf) - 1);
+  }
 
   Debug("remap_plugin", "done creating new plugin instance");
 

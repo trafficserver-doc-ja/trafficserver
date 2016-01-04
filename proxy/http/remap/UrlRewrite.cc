@@ -26,7 +26,7 @@
 #include "ReverseProxy.h"
 #include "UrlMappingPathIndex.h"
 #include "RemapConfig.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 #include "HttpSM.h"
 
 #define modulePrefix "[ReverseProxy]"
@@ -388,7 +388,7 @@ UrlRewrite::PerformACLFiltering(HttpTransact::State *s, url_mapping *map)
     int method_wksidx = (method != -1) ? (method - HTTP_WKSIDX_CONNECT) : -1;
     bool client_enabled_flag = true;
 
-    ink_release_assert(ats_is_ip(&s->client_info.addr));
+    ink_release_assert(ats_is_ip(&s->client_info.src_addr));
 
     for (acl_filter_rule *rp = map->filter; rp && client_enabled_flag; rp = rp->next) {
       bool match = true;
@@ -406,7 +406,7 @@ UrlRewrite::PerformACLFiltering(HttpTransact::State *s, url_mapping *map)
       if (match && rp->src_ip_valid) {
         match = false;
         for (int j = 0; j < rp->src_ip_cnt && !match; j++) {
-          bool in_range = rp->src_ip_array[j].contains(s->client_info.addr);
+          bool in_range = rp->src_ip_array[j].contains(s->client_info.src_addr);
           if (rp->src_ip_array[j].invert) {
             if (!in_range) {
               match = true;
@@ -894,9 +894,9 @@ UrlRewrite::_regexMappingLookup(RegexMappingList &regex_mappings, URL *request_u
     }
 
     int matches_info[MAX_REGEX_SUBS * 3];
-    int match_result = list_iter->regular_expression.exec(request_host, request_host_len, matches_info, countof(matches_info));
+    bool match_result = list_iter->regular_expression.exec(request_host, request_host_len, matches_info, countof(matches_info));
 
-    if (match_result > 0) {
+    if (match_result == true) {
       Debug("url_rewrite_regex", "Request URL host [%.*s] matched regex in mapping of rank %d "
                                  "with %d possible substitutions",
             request_host_len, request_host, reg_map_rank, match_result);
@@ -915,12 +915,9 @@ UrlRewrite::_regexMappingLookup(RegexMappingList &regex_mappings, URL *request_u
       Debug("url_rewrite_regex", "Expanded toURL to [%.*s]", expanded_url->length_get(), expanded_url->string_get_ref());
       retval = true;
       break;
-    } else if (match_result == PCRE_ERROR_NOMATCH) {
+    } else {
       Debug("url_rewrite_regex", "Request URL host [%.*s] did NOT match regex in mapping of rank %d", request_host_len,
             request_host, reg_map_rank);
-    } else {
-      Warning("pcre_exec() failed with error code %d", match_result);
-      break;
     }
   }
 

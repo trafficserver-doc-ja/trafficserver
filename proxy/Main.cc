@@ -30,10 +30,14 @@
 
  ****************************************************************************/
 
-#include "ink_config.h"
+#include "ts/ink_platform.h"
+#include "ts/ink_sys_control.h"
+#include "ts/ink_args.h"
+#include "ts/ink_lockfile.h"
+#include "ts/ink_stack_trace.h"
+#include "ts/ink_syslog.h"
+#include "ts/hugepages.h"
 
-#include "libts.h"
-#include "ink_sys_control.h"
 #include <syslog.h>
 
 #if !defined(linux)
@@ -51,7 +55,7 @@ extern "C" int plock(int);
 #endif
 
 #include "Main.h"
-#include "signals.h"
+#include "ts/signals.h"
 #include "Error.h"
 #include "StatSystem.h"
 #include "P_EventSystem.h"
@@ -62,7 +66,7 @@ extern "C" int plock(int);
 #include "P_Cluster.h"
 #include "P_HostDB.h"
 #include "P_Cache.h"
-#include "I_Layout.h"
+#include "ts/I_Layout.h"
 #include "I_Machine.h"
 #include "RecordsConfig.h"
 #include "I_RecProcess.h"
@@ -89,12 +93,12 @@ extern "C" int plock(int);
 #include "I_Tasks.h"
 #include "InkAPIInternal.h"
 #include "HTTP2.h"
-#include "ts/ink_config.h"
 
 #include <ts/ink_cap.h>
 
 #if TS_HAS_PROFILER
-#include <google/profiler.h>
+#include <gperftools/profiler.h>
+#include <gperftools/heap-profiler.h>
 #endif
 
 //
@@ -120,6 +124,7 @@ static const long MAX_LOGIN = ink_login_name_max();
 static void *mgmt_restart_shutdown_callback(void *, char *, int data_len);
 static void *mgmt_storage_device_cmd_callback(void *x, char *data, int len);
 static void init_ssl_ctx_callback(void *ctx, bool server);
+static void load_ssl_file_callback(const char *ssl_file, unsigned int options);
 
 static int num_of_net_threads = ink_number_of_processors();
 static int num_of_udp_threads = 0;
@@ -150,6 +155,8 @@ char cluster_host[MAXDNAME + 1] = DEFAULT_CLUSTER_HOST;
 static char command_string[512] = "";
 static char conf_dir[512] = "";
 int remote_management_flag = DEFAULT_REMOTE_MANAGEMENT_FLAG;
+static char bind_stdout[512] = DEFAULT_BIND_STDOUT;
+static char bind_stderr[512] = DEFAULT_BIND_STDERR;
 
 static char error_tags[1024] = "";
 static char action_tags[1024] = "";
@@ -160,8 +167,10 @@ HttpBodyFactory *body_factory = NULL;
 static int accept_mss = 0;
 static int cmd_line_dprintf_level = 0; // default debug output level from ink_dprintf function
 static int poll_timeout = -1;          // No value set.
+static int cmd_disable_freelist = 0;
 
 static volatile bool sigusr1_received = false;
+static volatile bool sigusr2_received = false;
 
 // 1: delay listen, wait for cache.
 // 0: Do not delay, start listen ASAP.
@@ -179,6 +188,7 @@ static const ArgumentDescription argument_descriptions[] = {
   {"httpport", 'p', "Port descriptor for HTTP Accept", "S*", &http_accept_port_descriptor, "PROXY_HTTP_ACCEPT_PORT", NULL},
   {"cluster_port", 'P', "Cluster Port Number", "I", &cluster_port_number, "PROXY_CLUSTER_PORT", NULL},
   {"dprintf_level", 'o', "Debug output level", "I", &cmd_line_dprintf_level, "PROXY_DPRINTF_LEVEL", NULL},
+  {"disable_freelist", 'f', "Disable the freelist memory allocator", "T", &cmd_disable_freelist, "PROXY_DPRINTF_LEVEL", NULL},
 
 #if TS_HAS_TESTS
   {"regression", 'R', "Regression Level (quick:1..long:3)", "I", &regression_level, "PROXY_REGRESSION", NULL},
@@ -196,6 +206,8 @@ static const ArgumentDescription argument_descriptions[] = {
   {"conf_dir", 'D', "config dir to verify", "S511", &conf_dir, "PROXY_SYS_CONFIG_DIR", NULL},
   {"clear_hostdb", 'k', "Clear HostDB on Startup", "F", &auto_clear_hostdb_flag, "PROXY_CLEAR_HOSTDB", NULL},
   {"clear_cache", 'K', "Clear Cache on Startup", "F", &cacheProcessor.auto_clear_flag, "PROXY_CLEAR_CACHE", NULL},
+  {"bind_stdout", '-', "Regular file to bind stdout to", "S512", &bind_stdout, "PROXY_BIND_STDOUT", NULL},
+  {"bind_stderr", '-', "Regular file to bind stderr to", "S512", &bind_stderr, "PROXY_BIND_STDERR", NULL},
 #if defined(linux)
   {"read_core", 'c', "Read Core file", "S255", &core_file, NULL, NULL},
 #endif
@@ -210,12 +222,10 @@ class SignalContinuation : public Continuation
 public:
   char *end;
   char *snap;
-  int fastmemsnap;
 
   SignalContinuation() : Continuation(new_ProxyMutex())
   {
     end = snap = 0;
-    fastmemsnap = 0;
     SET_HANDLER(&SignalContinuation::periodic);
   }
 
@@ -237,14 +247,15 @@ public:
       //       This is not error condition at the first place
       //       so why stderr?
       //
-      fprintf(stderr, "sbrk 0x%" PRIu64 "x from first %" PRIu64 " from last %" PRIu64 "\n", (uint64_t)((ptrdiff_t)now),
+      fprintf(stderr, "sbrk 0x%" PRIu64 " from first %" PRIu64 " from last %" PRIu64 "\n", (uint64_t)((ptrdiff_t)now),
               (uint64_t)((ptrdiff_t)(now - end)), (uint64_t)((ptrdiff_t)(now - snap)));
-#ifdef DEBUG
-      int fmdelta = fastmemtotal - fastmemsnap;
-      fprintf(stderr, "fastmem %" PRId64 " from last %" PRId64 "\n", (int64_t)fastmemtotal, (int64_t)fmdelta);
-      fastmemsnap += fmdelta;
-#endif
       snap = now;
+    } else if (sigusr2_received) {
+      sigusr2_received = false;
+      Debug("log", "received SIGUSR2, reloading traffic.out");
+      // reload output logfile (file is usually called traffic.out)
+      diags->set_stdout_output(bind_stdout);
+      diags->set_stderr_output(bind_stderr);
     }
 
     return EVENT_CONT;
@@ -272,9 +283,17 @@ public:
     baseline_taken = 0;
   }
 
+  ~TrackerContinuation() { mutex = NULL; }
+
   int
-  periodic(int /* event ATS_UNUSED */, Event * /* e ATS_UNUSED */)
+  periodic(int event, Event * /* e ATS_UNUSED */)
   {
+    if (event == EVENT_IMMEDIATE) {
+      // rescheduled from periodic to immediate event
+      // this is the indication to terminate this tracker.
+      delete this;
+      return EVENT_DONE;
+    }
     if (use_baseline) {
       // TODO: TS-567 Integrate with debugging allocators "dump" features?
       ink_freelists_dump_baselinerel(stderr);
@@ -292,11 +311,45 @@ public:
   }
 };
 
+// This continuation is used to periodically check on diags.log, and rotate
+// the logs if necessary
+class DiagsLogContinuation : public Continuation
+{
+public:
+  DiagsLogContinuation() : Continuation(new_ProxyMutex()) { SET_HANDLER(&DiagsLogContinuation::periodic); }
+  int
+  periodic(int /* event ATS_UNUSED */, Event * /* e ATS_UNUSED */)
+  {
+    Debug("log", "in DiagsLogContinuation, checking on diags.log");
+
+    // First, let us update the rolling config values for diagslog. We
+    // do not need to update the config values for outputlog because
+    // traffic_server never actually rotates outputlog. outputlog is always
+    // rotated in traffic_manager. The reason being is that it is difficult
+    // to send a notification from TS to TM, informing TM that outputlog has
+    // been rolled. It is much easier sending a notification (in the form
+    // of SIGUSR2) from TM -> TS.
+    int diags_log_roll_int = (int)REC_ConfigReadInteger("proxy.config.diags.logfile.rolling_interval_sec");
+    int diags_log_roll_size = (int)REC_ConfigReadInteger("proxy.config.diags.logfile.rolling_size_mb");
+    int diags_log_roll_enable = (int)REC_ConfigReadInteger("proxy.config.diags.logfile.rolling_enabled");
+    diags->config_roll_diagslog((RollingEnabledValues)diags_log_roll_enable, diags_log_roll_int, diags_log_roll_size);
+
+    if (diags->should_roll_diagslog()) {
+      Note("Rolled %s", DIAGS_LOG_FILENAME);
+    }
+    return EVENT_CONT;
+  }
+};
+
 static int
 init_memory_tracker(const char *config_var, RecDataT /* type ATS_UNUSED */, RecData data, void * /* cookie ATS_UNUSED */)
 {
   static Event *tracker_event = NULL;
+  Event *preE;
   int dump_mem_info_frequency = 0;
+
+  // set tracker_event to NULL, and return previous value
+  preE = ink_atomic_swap(&tracker_event, static_cast<Event *>(NULL));
 
   if (config_var) {
     dump_mem_info_frequency = data.rec_int;
@@ -304,11 +357,11 @@ init_memory_tracker(const char *config_var, RecDataT /* type ATS_UNUSED */, RecD
     dump_mem_info_frequency = REC_ConfigReadInteger("proxy.config.dump_mem_info_frequency");
   }
 
-  Debug("tracker", "init_tracker called [%d]\n", dump_mem_info_frequency);
+  Debug("tracker", "init_memory_tracker called [%d]\n", dump_mem_info_frequency);
 
-  if (tracker_event) {
-    tracker_event->cancel();
-    tracker_event = NULL;
+  if (preE) {
+    eventProcessor.schedule_imm(preE->continuation, ET_CALL);
+    preE->cancel();
   }
 
   if (dump_mem_info_frequency > 0) {
@@ -325,6 +378,9 @@ proxy_signal_handler(int signo, siginfo_t *info, void *)
   case SIGUSR1:
     sigusr1_received = true;
     return;
+  case SIGUSR2:
+    sigusr2_received = true;
+    return;
   case SIGHUP:
     return;
   }
@@ -332,6 +388,8 @@ proxy_signal_handler(int signo, siginfo_t *info, void *)
   signal_format_siginfo(signo, info, appVersionInfo.AppStr);
 
 #if TS_HAS_PROFILER
+  HeapProfilerDump("/tmp/ts_end.hprof");
+  HeapProfilerStop();
   ProfilerStop();
 #endif
 
@@ -592,7 +650,7 @@ cmd_check_internal(char * /* cmd ATS_UNUSED */, bool fix = false)
   hd.reset();
 #endif
 
-  cacheProcessor.set_after_init_callback(&CB_cmd_cache_check);
+  cacheProcessor.afterInitCallbackSet(&CB_cmd_cache_check);
   if (cacheProcessor.start_internal(PROCESSOR_CHECK) < 0) {
     printf("\nbad cache configuration, %s failed\n", n);
     return CMD_FAILED;
@@ -657,7 +715,7 @@ cmd_clear(char *cmd)
   if (c_all || c_cache) {
     Note("Clearing Cache");
 
-    cacheProcessor.set_after_init_callback(&CB_cmd_cache_clear);
+    cacheProcessor.afterInitCallbackSet(&CB_cmd_cache_clear);
     if (cacheProcessor.start_internal(PROCESSOR_RECONFIGURE) < 0) {
       Note("unable to open Cache, CLEAR failed");
       return CMD_FAILED;
@@ -1364,6 +1422,62 @@ change_uid_gid(const char *user)
 #endif
 }
 
+/** Open a file, elevating privilege only if needed.
+
+    @internal This is necessary because the CI machines run the regression tests
+    as a normal user, not as root, so attempts to get privilege fail even though
+    the @c open would succeed without elevation. So, try that first and ask for
+    elevation only on an explicit permission failure.
+*/
+static int
+elevating_open(char const *path, unsigned int flags, unsigned int fperms)
+{
+  int fd = open(path, flags, fperms);
+  if (fd < 0 && (EPERM == errno || EACCES == errno)) {
+    ElevateAccess access;
+    fd = open(path, flags, fperms);
+  }
+  return fd;
+}
+
+/*
+ * Binds stdout and stderr to files specified by the parameters
+ *
+ * On failure to bind, emits a warning and whatever is being bound
+ * just isn't bound
+ *
+ * This must work without the ability to elevate privilege if the files are accessible without.
+ */
+void
+bind_outputs(const char *bind_stdout, const char *bind_stderr)
+{
+  int log_fd;
+  unsigned int flags = O_WRONLY | O_APPEND | O_CREAT | O_SYNC;
+
+  if (*bind_stdout != 0) {
+    Debug("log", "binding stdout to %s", bind_stdout);
+    log_fd = elevating_open(bind_stdout, flags, 0644);
+    if (log_fd < 0) {
+      fprintf(stdout, "[Warning]: TS unable to open log file \"%s\" [%d '%s']\n", bind_stdout, errno, strerror(errno));
+    } else {
+      Debug("log", "duping stdout");
+      dup2(log_fd, STDOUT_FILENO);
+      close(log_fd);
+    }
+  }
+  if (*bind_stderr != 0) {
+    Debug("log", "binding stderr to %s", bind_stderr);
+    log_fd = elevating_open(bind_stderr, O_WRONLY | O_APPEND | O_CREAT | O_SYNC, 0644);
+    if (log_fd < 0) {
+      fprintf(stdout, "[Warning]: TS unable to open log file \"%s\" [%d '%s']\n", bind_stderr, errno, strerror(errno));
+    } else {
+      Debug("log", "duping stderr");
+      dup2(log_fd, STDERR_FILENO);
+      close(log_fd);
+    }
+  }
+}
+
 //
 // Main
 //
@@ -1372,6 +1486,7 @@ int
 main(int /* argc ATS_UNUSED */, const char **argv)
 {
 #if TS_HAS_PROFILER
+  HeapProfilerStart("/tmp/ts.hprof");
   ProfilerStart("/tmp/ts.prof");
 #endif
   bool admin_user_p = false;
@@ -1398,15 +1513,14 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   command_index = find_cmd_index(command_string);
   command_valid = command_flag && command_index >= 0;
 
+  if (cmd_disable_freelist) {
+    ink_freelist_init_ops(ink_freelist_malloc_ops());
+  }
   // Specific validity checks.
   if (*conf_dir && command_index != find_cmd_index(CMD_VERIFY_CONFIG)) {
     fprintf(stderr, "-D option can only be used with the %s command\n", CMD_VERIFY_CONFIG);
     _exit(1);
   }
-
-  // Set stdout/stdin to be unbuffered
-  setbuf(stdout, NULL);
-  setbuf(stdin, NULL);
 
   // Bootstrap syslog.  Since we haven't read records.config
   //   yet we do not know where
@@ -1421,11 +1535,20 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   // re-start Diag completely) because at initialize, TM only has 1 thread.
   // In TS, some threads have already created, so if we delete Diag and
   // re-start it again, TS will crash.
+  // This is also needed for log rotation - setting up the file can cause privilege
+  // related errors and if diagsConfig isn't get up yet that will crash on a NULL pointer.
   diagsConfig = new DiagsConfig(DIAGS_LOG_FILENAME, error_tags, action_tags, false);
   diags = diagsConfig->diags;
   diags->prefix_str = "Server ";
+  diags->set_stdout_output(bind_stdout);
+  diags->set_stderr_output(bind_stderr);
   if (is_debug_tag_set("diags"))
     diags->dump();
+
+  // Bind stdout and stderr to specified switches
+  // Still needed despite the set_std{err,out}_output() calls later since there are
+  // fprintf's before those calls
+  bind_outputs(bind_stdout, bind_stderr);
 
   // Local process manager
   initialize_process_manager();
@@ -1504,6 +1627,8 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   diags = diagsConfig->diags;
   RecSetDiags(diags);
   diags->prefix_str = "Server ";
+  diags->set_stdout_output(bind_stdout);
+  diags->set_stderr_output(bind_stderr);
   if (is_debug_tag_set("diags"))
     diags->dump();
 
@@ -1631,6 +1756,7 @@ main(int /* argc ATS_UNUSED */, const char **argv)
   }
 
   eventProcessor.schedule_every(new SignalContinuation, HRTIME_MSECOND * 500, ET_CALL);
+  eventProcessor.schedule_every(new DiagsLogContinuation, HRTIME_SECOND, ET_TASK);
   REC_RegisterConfigUpdateFunc("proxy.config.dump_mem_info_frequency", init_memory_tracker, NULL);
   init_memory_tracker(NULL, RECD_NULL, RecData(), NULL);
 
@@ -1688,11 +1814,12 @@ main(int /* argc ATS_UNUSED */, const char **argv)
     (void)plugin_init(); // plugin.config
 
     SSLConfigParams::init_ssl_ctx_cb = init_ssl_ctx_callback;
+    SSLConfigParams::load_ssl_file_cb = load_ssl_file_callback;
     sslNetProcessor.start(getNumSSLThreads(), stacksize);
 
     pmgmt->registerPluginCallbacks(global_config_cbs);
 
-    cacheProcessor.set_after_init_callback(&CB_After_Cache_Init);
+    cacheProcessor.afterInitCallbackSet(&CB_After_Cache_Init);
     cacheProcessor.start();
 
     // UDP net-threads are turned off by default.
@@ -1862,4 +1989,10 @@ init_ssl_ctx_callback(void *ctx, bool server)
     hook->invoke(event, ctx);
     hook = hook->next();
   }
+}
+
+static void
+load_ssl_file_callback(const char *ssl_file, unsigned int options)
+{
+  pmgmt->signalConfigFileChild("ssl_multicert.config", ssl_file, options);
 }

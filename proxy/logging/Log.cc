@@ -32,7 +32,7 @@
  class.
 
  ***************************************************************************/
-#include "libts.h"
+#include "ts/ink_platform.h"
 
 #include "Error.h"
 #include "Main.h"
@@ -53,11 +53,11 @@
 #include "LogUtils.h"
 #include "Log.h"
 #include "LogSock.h"
-#include "SimpleTokenizer.h"
+#include "ts/SimpleTokenizer.h"
 
-#include "ink_apidefs.h"
+#include "ts/ink_apidefs.h"
 
-#define PERIODIC_TASKS_INTERVAL 5 // TODO: Maybe this should be done as a config option
+#define PERIODIC_TASKS_INTERVAL_FALLBACK 5
 
 // Log global objects
 inkcoreapi LogObject *Log::error_log = NULL;
@@ -82,6 +82,7 @@ int Log::collation_port;
 int Log::init_status = 0;
 int Log::config_flags = 0;
 bool Log::logging_mode_changed = false;
+uint32_t Log::periodic_tasks_interval = PERIODIC_TASKS_INTERVAL_FALLBACK;
 
 // Hash table for LogField symbols
 InkHashTable *Log::field_symbol_hash = 0;
@@ -223,6 +224,7 @@ Log::periodic_tasks(long time_now)
     change_configuration();
   } else if (logging_mode > LOG_MODE_NONE || config->collation_mode == Log::COLLATION_HOST || config->has_api_objects()) {
     Debug("log-periodic", "Performing periodic tasks");
+    Debug("log-periodic", "Periodic task interval = %d", periodic_tasks_interval);
 
     // Check if space is ok and update the space used
     //
@@ -318,6 +320,11 @@ Log::init_fields()
   LogField *field;
 
   //
+  // Initializes material to find a milestone name from their
+  // name in a rapid manner.
+  LogField::init_milestone_container();
+
+  //
   // Create a hash table that will be used to find the global field
   // objects from their symbol names in a rapid manner.
   //
@@ -338,6 +345,18 @@ Log::init_fields()
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "chih", field);
 
+  // interface ip
+
+  field =
+    new LogField("host_interface_ip", "hii", LogField::IP, &LogAccess::marshal_host_interface_ip, &LogAccess::unmarshal_ip_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "hii", field);
+
+  field = new LogField("host_interface_ip_hex", "hiih", LogField::IP, &LogAccess::marshal_host_interface_ip,
+                       &LogAccess::unmarshal_ip_to_hex);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "hiih", field);
+  // interface ip end
   field = new LogField("client_auth_user_name", "caun", LogField::STRING, &LogAccess::marshal_client_auth_user_name,
                        (LogField::UnmarshalFunc) & LogAccess::unmarshal_str);
   global_field_list.add(field, false);
@@ -434,6 +453,11 @@ Log::init_fields()
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "cqhv", field);
 
+  field = new LogField("client_req_protocol_version", "cqpv", LogField::dINT, &LogAccess::marshal_client_req_protocol_version,
+                       (LogField::UnmarshalFunc) & LogAccess::unmarshal_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cqpv", field);
+
   field = new LogField("client_req_header_len", "cqhl", LogField::sINT, &LogAccess::marshal_client_req_header_len,
                        &LogAccess::unmarshal_int_to_str);
   global_field_list.add(field, false);
@@ -448,6 +472,31 @@ Log::init_fields()
                        &LogAccess::unmarshal_int_to_str);
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "cqbl", field);
+
+  field = new LogField("client_req_tcp_reused", "cqtr", LogField::dINT, &LogAccess::marshal_client_req_tcp_reused,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cqtr", field);
+
+  field = new LogField("client_req_is_ssl", "cqssl", LogField::dINT, &LogAccess::marshal_client_req_is_ssl,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cqssl", field);
+
+  field = new LogField("client_req_ssl_reused", "cqssr", LogField::dINT, &LogAccess::marshal_client_req_ssl_reused,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cqssr", field);
+
+  field = new LogField("client_sec_protocol", "cqssv", LogField::STRING, &LogAccess::marshal_client_security_protocol,
+                       (LogField::UnmarshalFunc) & LogAccess::unmarshal_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cqssv", field);
+
+  field = new LogField("client_cipher_suite", "cqssc", LogField::STRING, &LogAccess::marshal_client_security_cipher_suite,
+                       (LogField::UnmarshalFunc) & LogAccess::unmarshal_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "cqssc", field);
 
   Ptr<LogFieldAliasTable> finish_status_map = make_ptr(new LogFieldAliasTable);
   finish_status_map->init(N_LOG_FINISH_CODE_TYPES, LOG_FINISH_FIN, "FIN", LOG_FINISH_INTR, "INTR", LOG_FINISH_TIMEOUT, "TIMEOUT");
@@ -560,6 +609,11 @@ Log::init_fields()
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "pqsi", field);
 
+  field = new LogField("proxy_req_server_port", "pqsp", LogField::sINT, &LogAccess::marshal_proxy_req_server_port,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "pqsp", field);
+
   Ptr<LogFieldAliasTable> hierarchy_map = make_ptr(new LogFieldAliasTable);
   hierarchy_map->init(
     36, SQUID_HIER_EMPTY, "EMPTY", SQUID_HIER_NONE, "NONE", SQUID_HIER_DIRECT, "DIRECT", SQUID_HIER_SIBLING_HIT, "SIBLING_HIT",
@@ -599,8 +653,12 @@ Log::init_fields()
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "php", field);
 
-  // server -> proxy fields
+  field = new LogField("proxy_req_is_ssl", "pqssl", LogField::sINT, &LogAccess::marshal_proxy_req_is_ssl,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "pqssl", field);
 
+  // server -> proxy fields
   field = new LogField("server_host_ip", "shi", LogField::IP, &LogAccess::marshal_server_host_ip, &LogAccess::unmarshal_ip_to_str);
 
   global_field_list.add(field, false);
@@ -650,6 +708,11 @@ Log::init_fields()
                        &LogAccess::unmarshal_int_to_str);
   global_field_list.add(field, false);
   ink_hash_table_insert(field_symbol_hash, "sts", field);
+
+  field = new LogField("server_transact_count", "sstc", LogField::sINT, &LogAccess::marshal_server_transact_count,
+                       &LogAccess::unmarshal_int_to_str);
+  global_field_list.add(field, false);
+  ink_hash_table_insert(field_symbol_hash, "sstc", field);
 
   field = new LogField("cached_resp_status_code", "csssc", LogField::sINT, &LogAccess::marshal_cache_resp_status_code,
                        &LogAccess::unmarshal_http_status);
@@ -741,6 +804,23 @@ Log::handle_logging_mode_change(const char * /* name ATS_UNUSED */, RecDataT /* 
   return 0;
 }
 
+int
+Log::handle_periodic_tasks_int_change(const char * /* name ATS_UNUSED */, RecDataT /* data_type ATS_UNUSED */, RecData data,
+                                      void * /* cookie ATS_UNSED */)
+{
+  Debug("log-periodic", "periodic task interval changed");
+  if (data.rec_int <= 0) {
+    periodic_tasks_interval = PERIODIC_TASKS_INTERVAL_FALLBACK;
+    Error("new periodic tasks interval = %d is invalid, falling back to default = %d", (int)data.rec_int,
+          PERIODIC_TASKS_INTERVAL_FALLBACK);
+  } else {
+    periodic_tasks_interval = (uint32_t)data.rec_int;
+    Debug("log-periodic", "periodic task interval changed to %u", periodic_tasks_interval);
+  }
+  return REC_ERR_OKAY;
+}
+
+
 void
 Log::init(int flags)
 {
@@ -781,6 +861,17 @@ Log::init(int flags)
       } else {
         logging_mode = (LoggingMode)val;
       }
+      // periodic task interval are set on a per instance basis
+      MgmtInt pti = REC_ConfigReadInteger("proxy.config.log.periodic_tasks_interval");
+      if (pti <= 0) {
+        Error("proxy.config.log.periodic_tasks_interval = %" PRId64 " is invalid", pti);
+        Note("falling back to default periodic tasks interval = %d", PERIODIC_TASKS_INTERVAL_FALLBACK);
+        periodic_tasks_interval = PERIODIC_TASKS_INTERVAL_FALLBACK;
+      } else {
+        periodic_tasks_interval = static_cast<uint32_t>(pti);
+      }
+
+      REC_RegisterConfigUpdateFunc("proxy.config.log.periodic_tasks_interval", &Log::handle_periodic_tasks_int_change, NULL);
     }
   }
 
@@ -994,6 +1085,51 @@ Log::va_error(const char *format, va_list ap)
 }
 
 /*-------------------------------------------------------------------------
+  Log::trace
+
+  These functions are used for wiretracing of incoming SSL connections.
+  They are an extension of the existing Log::error functionality but with
+  special formatting and handling of the non null terminated buffer.
+  -------------------------------------------------------------------------*/
+
+void
+Log::trace_in(const sockaddr *peer_addr, uint16_t peer_port, const char *format_string, ...)
+{
+  va_list ap;
+  va_start(ap, format_string);
+  trace_va(true, peer_addr, peer_port, format_string, ap);
+  va_end(ap);
+}
+
+void
+Log::trace_out(const sockaddr *peer_addr, uint16_t peer_port, const char *format_string, ...)
+{
+  va_list ap;
+  va_start(ap, format_string);
+  trace_va(false, peer_addr, peer_port, format_string, ap);
+  va_end(ap);
+}
+
+void
+Log::trace_va(bool in, const sockaddr *peer_addr, uint16_t peer_port, const char *format_string, va_list ap)
+{
+  if (!peer_addr || !format_string) {
+    return;
+  }
+
+  char ip[INET6_ADDRSTRLEN];
+  ats_ip_ntop(peer_addr, ip, sizeof(ip));
+
+  struct timeval tp;
+  ink_gethrtimeofday(&tp, NULL);
+
+  Log::error("[%9d.%03d] Trace {0x%" PRIx64 "} %s %s:%d: ", (int)tp.tv_sec, (int)(tp.tv_usec / 1000), (uint64_t)pthread_self(),
+             in ? "RECV" : "SEND", ip, peer_port);
+  Log::va_error(format_string, ap);
+  Log::error("[End Trace]\n");
+}
+
+/*-------------------------------------------------------------------------
   Log::preproc_thread_main
 
   This function defines the functionality of the logging flush prepare
@@ -1094,6 +1230,10 @@ Log::flush_thread_main(void * /* args ATS_UNUSED */)
         continue;
       }
 
+      int logfilefd = logfile->get_fd();
+      // This should always be true because we just checked it.
+      ink_assert(logfilefd >= 0);
+
       // write *all* data to target file as much as possible
       //
       while (total_bytes - bytes_written) {
@@ -1106,7 +1246,8 @@ Log::flush_thread_main(void * /* args ATS_UNUSED */)
           break;
         }
 
-        len = ::write(logfile->m_fd, &buf[bytes_written], total_bytes - bytes_written);
+        len = ::write(logfilefd, &buf[bytes_written], total_bytes - bytes_written);
+
         if (len < 0) {
           Error("Failed to write log to %s: [tried %d, wrote %d, %s]", logfile->get_name(), total_bytes - bytes_written,
                 bytes_written, strerror(errno));
@@ -1115,12 +1256,14 @@ Log::flush_thread_main(void * /* args ATS_UNUSED */)
                          total_bytes - bytes_written);
           break;
         }
+        Debug("log", "Successfully wrote some stuff to %s", logfile->get_name());
         bytes_written += len;
       }
 
       RecIncrRawStat(log_rsb, mutex->thread_holding, log_stat_bytes_written_to_disk_stat, bytes_written);
 
-      ink_atomic_increment(&logfile->m_bytes_written, bytes_written);
+      if (logfile->m_log)
+        ink_atomic_increment(&logfile->m_log->m_bytes_written, bytes_written);
 
       delete fdata;
     }
@@ -1128,7 +1271,7 @@ Log::flush_thread_main(void * /* args ATS_UNUSED */)
     // Time to work on periodic events??
     //
     now = Thread::get_hrtime() / HRTIME_SECOND;
-    if (now >= last_time + PERIODIC_TASKS_INTERVAL) {
+    if (now >= last_time + periodic_tasks_interval) {
       Debug("log-preproc", "periodic tasks for %" PRId64, (int64_t)now);
       periodic_tasks(now);
       last_time = Thread::get_hrtime() / HRTIME_SECOND;
@@ -1282,18 +1425,16 @@ Log::match_logobject(LogBufferHeader *header)
   if (!obj) {
     // object does not exist yet, create it
     //
-    LogFormat *fmt = new LogFormat("__collation_format__", header->fmt_fieldlist(), header->fmt_printf());
+    LogFormat fmt("__collation_format__", header->fmt_fieldlist(), header->fmt_printf());
 
-    if (fmt->valid()) {
+    if (fmt.valid()) {
       LogFileFormat file_format = header->log_object_flags & LogObject::BINARY ?
                                     LOG_FILE_BINARY :
                                     (header->log_object_flags & LogObject::WRITES_TO_PIPE ? LOG_FILE_PIPE : LOG_FILE_ASCII);
 
-      obj = new LogObject(fmt, Log::config->logfile_dir, header->log_filename(), file_format, NULL,
+      obj = new LogObject(&fmt, Log::config->logfile_dir, header->log_filename(), file_format, NULL,
                           (Log::RollingEnabledValues)Log::config->rolling_enabled, Log::config->collation_preproc_threads,
                           Log::config->rolling_interval_sec, Log::config->rolling_offset_hr, Log::config->rolling_size_mb, true);
-
-      delete fmt; // This is copy constructed in LogObject.
 
       obj->set_remote_flag();
 
@@ -1306,5 +1447,6 @@ Log::match_logobject(LogBufferHeader *header)
       }
     }
   }
+
   return obj;
 }

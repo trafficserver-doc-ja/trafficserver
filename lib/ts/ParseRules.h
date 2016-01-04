@@ -26,9 +26,9 @@
 
 #include <string.h>
 
-#include "ink_defs.h"
-#include "ink_apidefs.h"
-#include "ink_platform.h"
+#include "ts/ink_defs.h"
+#include "ts/ink_apidefs.h"
+#include "ts/ink_platform.h"
 
 typedef unsigned int CTypeResult;
 
@@ -161,8 +161,6 @@ public:
   static void ink_tolower_buffer(char *ptr, unsigned int n);
   static const char *memchr(const char *s, char c, int max_length);
   static const char *strchr(const char *s, char c);
-
-  static unsigned char *scan_while(unsigned char *ptr, unsigned int n, uint32_t bitmask);
 
 private:
   ParseRules(const ParseRules &);

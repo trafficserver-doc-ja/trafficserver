@@ -108,10 +108,15 @@ public:
   void release();
   void attach_hostname(const char *hostname);
   NetVConnection *
-  get_netvc()
+  get_netvc() const
   {
     return server_vc;
   };
+  void
+  set_netvc(NetVConnection *new_vc)
+  {
+    server_vc = new_vc;
+  }
 
   // Keys for matching hostnames
   IpEndpoint server_ip;

@@ -25,12 +25,13 @@
 #define __HTTP_H__
 
 #include <assert.h>
-#include "Arena.h"
-#include "INK_MD5.h"
+#include "ts/Arena.h"
+#include "ts/INK_MD5.h"
 #include "MIME.h"
 #include "URL.h"
+#include "ts/TsBuffer.h"
 
-#include "ink_apidefs.h"
+#include "ts/ink_apidefs.h"
 
 #define HTTP_VERSION(a, b) ((((a)&0xFFFF) << 16) | ((b)&0xFFFF))
 #define HTTP_MINOR(v) ((v)&0xFFFF)
@@ -454,6 +455,7 @@ void http_parser_clear(HTTPParser *parser);
 MIMEParseResult http_parser_parse_req(HTTPParser *parser, HdrHeap *heap, HTTPHdrImpl *hh, const char **start, const char *end,
                                       bool must_copy_strings, bool eof);
 MIMEParseResult validate_hdr_host(HTTPHdrImpl *hh);
+bool validate_host_name(ts::ConstBuffer addr);
 MIMEParseResult http_parser_parse_resp(HTTPParser *parser, HdrHeap *heap, HTTPHdrImpl *hh, const char **start, const char *end,
                                        bool must_copy_strings, bool eof);
 

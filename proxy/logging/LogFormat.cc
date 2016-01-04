@@ -26,16 +26,16 @@
 
 
  ***************************************************************************/
-#include "ink_config.h"
+#include "ts/ink_config.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-#include "INK_MD5.h"
+#include "ts/INK_MD5.h"
 
 #include "Error.h"
-#include "SimpleTokenizer.h"
+#include "ts/SimpleTokenizer.h"
 
 #include "LogUtils.h"
 #include "LogFile.h"
@@ -570,7 +570,7 @@ LogFormat::parse_escape_string(const char *str, int len)
   b = (unsigned char)str[start + 2];
   c = (unsigned char)str[start + 3];
 
-  if (isdigit(a) && isdigit(b) && isdigit(b)) {
+  if (isdigit(a) && isdigit(b)) {
     sum = (a - '0') * 64 + (b - '0') * 8 + (c - '0');
 
     if (sum == 0 || sum >= 255) {

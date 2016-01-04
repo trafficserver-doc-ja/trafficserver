@@ -68,7 +68,7 @@ asf-dist-rc: asf-distdir
 asf-distdir:
 	@$(am__remove_distdir)
 	test -d .git && git clone . $(distdir)
-	cd $(distdir) && git submodule update --init && autoreconf -i
+	cd $(distdir) && autoreconf -i
 	$(RM) -r -- $(distdir)/autom4te.cache $(distdir)/ci `find $(distdir) -name .git -o -name .gitignore -o -name .gitmodules`
 
 asf-dist-sign: asf-dist
@@ -99,12 +99,45 @@ install-data-hook:
 rat:
 	java -jar $(top_srcdir)/ci/apache-rat-0.11-SNAPSHOT.jar -E $(top_srcdir)/ci/rat-regex.txt  -d $(top_srcdir)
 
-submodules:
-	git submodule update --init
+#
+# These are rules to make clang-format easy and fast to run. Run it with e.g.
+#    make -j clang-format
+#
+# If you make changes to directory structures, you must update this as well.
+#
+.PHONY:	clang-format-cmd clang-format-example clang-format-iocore clang-format-lib clang-format-mgmt \
+	clang-format-plugins clang-format-proxy clang-format-tools
 
-clang-format:
-	for f in `find $(top_srcdir) -iname \*.[ch] -o -iname \*.cc | fgrep -v -e lib/luajit -e lib/tsconfig`; do \
-	  echo $$f; clang-format -i $$f; done
+clang-format: 	clang-format-cmd clang-format-example clang-format-iocore clang-format-lib clang-format-mgmt \
+		clang-format-plugins clang-format-proxy clang-format-tools
+
+clang-format-cmd:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/cmd
+
+clang-format-example:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/example
+
+clang-format-iocore:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/iocore
+
+clang-format-lib:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/lib/atscppapi
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/lib/raft
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/lib/records
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/lib/ts
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/lib/wccp
+
+clang-format-mgmt:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/mgmt
+
+clang-format-plugins:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/plugins
+
+clang-format-proxy:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/proxy
+
+clang-format-tools:
+	@$(top_srcdir)/tools/clang-format.sh $(top_srcdir)/tools
 
 help:
 	@echo 'all             default target for building the package' && \
@@ -119,9 +152,8 @@ help:
 	echo 'rel-candidate    recreate a signed relelease candidate source package and a signed git tag' && \
 	echo 'distcheck        verify dist by performing VPATH build and then distclean' && \
 	echo 'rat              produce a RAT licence compliance report of the source' && \
-	echo 'submodules       update the git submodules' && \
 	echo 'doxygen          generate doxygen docs in doc/html dir' && \
-	echo 'clang-format     run clang-format over most C and C++ files (not git submodules/trees)' && \
+	echo 'clang-format     run clang-format over most C and C++ files (not git subtrees)' && \
 	echo 'help             display this list of make targets' && \
 	echo 'install          install by copying the built files to system-wide dirs' && \
 	echo 'install-strip    same as install but then strips debugging symbols' && \

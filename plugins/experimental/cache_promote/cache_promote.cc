@@ -30,10 +30,13 @@
 
 #include "ts/ts.h"
 #include "ts/remap.h"
-#include "ink_config.h"
+#include "ts/ink_config.h"
 
+#define MINIMUM_BUCKET_SIZE 10
 
 static const char *PLUGIN_NAME = "cache_promote";
+TSCont gNocacheCont;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Note that all options for all policies has to go here. Not particularly pretty...
@@ -207,6 +210,11 @@ public:
     switch (opt) {
     case 'b':
       _buckets = static_cast<unsigned>(strtol(optarg, NULL, 10));
+      if (_buckets < MINIMUM_BUCKET_SIZE) {
+        TSError("%s: Enforcing minimum LRU bucket size of %d", PLUGIN_NAME, MINIMUM_BUCKET_SIZE);
+        TSDebug(PLUGIN_NAME, "Enforcing minimum bucket size of %d", MINIMUM_BUCKET_SIZE);
+        _buckets = MINIMUM_BUCKET_SIZE;
+      }
       break;
     case 'h':
       _hits = static_cast<unsigned>(strtol(optarg, NULL, 10));
@@ -247,6 +255,7 @@ public:
     map_it = _map.find(&hash);
     if (_map.end() != map_it) {
       // We have an entry in the LRU
+      TSAssert(_list.size() > 0); // mismatch in the LRUs hash and list, shouldn't happen
       if (++(map_it->second->second) >= _hits) {
         // Promoted! Cleanup the LRU, and signal success. Save the promoted entry on the freelist.
         TSDebug(PLUGIN_NAME, "saving the LRUEntry to the freelist");
@@ -372,6 +381,20 @@ private:
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
+// Little helper continuation, to turn off writing to the cache. ToDo: when we have proper
+// APIs to make requests / responses, we can remove this completely.
+static int
+cont_nocache_response(TSCont contp, TSEvent event, void *edata)
+{
+  TSHttpTxn txnp = static_cast<TSHttpTxn>(edata);
+
+  TSHttpTxnServerRespNoStoreSet(txnp, 1);
+  // Reenable and continue with the state machine.
+  TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
+  return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
 // Main "plugin", a TXN hook in the TS_HTTP_READ_CACHE_HDR_HOOK. Unless the policy allows
 // caching, we will turn off the cache from here on for the TXN.
 //
@@ -399,7 +422,7 @@ cont_handle_policy(TSCont contp, TSEvent event, void *edata)
             TSDebug(PLUGIN_NAME, "cache-status is %d, and leaving cache on (promoted)", obj_status);
           } else {
             TSDebug(PLUGIN_NAME, "cache-status is %d, and turning off the cache (not promoted)", obj_status);
-            TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, contp);
+            TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, gNocacheCont);
           }
           break;
         default:
@@ -411,11 +434,6 @@ cont_handle_policy(TSCont contp, TSEvent event, void *edata)
     } else {
       TSDebug(PLUGIN_NAME, "Request is an internal (plugin) request, implicitly promoted");
     }
-    break;
-
-  // Temporaray hack, to deal with the fact that we can turn off the cache earlier
-  case TS_EVENT_HTTP_READ_RESPONSE_HDR:
-    TSHttpTxnServerRespNoStoreSet(txnp, 1);
     break;
 
   // Should not happen
@@ -446,6 +464,8 @@ TSRemapInit(TSRemapInterface *api_info, char *errbuf, int errbuf_size)
              (api_info->tsremap_version & 0xffff));
     return TS_ERROR;
   }
+
+  gNocacheCont = TSContCreate(cont_nocache_response, NULL);
 
   TSDebug(PLUGIN_NAME, "remap plugin is successfully initialized");
   return TS_SUCCESS; /* success */
