@@ -51,9 +51,10 @@ ts_lua_inject_misc_api(lua_State *L)
 static int
 ts_lua_get_now_time(lua_State *L)
 {
-  time_t now;
+  lua_Number now;
 
-  now = TShrtime() / 1000000000;
+  // Return fractional seconds.
+  now = ((lua_Number)TShrtime()) / 1000000000.0;
   lua_pushnumber(L, now);
   return 1;
 }
@@ -62,9 +63,10 @@ static int
 ts_lua_debug(lua_State *L)
 {
   const char *msg;
+  size_t len = 0;
 
-  msg = luaL_checkstring(L, 1);
-  TSDebug(TS_LUA_DEBUG_TAG, msg, NULL);
+  msg = luaL_checklstring(L, 1, &len);
+  TSDebug(TS_LUA_DEBUG_TAG, "%.*s", (int)len, msg);
   return 0;
 }
 
@@ -72,9 +74,10 @@ static int
 ts_lua_error(lua_State *L)
 {
   const char *msg;
+  size_t len = 0;
 
-  msg = luaL_checkstring(L, 1);
-  TSError(msg, NULL);
+  msg = luaL_checklstring(L, 1, &len);
+  TSError("%.*s", (int)len, msg);
   return 0;
 }
 
