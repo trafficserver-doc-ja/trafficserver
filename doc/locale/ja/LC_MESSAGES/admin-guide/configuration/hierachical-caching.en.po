@@ -28,10 +28,15 @@ msgid ""
 "forward requests. A child cache is a cache for which Traffic Server is a "
 "parent."
 msgstr ""
+"キャッシュ階層は互いに通信しあう複数のキャッシュレベルから構成されます。 "
+"Traffic Server はさまざまな種類のキャッシュ階層をサポートします。全ての"
+"キャッシュ階層は *親* と *子*の概念を認識します。親キャッシュは階層の高い方"
+"のキャッシュで、 Traffic Server がリクエストを転送することが出来ます。子"
+"キャッシュは Traffic Server が親となるキャッシュです。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:23
 msgid "Hierarchical Caching"
-msgstr ""
+msgstr "階層的なキャッシュ"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:43
 msgid ""
@@ -44,6 +49,15 @@ msgid ""
 "and the origin server is contacted. This is called `Parent Failover`_. "
 "Traffic Server supports parent caching for both HTTP and HTTPS requests."
 msgstr ""
+"Traffic Server のノードがリクエストされたオブジェクトをキャッシュ内に見つけ"
+"られない場合、次に Traffic Server は最終的にオリジンサーバーからオブジェクト"
+"を取得する前に親キャッシュを探します (そしてそれ自身は他のキャッシュを探すこ"
+"とが出来ます)。 Traffic Server のノードは複数の親キャッシュを使うように設定"
+"できます。そうすることでもし 1 つの親が利用できない際に、リクエストに対して"
+"正しく処理されるか、利用可能な親キャッシュがなくなってオリジンサーバーに接触"
+"されるまで他の親キャッシュが順にチェックされます。これは `親フェイルオーバー"
+"`_ と呼ばれます。 Traffic Server は HTTP と HTTPS のリクエストの両方に対して"
+"親キャッシュをサポートします。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:74
 msgid ""
@@ -53,14 +67,18 @@ msgid ""
 "copy to Traffic Server (its child), where it is cached and served to the "
 "client."
 msgstr ""
+"もしリクエストが親でキャッシュミスになったら、親はコンテンツをオリジンサー"
+"バーから取得します (あるいは親の設定に応じて別のキャッシュから取得します)。"
+"親はコンテンツをキャッシュしコピーを Traffic Server (親の子)に送ります。子で"
+"はコピーがキャッシュされクライアントに配信されます。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:41
 msgid "Parent Caching"
-msgstr ""
+msgstr "親キャッシュ"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:38
 msgid "Traffic Server supports the following hierarchical caching options:"
-msgstr ""
+msgstr "Traffic Server は次の階層キャッシュオプションをサポートします。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:82
 msgid ""
@@ -73,6 +91,14 @@ msgid ""
 "being enabled or not. The parent node will receive the translated request "
 "(and thus needs to be configured to accept it)."
 msgstr ""
+"もしリマップルールが必要なら (:ts:cv:`proxy.config.reverse_proxy.enabled`)、"
+"リクエストが子ノードに入ってきたときに、親を選択する前に :file:`remap."
+"config` が評価されます。これはクリアントのリクエストがリマップルールに応じて"
+"変換され、それゆえ、親のどんな選択もリマップされたホスト名に対してなされるべ"
+"きであることを意味します。これは元の状態のホストヘッダー (:ts:cv:`proxy."
+"config.url_remap.pristine_host_hdr`) が有効にされていたかどうかに関わらず正"
+"しいです。親ノードは変換されたリクエストを受け取るでしょう (そしてそのために"
+"それを受け入れるように設定しておく必要があります)。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:52
 msgid ""
@@ -81,10 +107,14 @@ msgid ""
 "containing specific URLs) directly to the origin server. This may be "
 "achieved by setting parent proxy rules in :file:`parent.config`."
 msgstr ""
+"もし全てのリクエストが親キャッシュに向かうことを望まない場合は、単に (特定の"
+"URLを含むリクエストのような) とあるリクエストを直接オリジンサーバーにルー"
+"ティングするように Traffic Server を設定してください。これは :file:`parent."
+"config` の親プロキシーのルールを設定することで実現できるかもしれません。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:132
 msgid "Configuring Traffic Server to Use a Parent Cache"
-msgstr ""
+msgstr "Traffic Server が親キャッシュを使うように設定する"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:218
 msgid ""
@@ -92,6 +122,9 @@ msgid ""
 "directory: For each ICP peer you want to identify, enter a separate rule in "
 "the :file:`icp.config` file."
 msgstr ""
+"Traffic Server の `config` ディレクトリに置かれている :file:`icp.config` を"
+"編集してください。特定したい ICP ピアのそれぞれについて :file:`icp.config` "
+"ファイル内の別々のルールを入力してください。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:92
 msgid "Example"
@@ -99,19 +132,19 @@ msgstr "例"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:97
 msgid "If the child's :file:`remap.config` contains"
-msgstr ""
+msgstr "子の :file:`remap.config` が以下の設定を持っていたら"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:80
 msgid "Interaction with Remap.config"
-msgstr ""
+msgstr "Remap.config との相互作用"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:115
 msgid "Parent Failover"
-msgstr ""
+msgstr "親のフェイルオーバー"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:72
 msgid "Parent caching"
-msgstr ""
+msgstr "親キャッシュ"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:93
 msgid ""
@@ -120,20 +153,27 @@ msgid ""
 "is ``parent1.example.com``, and the child node is configured as a reverse "
 "proxy."
 msgstr ""
+"クライアントは http://example.com へのリクエストを Traffic Server に送りま"
+"す。リクエストに対するオリジンサーバーは http://origin.example.com です。親"
+"ノードは ``parent1.example.com`` で、子ノードはリバースプロキシーとして設定"
+"されています。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:214
 msgid ":ts:cv:`proxy.config.icp.icp_port`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.icp.icp_port`"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:143
 msgid ""
 "Enable the parent caching option by adjusting :ts:cv:`proxy.config.http."
 "parent_proxy_routing_enable` in :file:`records.config`. ::"
 msgstr ""
+":file:`records.config` 内の :ts:cv:`proxy.config.http."
+"parent_proxy_routing_enable` を調整して親のキャッシュオプションを有効にしま"
+"す。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:215
 msgid ":ts:cv:`proxy.config.icp.multicast_enabled`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.icp.multicast_enabled`"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:57
 msgid ""
@@ -147,6 +187,16 @@ msgid ""
 "served to the client. Future requests for this content can now be served "
 "directly from the Traffic Server cache (until the data is stale or expired)."
 msgstr ""
+"親キャッシュを使うように設定された Traffic Server のノードとシンプルなキャッ"
+"シュ階層を下図に例示します。以下のシナリオでは、クライアントはキャッシュ階層"
+"の子である Traffic Server にリクエストを送ります (なぜならキャッシュミスした"
+"リクエストを親キャッシュに転送するように設定されているからです)。リクエスト"
+"はキャッシュミスになるので、 Traffic Server はリクエストを親キャッシュに転送"
+"し、そこでキャッシュヒットになります。親はコンテンツのコピーを Traffic "
+"Server に送り、そこではコピーがキャッシュされてクライアントに配信されます。"
+"これからこのコンテンツへの将来のリクエストは (データが新鮮でなくなるか有効期"
+"限が切れるまで) Traffic Server のキャッシュから直接配信出来るようになりまし"
+"た。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:164
 msgid ""
@@ -156,16 +206,25 @@ msgid ""
 "forwarded to ``parent2``. Because ``round-robin=true``, Traffic Server goes "
 "through the parent cache list in a round-robin based on client IP address.::"
 msgstr ""
+"以下の例では URL が ``http://host1`` で始まるキャッシュミスの全てのリクエス"
+"トを親キャッシュ ``parent1`` に向けるように Traffic Server を設定します。も"
+"し ``parent1`` がリクエストを処理できないならば、リクエストは ``parent2`` に"
+"転送されます。 ``round-robin=true`` と設定されているので、 Traffic Server は"
+"クライアントの IP アドレスに基いて親キャッシュリストをラウンドロビンで順番に"
+"調べます。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:154
 msgid ""
 "Edit :file:`parent.config` to set parent proxy rules which will specify the "
 "parent cache to which you want missed requests to be forwarded."
 msgstr ""
+"キャッシュミスしたリクエストのうちどれを親キャッシュに転送するかを指定するた"
+"めに :file:`parent.config` を編集して親プロキシーのルールを設定してくださ"
+"い。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:178
 msgid "ICP Peering"
-msgstr ""
+msgstr "ICP ピア"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:149
 msgid ""
@@ -174,6 +233,10 @@ msgid ""
 "when a parent cache is unavailable, requests are sent to another parent "
 "cache."
 msgstr ""
+"キャッシュミスのリクエストに応答するために使いたい親キャッシュを指定してくだ"
+"さい。親フェイルオーバーを使うためには、 1 つより多くの親キャッシュを指定す"
+"る必要があります。そうすれば親キャッシュが利用できないときに、リクエストが別"
+"の親キャッシュに送られます。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:195
 msgid ""
@@ -185,6 +248,12 @@ msgid ""
 "then Traffic Server forwards the request to either its HTTP parent caches "
 "or to the origin server."
 msgstr ""
+"もし Traffic Server が ICP ピアからヒットのメッセージを受け取ったら、 "
+"Traffic Server は HTTP リクエストをそのピアに送ります。しかし、元の HTTP リ"
+"クエストが ICP 問い合わせで通信されないヘッダー情報を含んでいるためにキャッ"
+"シュミスになるかもしれません。例えばヒットしたキャッシュはリクエストされた代"
+"替では無いかもしれません。もし ICP のヒットがミスだと判明したら、 Traffic "
+"Server はリクエストを HTTP 親キャッシュかオリジンサーバーに転送します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:157
 msgid ""
@@ -192,16 +261,21 @@ msgid ""
 "containing the regular expression ``politics`` and the path ``/viewpoint`` "
 "directly to the origin server (bypassing any parent hierarchies): ::"
 msgstr ""
+"以下の例では正規表現 ``politics`` とパス ``/viewpoint`` を含む全てのリクエス"
+"トを (親階層をバイパスして) 直接オリジンサーバーにルーティングするように "
+"Traffic Server を設定します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:99
 msgid "``map http://example.com http://origin.example.com``"
-msgstr ""
+msgstr "``map http://example.com http://origin.example.com``"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:134
 msgid ""
 "To configure Traffic Server to use one or more parent caches, you must "
 "perform the configuration adjustments detailed below."
 msgstr ""
+"Traffic Server を 1 つ以上の親キャッシュを使うように設定するには、以下で詳細"
+"に説明するような設定の調整を行う必要があります。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:117
 msgid ""
@@ -209,10 +283,13 @@ msgid ""
 "one parent cache is not available, another parent cache can service client "
 "requests."
 msgstr ""
+"Traffic Server は複数の親キャッシュの使用をサポートしています。これによりも"
+"し 1 つの親キャッシュが利用できない時でも、別の親キャッシュがクライアントの"
+"リクエストに応答できることを確かにします。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:29
 msgid "Understanding Cache Hierarchies"
-msgstr ""
+msgstr "キャッシュ階層を理解する"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:121
 msgid ""
@@ -224,12 +301,20 @@ msgid ""
 "configuration file. By default, the parent caches are queried in the order "
 "they are listed in the configuration file."
 msgstr ""
+"1 つより多くの親キャッシュを使うように Traffic Server を設定すると、 "
+"Traffic Server が親が利用可能でないのを検出すると失敗したリクエストを別の親"
+"キャッシュに送ります。 2 つより多くの親キャッシュを指定すると、どの親が順に"
+"問い合わせられるかは :file:`parent.config` 設定ファイルに設定された親プロキ"
+"シールールに依存します。デフォルトでは親キャシュは設定ファイルに書かれた順番"
+"に問い合わせられます。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:103
 msgid ""
 "``dest_domain=origin.example.com method=get parent=\"parent1.example."
 "com:80`` )"
 msgstr ""
+"``dest_domain=origin.example.com method=get parent=\"parent1.example."
+"com:80``"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:188
 msgid ""
@@ -240,36 +325,48 @@ msgid ""
 "parents. If there are no HTTP parent caches established, then Traffic "
 "Server forwards the request to the origin server."
 msgstr ""
+"Traffic Server が ICP キャッシュを有効にされていれば、 HTTP リクエストが"
+"キャッシュミスになると ICP 問い合わせを ICP ピアに送ります。どれもヒットしな"
+"かったが親が存在する場合は、ラウンドロビン方式を使って親が選ばれます。 ICP "
+"の親が存在しない場合は Traffic Server はリクエストを HTTP の親に転送しま"
+"す。 HTTP の親キャッシュが 1 つも設置されなかった場合は Traffic Server はリ"
+"クエストをオリジンサーバーに転送します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:110
 msgid ""
 "With this example, if parent1.example.com is down, the child node would "
 "automatically directly contact the ``origin.example.com`` on a cache miss."
 msgstr ""
+"この例では、もし parent1.example.com がダウンしていたら、子ノードはキャッ"
+"シュミスの際に自動的に ``origin.example.com`` に直接接続します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:108
 msgid "``map http://origin.example.com http://origin.example.com``"
-msgstr ""
+msgstr "``map http://origin.example.com http://origin.example.com``"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:105
 msgid ""
 "and parent cache (parent1.example.com) would need to have a :file:`remap."
 "config` line similar to"
 msgstr ""
+"そして親キャッシュ (parent1.example.com) は :file:`remap.config` に以下のよ"
+"うな行を持つ必要があるでしょう。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:213
 msgid ":ts:cv:`proxy.config.icp.enabled`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.icp.enabled`"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:216
 msgid ":ts:cv:`proxy.config.icp.query_timeout`"
-msgstr ""
+msgstr ":ts:cv:`proxy.config.icp.query_timeout`"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:206
 msgid ""
 "Determine if Traffic Server can send messages directly to each ICP peer or "
 "send a single message on a specified multicast channel."
 msgstr ""
+"Traffic Server が各 ICP ピアに直接メッセージを送信できるか、指定されたマルチ"
+"キャストチャンネルで単一のメッセージを送るかを決定します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:173
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:221
@@ -277,6 +374,8 @@ msgid ""
 "Run the command :option:`traffic_ctl config reload` to apply the "
 "configuration changes."
 msgstr ""
+"設定の変更を反映するにはコマンド :option:`traffic_ctl config reload` を実行"
+"してください。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:180
 msgid ""
@@ -288,38 +387,51 @@ msgid ""
 "peer can be a sibling cache (which is at the same level in the hierarchy) "
 "or a parent cache (which is one level up in the hierarchy)."
 msgstr ""
+"Internet Cache Protocol (ICP) はコンテンツについての情報を交換するためにプロ"
+"キシーキャッシュによって使われます。 ICP 問い合わせメッセージは特定の URL を"
+"保管しているかを別のキャッシュに問い合わせます。 ICP 応答メッセージはヒット"
+"かミスかの回答を返します。キャッシュは ICP メッセージを特定の ICP ピアとのみ"
+"交換します。特定の ICP ピアとは ICP メッセージを受信できる隣接するキャッシュ"
+"です。 ICP キャッシュは兄弟キャッシュ (階層内で同一レベルにある) でも良いで"
+"すし、親キャッシュ (階層内で 1 レベル上にある)でも良いです。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:205
 msgid ""
 "Determine if the Traffic Server can receive ICP messages only, or if it can "
 "send *and* receive ICP messages."
 msgstr ""
+"Traffic Server が ICP メッセージの受信だけを出来るか、送信 *と* 受信を出来る"
+"かを決定します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:209
 msgid ""
 "Identify the ICP peers (siblings and parents) with which Traffic Server can "
 "communicate."
-msgstr ""
+msgstr "Traffic Server が通信できる ICP ピア (兄弟と親) を特定します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:208
 msgid "Set the ICP query timeout."
-msgstr ""
+msgstr "ICP 問い合わせのタイムアウトを設定します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:207
 msgid "Specify the port used for ICP messages."
-msgstr ""
+msgstr "ICP メッセージに使用されるポートを指定します。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:211
 msgid ""
 "To configure Traffic Server to use an ICP cache hierarchy edit the "
 "following variables in :file:`records.config` file:"
 msgstr ""
+"Traffic Server が ICP キャッシュ階層を使うように設定するには :file:`records."
+"config` 内の以下の変数を編集してください。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:202
 msgid ""
 "To configure a Traffic Server node to be part of an ICP cache hierarchy, "
 "you must perform the following tasks:"
 msgstr ""
+"Traffic Server を ICP キャッシュ階層の要素として設定するには、以下の課題を実"
+"行しなければなりません。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:139
 msgid ""
@@ -327,7 +439,10 @@ msgid ""
 "configured to serve the child's origin server, no additional configuration "
 "is needed for the nodes acting as Traffic Server parent caches."
 msgstr ""
+"子キャッシュだけを設定する必要があります。親ノードが子のオリジンサーバーとし"
+"て設定されていると仮定すると、ノードが Traffic Server の親キャッシュとして機"
+"能するには追加の設定は必要ありません。"
 
 #: ../../admin-guide/configuration/hierachical-caching.en.rst:101
 msgid "with the child's :file:`parent.config` containing"
-msgstr ""
+msgstr "子の :file:`parent.config` には以下の設定を含めます。"
