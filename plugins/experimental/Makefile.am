@@ -31,6 +31,7 @@ SUBDIRS = \
  geoip_acl \
  header_normalize \
  hipes \
+ inliner \
  metalink \
  multiplexer \
  memcache \

@@ -1846,6 +1846,7 @@ AC_CONFIG_FILES([
   iocore/net/Makefile
   iocore/utils/Makefile
   lib/Makefile
+  lib/bindings/Makefile
   lib/perl/Makefile
   lib/perl/lib/Apache/TS.pm
   lib/records/Makefile
@@ -1919,6 +1920,7 @@ AS_IF([test "x$enable_experimental_plugins" = "xyes"], [
     plugins/experimental/geoip_acl/Makefile
     plugins/experimental/header_normalize/Makefile
     plugins/experimental/hipes/Makefile
+    plugins/experimental/inliner/Makefile
     plugins/experimental/memcache/Makefile
     plugins/experimental/memcached_remap/Makefile
     plugins/experimental/metalink/Makefile
@@ -1957,6 +1959,7 @@ AS_IF([test "x$enable_cppapi" = "xyes"], [
   lib/atscppapi/examples/null_transformation_plugin/Makefile
   lib/atscppapi/examples/post_buffer/Makefile
   lib/atscppapi/examples/remap_plugin/Makefile
+  lib/atscppapi/examples/custom_error_remap_plugin/Makefile
   lib/atscppapi/examples/serverresponse/Makefile
   lib/atscppapi/examples/stat_example/Makefile
   lib/atscppapi/examples/timeout_example/Makefile
