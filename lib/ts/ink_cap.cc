@@ -61,7 +61,7 @@ ink_mutex ElevateAccess::lock = INK_MUTEX_INIT;
 #define DEBUG_PRIVILEGES(tag)                                                                                    \
   do {                                                                                                           \
     if (is_debug_tag_set(tag)) {                                                                                 \
-      cap_t caps = cap_get_proc();                                                                               \
+      cap_t caps      = cap_get_proc();                                                                          \
       char *caps_text = cap_to_text(caps, NULL);                                                                 \
       Debug(tag, "caps='%s', core=%s, death signal=%d, thread=0x%llx", caps_text, is_dumpable(), death_signal(), \
             (unsigned long long)pthread_self());                                                                 \
@@ -86,7 +86,7 @@ ink_mutex ElevateAccess::lock = INK_MUTEX_INIT;
 static int
 getresuid(uid_t *uid, uid_t *euid, uid_t *suid)
 {
-  *uid = getuid();
+  *uid  = getuid();
   *euid = geteuid();
   return 0;
 }
@@ -96,7 +96,7 @@ getresuid(uid_t *uid, uid_t *euid, uid_t *suid)
 static int
 getresgid(gid_t *gid, gid_t *egid, gid_t *sgid)
 {
-  *gid = getgid();
+  *gid  = getgid();
   *egid = getegid();
   return 0;
 }
@@ -147,7 +147,7 @@ DebugCapabilities(char const *tag)
 static void
 impersonate(const struct passwd *pwd, ImpersonationLevel level)
 {
-  int deathsig = death_signal();
+  int deathsig  = death_signal();
   bool dumpable = false;
 
   DEBUG_CREDENTIALS("privileges");
@@ -250,7 +250,7 @@ PreserveCapabilities()
 #if TS_USE_POSIX_CAP
   zret = prctl(PR_SET_KEEPCAPS, 1);
 #endif
-  Debug("privileges", "[PreserveCapabilities] zret : %d\n", zret);
+  Debug("privileges", "[PreserveCapabilities] zret : %d", zret);
   return zret == 0;
 }
 
@@ -262,17 +262,17 @@ RestrictCapabilities()
 #if TS_USE_POSIX_CAP
   cap_t caps = cap_init(); // start with nothing.
   // Capabilities we need.
-  cap_value_t perm_list[] = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE, CAP_IPC_LOCK, CAP_DAC_OVERRIDE};
+  cap_value_t perm_list[]         = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE, CAP_IPC_LOCK, CAP_DAC_OVERRIDE};
   static int const PERM_CAP_COUNT = sizeof(perm_list) / sizeof(*perm_list);
-  cap_value_t eff_list[] = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE, CAP_IPC_LOCK};
-  static int const EFF_CAP_COUNT = sizeof(eff_list) / sizeof(*eff_list);
+  cap_value_t eff_list[]          = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE, CAP_IPC_LOCK};
+  static int const EFF_CAP_COUNT  = sizeof(eff_list) / sizeof(*eff_list);
 
   cap_set_flag(caps, CAP_PERMITTED, PERM_CAP_COUNT, perm_list, CAP_SET);
   cap_set_flag(caps, CAP_EFFECTIVE, EFF_CAP_COUNT, eff_list, CAP_SET);
   zret = cap_set_proc(caps);
   cap_free(caps);
 #endif
-  Debug("privileges", "[RestrictCapabilities] zret : %d\n", zret);
+  Debug("privileges", "[RestrictCapabilities] zret : %d", zret);
   return zret == 0;
 }
 
@@ -291,7 +291,7 @@ EnableCoreFile(bool flag)
   }
 #endif // linux check
 
-  Debug("privileges", "[EnableCoreFile] zret : %d\n", zret);
+  Debug("privileges", "[EnableCoreFile] zret : %d", zret);
   return zret == 0;
 }
 
@@ -351,7 +351,7 @@ ElevateAccess::acquirePrivilege(unsigned priv_mask)
   cap_value_t cap_list[2];
   cap_t new_cap_state;
 
-  Debug("privileges", "[acquirePrivilege] level= %x\n", level);
+  Debug("privileges", "[acquirePrivilege] level= %x", level);
 
   ink_assert(NULL == cap_state);
 
@@ -374,7 +374,7 @@ ElevateAccess::acquirePrivilege(unsigned priv_mask)
 
   if (cap_count > 0) {
     this->cap_state = cap_get_proc(); // save current capabilities
-    new_cap_state = cap_get_proc();   // and another instance to modify.
+    new_cap_state   = cap_get_proc(); // and another instance to modify.
     cap_set_flag(new_cap_state, CAP_EFFECTIVE, cap_count, cap_list, CAP_SET);
 
     if (cap_set_proc(new_cap_state) != 0) {
@@ -402,7 +402,9 @@ ElevateAccess::releasePrivilege()
 #endif
 
 ElevateAccess::ElevateAccess(unsigned lvl)
-  : elevated(false), saved_uid(geteuid()), level(lvl)
+  : elevated(false),
+    saved_uid(geteuid()),
+    level(lvl)
 #if TS_USE_POSIX_CAP
     ,
     cap_state(0)

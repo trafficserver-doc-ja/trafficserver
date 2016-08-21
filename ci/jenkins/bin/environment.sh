@@ -32,12 +32,14 @@ export TODAY=$(/bin/date +'%m%d%Y')
 
 # Extract the current branch (default to master). ToDo: Can we do this better ?
 ATS_BRANCH=master
-test "${JOB_NAME#*-4.2.x}" != "${JOB_NAME}" && ATS_BRANCH=4.2.x
-test "${JOB_NAME#*-5.3.x}" != "${JOB_NAME}" && ATS_BRANCH=5.3.x
-test "${JOB_NAME#*-6.0.x}" != "${JOB_NAME}" && ATS_BRANCH=6.0.x
-test "${JOB_NAME#*-6.1.x}" != "${JOB_NAME}" && ATS_BRANCH=6.1.x
-test "${JOB_NAME#*-6.2.x}" != "${JOB_NAME}" && ATS_BRANCH=6.2.x
-test "${JOB_NAME#*-6.3.x}" != "${JOB_NAME}" && ATS_BRANCH=6.3.x
+ATS_IS_7="yes"
+
+test "${JOB_NAME#*-4.2.x}" != "${JOB_NAME}" && ATS_BRANCH=4.2.x && ATS_IS_7="no"
+test "${JOB_NAME#*-5.3.x}" != "${JOB_NAME}" && ATS_BRANCH=5.3.x && ATS_IS_7="no"
+test "${JOB_NAME#*-6.0.x}" != "${JOB_NAME}" && ATS_BRANCH=6.0.x && ATS_IS_7="no"
+test "${JOB_NAME#*-6.1.x}" != "${JOB_NAME}" && ATS_BRANCH=6.1.x && ATS_IS_7="no"
+test "${JOB_NAME#*-6.2.x}" != "${JOB_NAME}" && ATS_BRANCH=6.2.x && ATS_IS_7="no"
+test "${JOB_NAME#*-6.3.x}" != "${JOB_NAME}" && ATS_BRANCH=6.3.x && ATS_IS_7="no"
 test "${JOB_NAME#*-7.0.x}" != "${JOB_NAME}" && ATS_BRANCH=7.0.x
 test "${JOB_NAME#*-7.1.x}" != "${JOB_NAME}" && ATS_BRANCH=7.1.x
 test "${JOB_NAME#*-7.2.x}" != "${JOB_NAME}" && ATS_BRANCH=7.2.x
@@ -58,6 +60,16 @@ if test "${JOB_NAME#*compiler=clang}" != "${JOB_NAME}"; then
     export WITH_LIBCPLUSPLUS="yes"
 fi
 
+# I can't figure out how to deal with scl enable devtoolset-3 bash and the sub-shell with Jenkins,
+# so hacking this up for now.
+if test "$ATS_IS_7" == "yes" -a -x "/opt/rh/devtoolset-3/root/usr/bin/gcc"; then
+    export CC="/opt/rh/devtoolset-3/root/usr/bin/gcc"
+    export CXX="/opt/rh/devtoolset-3/root/usr/bin/g++"
+    export PATH="/opt/rh/devtoolset-3/root/usr/bin:${PATH}"
+fi
+
 # Figure out parallelism for regular builds / bots
-ATS_MAKE_FLAGS="-j 4"
-[ -x /usr/sbin/psrinfo ] && ATS_MAKE_FLAGS="-j $(/usr/sbin/psrinfo -p)" # Conservative on Solaris
+ATS_MAKE_FLAGS="-j4"
+
+# This is for Solaris, but didn't seem to work
+#[ -x /usr/sbin/psrinfo ] && ATS_MAKE_FLAGS="-j $(/usr/sbin/psrinfo -p)" # Conservative on Solaris

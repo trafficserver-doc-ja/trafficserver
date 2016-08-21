@@ -40,8 +40,8 @@
 class Pattern
 {
 public:
-  static const int TOKENCOUNT = 10;           /**< @brief Capturing groups $0..$9 */
-  static const int OVECOUNT = TOKENCOUNT * 3; /**< @brief pcre_exec() array count, handle 10 capture groups */
+  static const int TOKENCOUNT = 10;             /**< @brief Capturing groups $0..$9 */
+  static const int OVECOUNT   = TOKENCOUNT * 3; /**< @brief pcre_exec() array count, handle 10 capture groups */
 
   Pattern();
   virtual ~Pattern();
@@ -68,9 +68,6 @@ private:
   int _tokenCount;              /**< @brief number of replacements $0..$9 found in the replacement string if not empty */
   int _tokens[TOKENCOUNT];      /**< @brief replacement index 0..9, since they can be used in the replacement string in any order */
   int _tokenOffset[TOKENCOUNT]; /**< @brief replacement offset inside the replacement string */
-
-  int _matchCount;        /**< @brief match count */
-  int _ovector[OVECOUNT]; /**< @brief vector used by the pcre_exec() */
 };
 
 /**
@@ -103,7 +100,6 @@ class NonMatchingMultiPattern : public MultiPattern
 {
 public:
   NonMatchingMultiPattern(const String &name) { _name = name; }
-
   /*
    * @brief Matches the subject string against all patterns.
    * @param subject subject string
@@ -120,7 +116,6 @@ private:
   NonMatchingMultiPattern(const NonMatchingMultiPattern &);            // disallow
   NonMatchingMultiPattern &operator=(const NonMatchingMultiPattern &); // disallow
 };
-
 
 /**
  * @brief Simple classifier which classifies a subject string using a list of named multi-patterns.

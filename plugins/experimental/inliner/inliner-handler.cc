@@ -33,7 +33,7 @@ namespace ats
 namespace inliner
 {
   Handler::Handler(const TSIOBufferReader r, ats::io::IOSinkPointer &&i)
-    : ioSink_(i), sink_(ioSink_->branch()), sink2_(sink_->branch()), reader_(TSIOBufferReaderClone(r)), counter_(0)
+    : ioSink_(i), sink_(ioSink_->branch()), sink2_(sink_->branch()), reader_(TSIOBufferReaderClone(r)), counter_(0), abort_(false)
   {
     assert(ioSink_);
     assert(sink_);
@@ -71,9 +71,9 @@ namespace inliner
   {
     assert(reader_ != NULL);
     TSIOBufferBlock block = TSIOBufferReaderStart(reader_);
-    int64_t offset = 0;
+    int64_t offset        = 0;
     while (block != NULL) {
-      int64_t length = 0;
+      int64_t length           = 0;
       const char *const buffer = TSIOBufferBlockReadStart(block, reader_, &length);
       assert(buffer != NULL);
       if (length > 0) {
@@ -141,6 +141,7 @@ namespace inliner
   void
   Handler::abort(void)
   {
+    abort_ = true;
     assert(ioSink_);
     ioSink_->abort();
   }

@@ -33,7 +33,6 @@ struct ProtocolProbeSessionAcceptEnums {
   enum ProtoGroupKey {
     PROTO_HTTP,    ///< HTTP group (0.9-1.1)
     PROTO_HTTP2,   ///< HTTP 2 group
-    PROTO_SPDY,    ///< All SPDY versions
     N_PROTO_GROUPS ///< Size value.
   };
 };
@@ -47,10 +46,9 @@ public:
     SET_HANDLER(&ProtocolProbeSessionAccept::mainEvent);
   }
   ~ProtocolProbeSessionAccept() {}
-
   void registerEndpoint(ProtoGroupKey key, SessionAccept *ap);
 
-  void accept(NetVConnection *, MIOBuffer *, IOBufferReader *);
+  bool accept(NetVConnection *, MIOBuffer *, IOBufferReader *);
 
 private:
   int mainEvent(int event, void *netvc);

@@ -25,7 +25,7 @@
 #define ATSCPPAPI_ASYNCHTTPFETCH_H_
 
 #include <string>
-#include <atscppapi/shared_ptr.h>
+#include <memory>
 #include <atscppapi/Async.h>
 #include <atscppapi/Request.h>
 #include <atscppapi/Response.h>
@@ -57,7 +57,7 @@ public:
 
   enum StreamingFlag {
     STREAMING_DISABLED = 0,
-    STREAMING_ENABLED = 0x1,
+    STREAMING_ENABLED  = 0x1,
   };
 
   AsyncHttpFetch(const std::string &url_str, StreamingFlag streaming_flag, HttpMethod http_method = HTTP_METHOD_GET);

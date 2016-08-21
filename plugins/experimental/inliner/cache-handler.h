@@ -50,13 +50,13 @@ namespace ats
 bool
 getHeader(TSMBuffer buffer, TSMLoc location, const std::string &name, std::string &value)
 {
-  bool result = false;
+  bool result        = false;
   const TSMLoc field = TSMimeHdrFieldFind(buffer, location, name.c_str(), name.size());
   if (field != NULL) {
-    int length = 0;
+    int length                = 0;
     const char *const content = TSMimeHdrFieldValueStringGet(buffer, location, field, -1, &length);
     if (content != NULL && length > 0) {
-      value = std::string(content, length);
+      value  = std::string(content, length);
       result = true;
     }
     TSHandleMLocRelease(buffer, location, field);
@@ -87,7 +87,7 @@ namespace inliner
       int64_t length = 0;
 
       for (; block && l > 0; block = TSIOBufferBlockNext(block)) {
-        int64_t size = 0;
+        int64_t size              = 0;
         const char *const pointer = TSIOBufferBlockReadStart(block, r, &size);
         if (pointer != NULL && size > 0) {
           size = std::min(size, l);
@@ -128,7 +128,7 @@ namespace inliner
 
         {
           const int64_t s = output.size();
-          size_t size = 0;
+          size_t size     = 0;
           output.resize(content_.size() * 5);
           CHECK(TSBase64Encode(content_.data(), content_.size(), const_cast<char *>(output.data()) + s, output.size() - s, &size));
           output.resize(size + s);
@@ -192,7 +192,7 @@ namespace inliner
     uint64_t length = 0;
 
     for (; block && l > 0; block = TSIOBufferBlockNext(block)) {
-      int64_t size = 0;
+      int64_t size              = 0;
       const char *const pointer = TSIOBufferBlockReadStart(block, r, &size);
       if (pointer != NULL && size > 0) {
         size = std::min(size, l);
@@ -233,8 +233,13 @@ namespace inliner
     }
 
     CacheHandler(CacheHandler &&h)
-      : src_(std::move(h.src_)), original_(std::move(h.original_)), classes_(std::move(h.classes_)), id_(std::move(h.id_)),
-        sink_(std::move(h.sink_)), sink2_(std::move(h.sink2_)), reader_(h.reader_)
+      : src_(std::move(h.src_)),
+        original_(std::move(h.original_)),
+        classes_(std::move(h.classes_)),
+        id_(std::move(h.id_)),
+        sink_(std::move(h.sink_)),
+        sink2_(std::move(h.sink2_)),
+        reader_(h.reader_)
     {
       h.reader_ = NULL;
     }

@@ -24,33 +24,20 @@ Session Protocol
 
 |TS| supports some session level protocols in place of or on top of HTTP. These
 can be provided by a plugin (see :ref:`developer-plugins-new-protocol-plugins`)
-or be one that is supported directly by |TS|. The
-`SPDY <http://www.chromium.org/spdy>`_ protocol is the only one currently
-supported, but it is planned to support HTTP 2 when that is finalized.
+or be one that is supported directly by |TS|.
 
-Session protocols are specified by explicit names, based on the
-`NPN <https://technotes.googlecode.com/git/nextprotoneg.html>`_ names. The
-core supported names are:
+Session protocols are specified by explicit names:
 
 *  ``http/0.9``
 *  ``http/1.0``
 *  ``http/1.1``
 *  ``http/2``
-*  ``spdy/1``
-*  ``spdy/2``
-*  ``spdy/3``
-*  ``spdy/3.1``
-
-The ``http/2`` value is not currently functional, but is included for future
-use. Both ``spdy/1`` and ``spdy/2`` are obsolete, but are include for
-completeness.
 
 The session protocols supported on a proxy port are a subset of these values.
 For convenience some pseudo-values are defined in terms of these fundamental
 protocols:
 
 *  ``http`` means ``http/0.9``, ``http/1.0``, and ``http/1.1``
-*  ``spdy`` means ``spdy/3`` and ``spdy/3.1``.
 *  ``http2`` means ``http/2``
 
 Each proxy port can be configured in :ts:cv:`proxy.config.http.server_ports`

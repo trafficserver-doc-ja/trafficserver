@@ -66,7 +66,7 @@ enum {
 
 enum {
   PLUGIN_VC_MAGIC_ALIVE = 0xaabbccdd,
-  PLUGIN_VC_MAGIC_DEAD = 0xaabbdead,
+  PLUGIN_VC_MAGIC_DEAD  = 0xaabbdead,
 };
 
 class PluginVC : public NetVConnection, public PluginIdentity
@@ -263,8 +263,17 @@ private:
 };
 
 inline PluginVCCore::PluginVCCore()
-  : active_vc(this), passive_vc(this), connect_to(NULL), connected(false), p_to_a_buffer(NULL), p_to_a_reader(NULL),
-    a_to_p_buffer(NULL), a_to_p_reader(NULL), passive_data(NULL), active_data(NULL), id(0)
+  : active_vc(this),
+    passive_vc(this),
+    connect_to(NULL),
+    connected(false),
+    p_to_a_buffer(NULL),
+    p_to_a_reader(NULL),
+    a_to_p_buffer(NULL),
+    a_to_p_reader(NULL),
+    passive_data(NULL),
+    active_data(NULL),
+    id(0)
 {
   memset(&active_addr_struct, 0, sizeof active_addr_struct);
   memset(&passive_addr_struct, 0, sizeof passive_addr_struct);

@@ -34,7 +34,7 @@ namespace io
   IO::read(TSVConn v, TSCont c, const int64_t s)
   {
     assert(s > 0);
-    IO *io = new IO();
+    IO *io  = new IO();
     io->vio = TSVConnRead(v, c, io->buffer, s);
     return io;
   }
@@ -43,7 +43,7 @@ namespace io
   IO::write(TSVConn v, TSCont c, const int64_t s)
   {
     assert(s > 0);
-    IO *io = new IO();
+    IO *io  = new IO();
     io->vio = TSVConnWrite(v, c, io->reader, s);
     return io;
   }
@@ -104,9 +104,15 @@ namespace io
   }
 
   WriteOperation::WriteOperation(const TSVConn v, const TSMutex m, const size_t t)
-    : vconnection_(v), buffer_(TSIOBufferCreate()), reader_(TSIOBufferReaderAlloc(buffer_)),
-      mutex_(m != NULL ? m : TSMutexCreate()), continuation_(TSContCreate(WriteOperation::Handle, mutex_)),
-      vio_(TSVConnWrite(v, continuation_, reader_, std::numeric_limits<int64_t>::max())), action_(NULL), timeout_(t), bytes_(0),
+    : vconnection_(v),
+      buffer_(TSIOBufferCreate()),
+      reader_(TSIOBufferReaderAlloc(buffer_)),
+      mutex_(m != NULL ? m : TSMutexCreate()),
+      continuation_(TSContCreate(WriteOperation::Handle, mutex_)),
+      vio_(TSVConnWrite(v, continuation_, reader_, std::numeric_limits<int64_t>::max())),
+      action_(NULL),
+      timeout_(t),
+      bytes_(0),
       reenable_(true)
   {
     assert(vconnection_ != NULL);
@@ -172,7 +178,6 @@ namespace io
     handle_error:
       operation.close();
       assert(operation.action_ != NULL);
-      TSActionDone(operation.action_);
       operation.action_ = NULL;
       /*
       TSContDataSet(c, NULL);
@@ -212,35 +217,40 @@ namespace io
     return WriteOperationWeakPointer(*pointer);
   }
 
-  WriteOperation &WriteOperation::operator<<(const TSIOBufferReader r)
+  WriteOperation &
+  WriteOperation::operator<<(const TSIOBufferReader r)
   {
     assert(r != NULL);
     process(TSIOBufferCopy(buffer_, r, TSIOBufferReaderAvail(r), 0));
     return *this;
   }
 
-  WriteOperation &WriteOperation::operator<<(const ReaderSize &r)
+  WriteOperation &
+  WriteOperation::operator<<(const ReaderSize &r)
   {
     assert(r.reader != NULL);
     process(TSIOBufferCopy(buffer_, r.reader, r.size, r.offset));
     return *this;
   }
 
-  WriteOperation &WriteOperation::operator<<(const ReaderOffset &r)
+  WriteOperation &
+  WriteOperation::operator<<(const ReaderOffset &r)
   {
     assert(r.reader != NULL);
     process(TSIOBufferCopy(buffer_, r.reader, TSIOBufferReaderAvail(r.reader), r.offset));
     return *this;
   }
 
-  WriteOperation &WriteOperation::operator<<(const char *const s)
+  WriteOperation &
+  WriteOperation::operator<<(const char *const s)
   {
     assert(s != NULL);
     process(TSIOBufferWrite(buffer_, s, strlen(s)));
     return *this;
   }
 
-  WriteOperation &WriteOperation::operator<<(const std::string &s)
+  WriteOperation &
+  WriteOperation::operator<<(const std::string &s)
   {
     process(TSIOBufferWrite(buffer_, s.data(), s.size()));
     return *this;
@@ -321,35 +331,40 @@ namespace io
     }
   }
 
-  BufferNode &BufferNode::operator<<(const TSIOBufferReader r)
+  BufferNode &
+  BufferNode::operator<<(const TSIOBufferReader r)
   {
     assert(r != NULL);
     TSIOBufferCopy(buffer_, r, TSIOBufferReaderAvail(r), 0);
     return *this;
   }
 
-  BufferNode &BufferNode::operator<<(const ReaderSize &r)
+  BufferNode &
+  BufferNode::operator<<(const ReaderSize &r)
   {
     assert(r.reader != NULL);
     TSIOBufferCopy(buffer_, r.reader, r.size, r.offset);
     return *this;
   }
 
-  BufferNode &BufferNode::operator<<(const ReaderOffset &r)
+  BufferNode &
+  BufferNode::operator<<(const ReaderOffset &r)
   {
     assert(r.reader != NULL);
     TSIOBufferCopy(buffer_, r.reader, TSIOBufferReaderAvail(r.reader), r.offset);
     return *this;
   }
 
-  BufferNode &BufferNode::operator<<(const char *const s)
+  BufferNode &
+  BufferNode::operator<<(const char *const s)
   {
     assert(s != NULL);
     TSIOBufferWrite(buffer_, s, strlen(s));
     return *this;
   }
 
-  BufferNode &BufferNode::operator<<(const std::string &s)
+  BufferNode &
+  BufferNode::operator<<(const std::string &s)
   {
     TSIOBufferWrite(buffer_, s.data(), s.size());
     return *this;
@@ -362,7 +377,7 @@ namespace io
     assert(buffer_ != NULL);
     assert(reader_ != NULL);
     const size_t available = TSIOBufferReaderAvail(reader_);
-    const size_t copied = TSIOBufferCopy(b, reader_, available, 0);
+    const size_t copied    = TSIOBufferCopy(b, reader_, available, 0);
     assert(copied == available);
     TSIOBufferReaderConsume(reader_, copied);
     // TSDebug(PLUGIN_TAG, "BufferNode::process %lu", copied);
@@ -459,7 +474,8 @@ namespace io
     return Node::Result(length, nodes_.empty());
   }
 
-  Sink &Sink::operator<<(std::string &&s)
+  Sink &
+  Sink::operator<<(std::string &&s)
   {
     if (data_) {
       data_->nodes_.emplace_back(new StringNode(std::move(s)));

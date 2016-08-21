@@ -31,11 +31,9 @@
 #include <iterator>
 #include <map>
 
-
 // Constants and some declarations
 const char PLUGIN_NAME[] = "escalate";
 static int EscalateResponse(TSCont, TSEvent, void *);
-
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Hold information about the escalation / retry states for a remap rule.
@@ -60,12 +58,10 @@ struct EscalationState {
   }
 
   ~EscalationState() { TSContDestroy(cont); }
-
   TSCont cont;
   StatusMapType status_map;
   bool use_pristine;
 };
-
 
 // Little helper function, to update the Host portion of a URL, and stringify the result.
 // Returns the URL string, and updates url_len with the length.
@@ -88,7 +84,7 @@ MakeEscalateUrl(TSMBuffer mbuf, TSMLoc url, const char *host, size_t host_len, i
 static int
 EscalateResponse(TSCont cont, TSEvent event, void *edata)
 {
-  TSHttpTxn txn = (TSHttpTxn)edata;
+  TSHttpTxn txn       = (TSHttpTxn)edata;
   EscalationState *es = static_cast<EscalationState *>(TSContDataGet(cont));
   EscalationState::StatusMapType::const_iterator entry;
   TSMBuffer mbuf;
@@ -129,13 +125,12 @@ EscalateResponse(TSCont cont, TSEvent event, void *edata)
     if (es->use_pristine) {
       if (TS_SUCCESS == TSHttpTxnPristineUrlGet(txn, &mbuf, &url)) {
         url_str = MakeEscalateUrl(mbuf, url, entry->second.target.c_str(), entry->second.target.size(), url_len);
-        printf("STRING is %.*s\n", url_len, url_str);
+        TSHandleMLocRelease(mbuf, TS_NULL_MLOC, url);
       }
     } else {
       if (TS_SUCCESS == TSHttpTxnClientReqGet(txn, &mbuf, &hdrp)) {
         if (TS_SUCCESS == TSHttpHdrUrlGet(mbuf, hdrp, &url)) {
           url_str = MakeEscalateUrl(mbuf, url, entry->second.target.c_str(), entry->second.target.size(), url_len);
-          printf("Old code STRING is %.*s\n", url_len, url_str);
         }
         // Release the request MLoc
         TSHandleMLocRelease(mbuf, TS_NULL_MLOC, hdrp);
@@ -154,13 +149,11 @@ no_action:
   return TS_EVENT_NONE;
 }
 
-
 TSReturnCode
 TSRemapInit(TSRemapInterface * /* api */, char * /* errbuf */, int /* bufsz */)
 {
   return TS_SUCCESS;
 }
-
 
 TSReturnCode
 TSRemapNewInstance(int argc, char *argv[], void **instance, char *errbuf, int errbuf_size)
@@ -220,13 +213,11 @@ fail:
   return TS_ERROR;
 }
 
-
 void
 TSRemapDeleteInstance(void *instance)
 {
   delete static_cast<EscalationState *>(instance);
 }
-
 
 TSRemapStatus
 TSRemapDoRemap(void *instance, TSHttpTxn txn, TSRemapRequestInfo * /* rri */)

@@ -20,12 +20,12 @@
  * @file TransactionPlugin.cc
  */
 
-#include "atscppapi/TransactionPlugin.h"
-#include <ts/ts.h>
+#include <memory>
 #include <cstddef>
 #include <cassert>
+#include <ts/ts.h>
+#include "atscppapi/TransactionPlugin.h"
 #include "atscppapi/Mutex.h"
-#include "atscppapi/shared_ptr.h"
 #include "utils_internal.h"
 #include "atscppapi/noncopyable.h"
 #include "logging_internal.h"
@@ -39,7 +39,7 @@ using atscppapi::TransactionPlugin;
 struct atscppapi::TransactionPluginState : noncopyable {
   TSCont cont_;
   TSHttpTxn ats_txn_handle_;
-  shared_ptr<Mutex> mutex_;
+  std::shared_ptr<Mutex> mutex_;
   TransactionPluginState(TSHttpTxn ats_txn_handle) : ats_txn_handle_(ats_txn_handle), mutex_(new Mutex(Mutex::TYPE_RECURSIVE)) {}
 };
 
@@ -48,7 +48,7 @@ namespace
 static int
 handleTransactionPluginEvents(TSCont cont, TSEvent event, void *edata)
 {
-  TSHttpTxn txn = static_cast<TSHttpTxn>(edata);
+  TSHttpTxn txn             = static_cast<TSHttpTxn>(edata);
   TransactionPlugin *plugin = static_cast<TransactionPlugin *>(TSContDataGet(cont));
   LOG_DEBUG("cont=%p, event=%d, tshttptxn=%p, plugin=%p", cont, event, edata, plugin);
   atscppapi::utils::internal::invokePluginForEvent(plugin, txn, event);
@@ -59,14 +59,14 @@ handleTransactionPluginEvents(TSCont cont, TSEvent event, void *edata)
 
 TransactionPlugin::TransactionPlugin(Transaction &transaction)
 {
-  state_ = new TransactionPluginState(static_cast<TSHttpTxn>(transaction.getAtsHandle()));
+  state_        = new TransactionPluginState(static_cast<TSHttpTxn>(transaction.getAtsHandle()));
   TSMutex mutex = NULL;
   state_->cont_ = TSContCreate(handleTransactionPluginEvents, mutex);
   TSContDataSet(state_->cont_, static_cast<void *>(this));
   LOG_DEBUG("Creating new TransactionPlugin=%p tshttptxn=%p, cont=%p", this, state_->ats_txn_handle_, state_->cont_);
 }
 
-shared_ptr<Mutex>
+std::shared_ptr<Mutex>
 TransactionPlugin::getMutex()
 {
   return state_->mutex_;

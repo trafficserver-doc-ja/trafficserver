@@ -25,9 +25,9 @@
 #ifndef ATSCPPAPI_MUTEX_H_
 #define ATSCPPAPI_MUTEX_H_
 
+#include <memory>
 #include <pthread.h>
 #include <atscppapi/noncopyable.h>
-#include <atscppapi/shared_ptr.h>
 
 // Import in name only.
 typedef struct tsapi_mutex *TSMutex;
@@ -87,7 +87,6 @@ public:
   }
 
   ~Mutex() { pthread_mutex_destroy(&mutex); }
-
   /**
    * Try to take the lock, this call will NOT block if the mutex cannot be taken.
    * @return Returns true if the lock was taken, false if it was not. This call obviously will not block.
@@ -136,18 +135,16 @@ public:
    * @param mutex a reference to a Mutex.
    */
   explicit ScopedMutexLock(Mutex &mutex) : mutex_(mutex) { mutex_.lock(); }
-
   /**
    * Unlock the mutex.
    */
   ~ScopedMutexLock() { mutex_.unlock(); }
-
 private:
   Mutex &mutex_;
 };
 
 /**
- * @brief Take a shared_ptr to a Mutex and lock inside a scope and unlock when the scope is exited.
+ * @brief Take a std::shared_ptr to a Mutex and lock inside a scope and unlock when the scope is exited.
  *
  * This is an RAII implementation which will lock a mutex at the start of the
  * scope and unlock it when the scope is exited.
@@ -161,15 +158,13 @@ public:
    * Create the scoped mutex lock, once this object is constructed the lock will be held by the thread.
    * @param mutex a shared pointer to a Mutex.
    */
-  explicit ScopedSharedMutexLock(shared_ptr<Mutex> mutex) : mutex_(mutex) { mutex_->lock(); }
-
+  explicit ScopedSharedMutexLock(std::shared_ptr<Mutex> mutex) : mutex_(mutex) { mutex_->lock(); }
   /**
    * Unlock the mutex.
    */
   ~ScopedSharedMutexLock() { mutex_->unlock(); }
-
 private:
-  shared_ptr<Mutex> mutex_;
+  std::shared_ptr<Mutex> mutex_;
 };
 
 /**
@@ -189,7 +184,6 @@ public:
    * @param mutex a shared pointer to a Mutex.
    */
   explicit ScopedMutexTryLock(Mutex &mutex) : mutex_(mutex), has_lock_(false) { has_lock_ = mutex_.tryLock(); }
-
   /**
    * Unlock the mutex (if we hold the lock)
    */
@@ -215,7 +209,8 @@ private:
 };
 
 /**
- * @brief Take a shared_ptr to a Mutex and try to lock inside a scope and unlock when the scope is exited (if the lock was taken).
+ * @brief Take a std::shared_ptr to a Mutex and try to lock inside a scope and unlock when the scope is exited (if the lock was
+ * taken).
  *
  * This is an RAII implementation which will lock a mutex at the start of the
  * scope and unlock it when the scope is exited if the lock was taken.
@@ -230,8 +225,10 @@ public:
    * the lock.
    * @param mutex a shared pointer to a Mutex.
    */
-  explicit ScopedSharedMutexTryLock(shared_ptr<Mutex> mutex) : mutex_(mutex), has_lock_(false) { has_lock_ = mutex_->tryLock(); }
-
+  explicit ScopedSharedMutexTryLock(std::shared_ptr<Mutex> mutex) : mutex_(mutex), has_lock_(false)
+  {
+    has_lock_ = mutex_->tryLock();
+  }
   /**
    * Unlock the mutex (if we hold the lock)
    */
@@ -252,7 +249,7 @@ public:
   }
 
 private:
-  shared_ptr<Mutex> mutex_;
+  std::shared_ptr<Mutex> mutex_;
   bool has_lock_;
 };
 
@@ -281,6 +278,5 @@ private:
 };
 
 } /* atscppapi */
-
 
 #endif /* ATSCPPAPI_MUTEX_H_ */

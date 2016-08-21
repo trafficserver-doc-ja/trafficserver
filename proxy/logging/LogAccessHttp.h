@@ -21,7 +21,6 @@
   limitations under the License.
  */
 
-
 #ifndef LOG_ACCESS_HTTP_H
 #define LOG_ACCESS_HTTP_H
 
@@ -46,8 +45,9 @@ public:
   virtual ~LogAccessHttp();
 
   void init();
+
   LogEntryType
-  entry_type()
+  entry_type() const
   {
     return LOG_ENTRY_HTTP;
   }
@@ -71,22 +71,25 @@ public:
   virtual int marshal_client_req_http_version(char *);       // INT
   virtual int marshal_client_req_protocol_version(char *);   // STR
   virtual int marshal_client_req_header_len(char *);         // INT
-  virtual int marshal_client_req_body_len(char *);           // INT
+  virtual int marshal_client_req_content_len(char *);        // INT
+  virtual int marshal_client_req_squid_len(char *);          // INT
   virtual int marshal_client_req_tcp_reused(char *);         // INT
   virtual int marshal_client_req_is_ssl(char *);             // INT
   virtual int marshal_client_req_ssl_reused(char *);         // INT
-  virtual int marshal_client_finish_status_code(char *);     // INT
   virtual int marshal_client_security_protocol(char *);      // STR
   virtual int marshal_client_security_cipher_suite(char *);  // STR
+  virtual int marshal_client_finish_status_code(char *);     // INT
+  virtual int marshal_client_req_id(char *);                 // INT
+  virtual int marshal_client_req_uuid(char *);               // STR
 
   //
   // proxy -> client fields
   //
   virtual int marshal_proxy_resp_content_type(char *);  // STR
-  virtual int marshal_proxy_resp_squid_len(char *);     // INT
-  virtual int marshal_proxy_resp_content_len(char *);   // INT
-  virtual int marshal_proxy_resp_status_code(char *);   // INT
   virtual int marshal_proxy_resp_header_len(char *);    // INT
+  virtual int marshal_proxy_resp_content_len(char *);   // INT
+  virtual int marshal_proxy_resp_squid_len(char *);     // INT
+  virtual int marshal_proxy_resp_status_code(char *);   // INT
   virtual int marshal_proxy_finish_status_code(char *); // INT
   virtual int marshal_cache_result_code(char *);        // INT
   virtual int marshal_cache_hit_miss(char *);           // INT
@@ -95,7 +98,8 @@ public:
   // proxy -> server fields
   //
   virtual int marshal_proxy_req_header_len(char *);  // INT
-  virtual int marshal_proxy_req_body_len(char *);    // INT
+  virtual int marshal_proxy_req_content_len(char *); // INT
+  virtual int marshal_proxy_req_squid_len(char *);   // INT
   virtual int marshal_proxy_req_server_name(char *); // STR
   virtual int marshal_proxy_req_server_ip(char *);   // INT
   virtual int marshal_proxy_req_server_port(char *); // INT
@@ -109,8 +113,9 @@ public:
   virtual int marshal_server_host_ip(char *);           // INT
   virtual int marshal_server_host_name(char *);         // STR
   virtual int marshal_server_resp_status_code(char *);  // INT
-  virtual int marshal_server_resp_content_len(char *);  // INT
   virtual int marshal_server_resp_header_len(char *);   // INT
+  virtual int marshal_server_resp_content_len(char *);  // INT
+  virtual int marshal_server_resp_squid_len(char *);    // INT
   virtual int marshal_server_resp_http_version(char *); // INT
   virtual int marshal_server_resp_time_ms(char *);      // INT
   virtual int marshal_server_resp_time_s(char *);       // INT
@@ -121,8 +126,9 @@ public:
   // cache -> client fields
   //
   virtual int marshal_cache_resp_status_code(char *);  // INT
-  virtual int marshal_cache_resp_content_len(char *);  // INT
   virtual int marshal_cache_resp_header_len(char *);   // INT
+  virtual int marshal_cache_resp_content_len(char *);  // INT
+  virtual int marshal_cache_resp_squid_len(char *);    // INT
   virtual int marshal_cache_resp_http_version(char *); // INT
 
   //

@@ -27,9 +27,9 @@ ParentConsistentHash::ParentConsistentHash(ParentRecord *parent_record)
   int i;
 
   ink_assert(parent_record->num_parents > 0);
-  parents[PRIMARY] = parent_record->parents;
+  parents[PRIMARY]   = parent_record->parents;
   parents[SECONDARY] = parent_record->secondary_parents;
-  ignore_query = parent_record->ignore_query;
+  ignore_query       = parent_record->ignore_query;
   ink_zero(foundParents);
 
   chash[PRIMARY] = new ATSConsistentHash();
@@ -57,7 +57,6 @@ ParentConsistentHash::~ParentConsistentHash()
   delete chash[PRIMARY];
   delete chash[SECONDARY];
 }
-
 
 uint64_t
 ParentConsistentHash::getPathHash(HttpRequestData *hrdata, ATSHash64 *h)
@@ -93,10 +92,10 @@ ParentConsistentHash::selectParent(const ParentSelectionPolicy *policy, bool fir
   ATSHash64Sip24 hash;
   ATSConsistentHash *fhash;
   HttpRequestData *request_info = static_cast<HttpRequestData *>(rdata);
-  bool firstCall = first_call;
-  bool parentRetry = false;
-  bool wrap_around[2] = {false, false};
-  uint64_t path_hash = 0;
+  bool firstCall                = first_call;
+  bool parentRetry              = false;
+  bool wrap_around[2]           = {false, false};
+  uint64_t path_hash            = 0;
   uint32_t last_lookup;
   pRecord *prtmp = NULL, *pRec = NULL;
 
@@ -105,42 +104,45 @@ ParentConsistentHash::selectParent(const ParentSelectionPolicy *policy, bool fir
 
   // Should only get into this state if we are supposed to go direct.
   if (parents[PRIMARY] == NULL && parents[SECONDARY] == NULL) {
-    if (result->rec->go_direct == true) {
-      result->r = PARENT_DIRECT;
+    if (result->rec->go_direct == true && result->rec->parent_is_proxy == true) {
+      result->result = PARENT_DIRECT;
     } else {
-      result->r = PARENT_FAIL;
+      result->result = PARENT_FAIL;
     }
     result->hostname = NULL;
-    result->port = 0;
+    result->port     = 0;
     return;
   }
 
   // findParent() call if firstCall.
   if (firstCall) {
     last_lookup = PRIMARY;
-    path_hash = getPathHash(request_info, (ATSHash64 *)&hash);
-    fhash = chash[PRIMARY];
+    path_hash   = getPathHash(request_info, (ATSHash64 *)&hash);
+    fhash       = chash[PRIMARY];
     if (path_hash) {
-      prtmp = (pRecord *)fhash->lookup_by_hashval(path_hash, &chashIter[last_lookup], &wrap_around[last_lookup]);
-      if (prtmp)
+      prtmp = (pRecord *)fhash->lookup_by_hashval(path_hash, &result->chashIter[last_lookup], &wrap_around[last_lookup]);
+      if (prtmp) {
         pRec = (parents[last_lookup] + prtmp->idx);
+      }
     }
     // else called by nextParent().
   } else {
     if (chash[SECONDARY] != NULL) {
       last_lookup = SECONDARY;
-      fhash = chash[SECONDARY];
-      path_hash = getPathHash(request_info, (ATSHash64 *)&hash);
-      prtmp = (pRecord *)fhash->lookup_by_hashval(path_hash, &chashIter[last_lookup], &wrap_around[last_lookup]);
-      if (prtmp)
+      fhash       = chash[SECONDARY];
+      path_hash   = getPathHash(request_info, (ATSHash64 *)&hash);
+      prtmp       = (pRecord *)fhash->lookup_by_hashval(path_hash, &result->chashIter[last_lookup], &wrap_around[last_lookup]);
+      if (prtmp) {
         pRec = (parents[last_lookup] + prtmp->idx);
+      }
     } else {
       last_lookup = PRIMARY;
-      fhash = chash[PRIMARY];
+      fhash       = chash[PRIMARY];
       do { // search until we've selected a different parent.
-        prtmp = (pRecord *)fhash->lookup(NULL, &chashIter[last_lookup], &wrap_around[last_lookup], &hash);
-        if (prtmp)
+        prtmp = (pRecord *)fhash->lookup(NULL, &result->chashIter[last_lookup], &wrap_around[last_lookup], &hash);
+        if (prtmp) {
           pRec = (parents[last_lookup] + prtmp->idx);
+        }
       } while (prtmp && strcmp(prtmp->hostname, result->hostname) == 0);
     }
   }
@@ -156,8 +158,8 @@ ParentConsistentHash::selectParent(const ParentSelectionPolicy *policy, bool fir
           // make sure that the proper state is recorded in the result structure
           result->last_parent = pRec->idx;
           result->last_lookup = last_lookup;
-          result->retry = parentRetry;
-          result->r = PARENT_SPECIFIED;
+          result->retry       = parentRetry;
+          result->result      = PARENT_SPECIFIED;
           Debug("parent_select", "Down parent %s is now retryable, marked it available.", pRec->hostname);
           break;
         }
@@ -166,17 +168,17 @@ ParentConsistentHash::selectParent(const ParentSelectionPolicy *policy, bool fir
       if (!wrap_around[PRIMARY] || (chash[SECONDARY] != NULL)) {
         Debug("parent_select", "Selected parent %s is not available, looking up another parent.", pRec->hostname);
         if (chash[SECONDARY] != NULL && !wrap_around[SECONDARY]) {
-          fhash = chash[SECONDARY];
+          fhash       = chash[SECONDARY];
           last_lookup = SECONDARY;
         } else {
-          fhash = chash[PRIMARY];
+          fhash       = chash[PRIMARY];
           last_lookup = PRIMARY;
         }
         if (firstCall) {
-          prtmp = (pRecord *)fhash->lookup_by_hashval(path_hash, &chashIter[last_lookup], &wrap_around[last_lookup]);
+          prtmp     = (pRecord *)fhash->lookup_by_hashval(path_hash, &result->chashIter[last_lookup], &wrap_around[last_lookup]);
           firstCall = false;
         } else {
-          prtmp = (pRecord *)fhash->lookup(NULL, &chashIter[last_lookup], &wrap_around[last_lookup], &hash);
+          prtmp = (pRecord *)fhash->lookup(NULL, &result->chashIter[last_lookup], &wrap_around[last_lookup], &hash);
         }
 
         if (prtmp) {
@@ -196,25 +198,25 @@ ParentConsistentHash::selectParent(const ParentSelectionPolicy *policy, bool fir
   }
 
   // use the available or marked for retry parent.
-  if ((pRec && pRec->available) || result->retry) {
-    result->r = PARENT_SPECIFIED;
-    result->hostname = pRec->hostname;
-    result->port = pRec->port;
+  if (pRec && (pRec->available || result->retry)) {
+    result->result      = PARENT_SPECIFIED;
+    result->hostname    = pRec->hostname;
+    result->port        = pRec->port;
     result->last_parent = pRec->idx;
     result->last_lookup = last_lookup;
-    result->retry = parentRetry;
+    result->retry       = parentRetry;
     ink_assert(result->hostname != NULL);
     ink_assert(result->port != 0);
     Debug("parent_select", "Chosen parent: %s.%d", result->hostname, result->port);
   } else {
-    if (result->rec->go_direct == true) {
-      result->r = PARENT_DIRECT;
+    if (result->rec->go_direct == true && result->rec->parent_is_proxy == true) {
+      result->result = PARENT_DIRECT;
     } else {
-      result->r = PARENT_FAIL;
+      result->result = PARENT_FAIL;
     }
     result->hostname = NULL;
-    result->port = 0;
-    result->retry = false;
+    result->port     = 0;
+    result->retry    = false;
   }
 
   return;
@@ -231,13 +233,13 @@ ParentConsistentHash::markParentDown(const ParentSelectionPolicy *policy, Parent
 
   //  Make sure that we are being called back with with a
   //   result structure with a parent
-  ink_assert(result->r == PARENT_SPECIFIED);
-  if (result->r != PARENT_SPECIFIED) {
+  ink_assert(result->result == PARENT_SPECIFIED);
+  if (result->result != PARENT_SPECIFIED) {
     return;
   }
   // If we were set through the API we currently have not failover
   //   so just return fail
-  if (result->rec == extApiRecord) {
+  if (result->is_api_result()) {
     return;
   }
 
@@ -307,13 +309,13 @@ ParentConsistentHash::markParentUp(ParentResult *result)
   //  Make sure that we are being called back with with a
   //   result structure with a parent that is being retried
   ink_release_assert(result->retry == true);
-  ink_assert(result->r == PARENT_SPECIFIED);
-  if (result->r != PARENT_SPECIFIED) {
+  ink_assert(result->result == PARENT_SPECIFIED);
+  if (result->result != PARENT_SPECIFIED) {
     return;
   }
   // If we were set through the API we currently have not failover
   //   so just return fail
-  if (result->rec == extApiRecord) {
+  if (result->is_api_result()) {
     ink_assert(0);
     return;
   }

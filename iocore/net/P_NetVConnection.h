@@ -33,13 +33,19 @@ NetVConnection::get_remote_addr()
   return &remote_addr.sa;
 }
 
+TS_INLINE IpEndpoint const &
+NetVConnection::get_remote_endpoint()
+{
+  get_remote_addr(); // Make sure the vallue is filled in
+  return remote_addr;
+}
+
 TS_INLINE in_addr_t
 NetVConnection::get_remote_ip()
 {
   sockaddr const *addr = this->get_remote_addr();
   return ats_is_ip4(addr) ? ats_ip4_addr_cast(addr) : 0;
 }
-
 
 /// @return The remote port in host order.
 TS_INLINE uint16_t

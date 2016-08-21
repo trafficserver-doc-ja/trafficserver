@@ -26,7 +26,6 @@
   easily remembered names can be used to refer to log fields of integer type.
  */
 
-
 #ifndef LOG_FIELD_ALIAS_MAP_H
 #define LOG_FIELD_ALIAS_MAP_H
 
@@ -70,7 +69,6 @@ to a LogField object) without the object having to worry about freeing
 any memory the map may have allocated.
 
  *****************************************************************************/
-
 
 class LogFieldAliasMap : public RefCountObj
 {
@@ -129,9 +127,7 @@ private:
 
 public:
   LogFieldAliasTable() : m_min(0), m_max(0), m_entries(0), m_table(0) {}
-
   ~LogFieldAliasTable() { delete[] m_table; }
-
   void init(size_t numPairs, ...);
 
   int
@@ -151,7 +147,7 @@ public:
         found = false;
       }
       if (found) {
-        *val = (unsigned int)(i + m_min);
+        *val   = (unsigned int)(i + m_min);
         retVal = ALL_OK;
         break;
       }
@@ -172,14 +168,14 @@ public:
       if (l < bufLen) {
         ink_strlcpy(buf, m_table[key - m_min].name, bufLen);
         numChars = l;
-        retVal = ALL_OK;
+        retVal   = ALL_OK;
       } else {
         numChars = 0;
-        retVal = BUFFER_TOO_SMALL;
+        retVal   = BUFFER_TOO_SMALL;
       }
     } else {
       numChars = 0;
-      retVal = INVALID_INT;
+      retVal   = INVALID_INT;
     }
     if (numCharsPtr) {
       *numCharsPtr = numChars;
@@ -217,7 +213,6 @@ public:
     return (LogUtils::timestamp_to_hex_str(time, buf, bufLen, numCharsPtr) ? BUFFER_TOO_SMALL : ALL_OK);
   }
 };
-
 
 // LOG_FIELD_ALIAS_MAP_H
 #endif

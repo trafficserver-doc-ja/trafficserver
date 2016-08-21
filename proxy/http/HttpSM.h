@@ -39,8 +39,7 @@
 #include "HttpTransact.h"
 #include "HttpTunnel.h"
 #include "InkAPIInternal.h"
-#include "StatSystem.h"
-#include "HttpClientSession.h"
+#include "../ProxyClientTransaction.h"
 #include "HdrUtils.h"
 //#include "AuthHttpAdapter.h"
 
@@ -145,20 +144,20 @@ struct HttpTransformInfo {
 
 enum {
   HTTP_SM_MAGIC_ALIVE = 0x0000FEED,
-  HTTP_SM_MAGIC_DEAD = 0xDEADFEED,
+  HTTP_SM_MAGIC_DEAD  = 0xDEADFEED,
 };
 
 enum {
-  HTTP_SM_POST_UNKNOWN = 0,
-  HTTP_SM_POST_UA_FAIL = 1,
+  HTTP_SM_POST_UNKNOWN     = 0,
+  HTTP_SM_POST_UA_FAIL     = 1,
   HTTP_SM_POST_SERVER_FAIL = 2,
-  HTTP_SM_POST_SUCCESS = 3,
+  HTTP_SM_POST_SUCCESS     = 3,
 };
 
 enum {
-  HTTP_SM_TRANSFORM_OPEN = 0,
+  HTTP_SM_TRANSFORM_OPEN   = 0,
   HTTP_SM_TRANSFORM_CLOSED = 1,
-  HTTP_SM_TRANSFORM_FAIL = 2,
+  HTTP_SM_TRANSFORM_FAIL   = 2,
 };
 
 enum HttpApiState_t {
@@ -167,7 +166,6 @@ enum HttpApiState_t {
   HTTP_API_DEFERED_CLOSE,
   HTTP_API_DEFERED_SERVER_ERROR,
 };
-
 
 enum HttpPluginTunnel_t {
   HTTP_NO_PLUGIN_TUNNEL = 0,
@@ -194,7 +192,7 @@ public:
 
   void init();
 
-  void attach_client_session(HttpClientSession *client_vc_arg, IOBufferReader *buffer_reader);
+  void attach_client_session(ProxyClientTransaction *client_vc_arg, IOBufferReader *buffer_reader);
 
   // Called by httpSessionManager so that we can reset
   //  the session timeouts and initiate a read while
@@ -302,7 +300,7 @@ protected:
   void remove_ua_entry();
 
 public:
-  HttpClientSession *ua_session;
+  ProxyClientTransaction *ua_session;
   BackgroundFill_t background_fill;
   // AuthHttpAdapter authAdapter;
   void set_http_schedule(Continuation *);
@@ -337,7 +335,6 @@ protected:
 
   HttpSMHandler default_handler;
   Action *pending_action;
-  Action *historical_action;
   Continuation *schedule_cont;
 
   HTTPParser http_parser;
@@ -411,6 +408,7 @@ protected:
   void do_hostdb_reverse_lookup();
   void do_cache_lookup_and_read();
   void do_http_server_open(bool raw = false);
+  void send_origin_throttled_response();
   void do_setup_post_tunnel(HttpVC_t to_vc_type);
   void do_cache_prepare_write();
   void do_cache_prepare_write_transform();
@@ -497,6 +495,7 @@ public:
   // Info about client's SSL connection.
   bool client_ssl_reused;
   bool client_connection_is_ssl;
+  const char *client_protocol;
   const char *client_sec_protocol;
   const char *client_cipher_suite;
   int server_transact_count;
@@ -549,6 +548,11 @@ public:
 
 public:
   bool set_server_session_private(bool private_session);
+  bool
+  is_dying() const
+  {
+    return terminate_sm;
+  }
 };
 
 // Function to get the cache_sm object - YTS Team, yamsat
@@ -601,9 +605,9 @@ HttpSM::write_response_header_into_buffer(HTTPHdr *h, MIOBuffer *b)
 inline void
 HttpSM::add_history_entry(const char *fileline, int event, int reentrant)
 {
-  int pos = history_pos++ % HISTORY_SIZE;
-  history[pos].fileline = fileline;
-  history[pos].event = (unsigned short)event;
+  int pos                 = history_pos++ % HISTORY_SIZE;
+  history[pos].fileline   = fileline;
+  history[pos].event      = (unsigned short)event;
   history[pos].reentrancy = (short)reentrant;
 }
 
@@ -640,11 +644,11 @@ HttpSM::add_cache_sm()
     second_cache_sm = new HttpCacheSM;
     second_cache_sm->init(this, mutex);
     if (t_state.cache_info.object_read != NULL) {
-      second_cache_sm->cache_read_vc = cache_sm.cache_read_vc;
-      cache_sm.cache_read_vc = NULL;
-      second_cache_sm->read_locked = cache_sm.read_locked;
+      second_cache_sm->cache_read_vc        = cache_sm.cache_read_vc;
+      cache_sm.cache_read_vc                = NULL;
+      second_cache_sm->read_locked          = cache_sm.read_locked;
       t_state.cache_info.second_object_read = t_state.cache_info.object_read;
-      t_state.cache_info.object_read = NULL;
+      t_state.cache_info.object_read        = NULL;
     }
   }
 }
@@ -652,7 +656,8 @@ HttpSM::add_cache_sm()
 inline bool
 HttpSM::is_transparent_passthrough_allowed()
 {
-  return (t_state.client_info.is_transparent && ua_session->f_transparent_passthrough && ua_session->get_transact_count() == 1);
+  return (t_state.client_info.is_transparent && ua_session->is_transparent_passthrough_allowed() &&
+          ua_session->get_transact_count() == 1);
 }
 
 #endif

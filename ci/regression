@@ -89,7 +89,6 @@ configure() {
       --enable-example-plugins \
       --enable-test-tools \
       --enable-experimental-plugins \
-      --enable-cppapi \
       $(extras) \
       CC="$CC" \
       CXX="$CXX" \
@@ -105,7 +104,7 @@ build() {
 # Run extended (level 3) regressions.
 regress() {
   ( cd $OBJROOT && $MAKE check ) && \
-  $DSTROOT/bin/traffic_server -R 3
+  $DSTROOT/bin/traffic_server -k -K -R 1
 }
 
 CC=${CC:-$(prog cc)}

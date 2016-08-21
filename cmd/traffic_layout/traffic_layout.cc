@@ -45,7 +45,6 @@ const ArgumentDescription argument_descriptions[] = {
   HELP_ARGUMENT_DESCRIPTION(),
   VERSION_ARGUMENT_DESCRIPTION()};
 
-
 // Produce output about compile time features, useful for checking how things were built, as well
 // as for our TSQA test harness.
 static void
@@ -93,7 +92,6 @@ produce_features(bool json)
   print_feature("TS_USE_POSIX_CAP", TS_USE_POSIX_CAP, json);
   print_feature("TS_USE_TPROXY", TS_USE_TPROXY, json);
   print_feature("TS_HAS_SO_MARK", TS_HAS_SO_MARK, json);
-  print_feature("TS_HAS_SPDY", TS_HAS_SPDY, json);
   print_feature("TS_HAS_IP_TOS", TS_HAS_IP_TOS, json);
   print_feature("TS_USE_HWLOC", TS_USE_HWLOC, json);
   print_feature("TS_USE_TLS_NPN", TS_USE_TLS_NPN, json);
@@ -123,7 +121,6 @@ produce_features(bool json)
     printf("}\n");
   }
 }
-
 
 static void
 print_var(const char *name, char *value, bool json, bool free = true, bool last = false)

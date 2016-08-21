@@ -106,7 +106,7 @@
     if (_already == false)                                  \
       pmgmt->signalManager(MGMT_SIGNAL_CONFIG_ERROR, _buf); \
     _already = true;                                        \
-    Warning("%s", _buf);                                    \
+    Error("%s", _buf);                                      \
   }
 
 class HostLookup;
@@ -121,8 +121,8 @@ public:
   //  depending on how the module user wants to key
   //  the table
   virtual ~RequestData() {}
-  virtual char *get_string() = 0;
-  virtual const char *get_host() = 0;
+  virtual char *get_string()       = 0;
+  virtual const char *get_host()   = 0;
   virtual sockaddr const *get_ip() = 0;
 
   virtual sockaddr const *get_client_ip() = 0;
@@ -152,7 +152,6 @@ public:
   char *tag;
   bool internal_txn;
 };
-
 
 template <class Data, class Result> class UrlMatcher
 {
@@ -185,7 +184,6 @@ protected:
   const char *matcher_name; // Used for Debug/Warning/Error messages
   const char *file_name;    // Used for Debug/Warning/Error messages
 };
-
 
 template <class Data, class Result> class RegexMatcher
 {
@@ -290,7 +288,6 @@ public:
   const char *matcher_name; // Used for Debug/Warning/Error messages
   const char *file_name;    // Used for Debug/Warning/Error messages
 };
-
 
 #define ALLOW_HOST_TABLE 1 << 0
 #define ALLOW_IP_TABLE 1 << 1

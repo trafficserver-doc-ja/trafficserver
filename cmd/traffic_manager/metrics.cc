@@ -36,7 +36,6 @@
 
 struct Evaluator {
   Evaluator() : rec_name(NULL), data_type(RECD_NULL), ref(-1) {}
-
   ~Evaluator()
   {
     ats_free(this->rec_name);
@@ -146,7 +145,6 @@ struct EvaluatorList {
     ink_hrtime elapsed;
 
     forv_Vec(Evaluator, e, this->evaluators) { e->eval(L); }
-
     elapsed = ink_hrtime_diff(ink_get_hrtime_internal(), start);
     Debug("lua", "evaluated %u metrics in %fmsec", evaluators.length(), ink_hrtime_to_usec(elapsed) / 1000.0);
   }
@@ -189,7 +187,7 @@ metrics_register_evaluator(lua_State *L)
   // The evaluation chunk is the (only) argument.
   chunk = lua_tostring(L, -1);
 
-  binding = BindingInstance::self(L);
+  binding    = BindingInstance::self(L);
   evaluators = (EvaluatorList *)binding->retrieve_ptr("evaluators");
 
   ink_release_assert(evaluators != NULL);
@@ -206,7 +204,7 @@ metrics_create_record(lua_State *L, RecDataT data_type)
 {
   const char *name;
   RecT rec_type = RECT_NULL;
-  int error = REC_ERR_FAIL;
+  int error     = REC_ERR_FAIL;
 
   BindingInstance::typecheck(L, "record.create", LUA_TSTRING, LUA_TNONE);
 
@@ -290,7 +288,7 @@ metrics_cluster_sum(lua_State *L)
 
   // Sum the cluster value.
   if (!overviewGenerator->varClusterDataFromName(data_type, rec_name, &rec_data)) {
-    RecDataClear(data_type, &rec_data);
+    RecDataZero(data_type, &rec_data);
 
     // If we can't get any cluster data, return nil. This will generally cause the
     // evaluator to fail, which is handled by logging and ignoring the failure.
@@ -338,7 +336,7 @@ metrics_binding_initialize(BindingInstance &binding)
   binding.bind_function("metrics.cluster.sum", metrics_cluster_sum);
 
   binding.bind_constant("metrics.now.msec", timestamp_now_msec());
-  binding.bind_constant("metrics.update.pass", int64_t(0));
+  binding.bind_constant("metrics.update.pass", lua_Integer(0));
 
   // Stash a backpointer to the evaluators.
   binding.attach_ptr("evaluators", new EvaluatorList());

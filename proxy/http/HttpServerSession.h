@@ -62,19 +62,30 @@ enum HSS_State {
 
 enum {
   HTTP_SS_MAGIC_ALIVE = 0x0123FEED,
-  HTTP_SS_MAGIC_DEAD = 0xDEADFEED,
+  HTTP_SS_MAGIC_DEAD  = 0xDEADFEED,
 };
 
 class HttpServerSession : public VConnection
 {
 public:
   HttpServerSession()
-    : VConnection(NULL), hostname_hash(), con_id(0), transact_count(0), state(HSS_INIT), to_parent_proxy(false),
-      server_trans_stat(0), private_session(false), sharing_match(TS_SERVER_SESSION_SHARING_MATCH_BOTH),
-      sharing_pool(TS_SERVER_SESSION_SHARING_POOL_GLOBAL), enable_origin_connection_limiting(false), connection_count(NULL),
-      read_buffer(NULL), server_vc(NULL), magic(HTTP_SS_MAGIC_DEAD), buf_reader(NULL)
+    : VConnection(NULL),
+      hostname_hash(),
+      con_id(0),
+      transact_count(0),
+      state(HSS_INIT),
+      to_parent_proxy(false),
+      server_trans_stat(0),
+      private_session(false),
+      sharing_match(TS_SERVER_SESSION_SHARING_MATCH_BOTH),
+      sharing_pool(TS_SERVER_SESSION_SHARING_POOL_GLOBAL),
+      enable_origin_connection_limiting(false),
+      connection_count(NULL),
+      read_buffer(NULL),
+      server_vc(NULL),
+      magic(HTTP_SS_MAGIC_DEAD),
+      buf_reader(NULL)
   {
-    ink_zero(server_ip);
   }
 
   void destroy();
@@ -87,7 +98,7 @@ public:
     ink_assert(buf_reader != NULL);
     read_buffer->dealloc_all_readers();
     read_buffer->_writer = NULL;
-    buf_reader = read_buffer->alloc_reader();
+    buf_reader           = read_buffer->alloc_reader();
   }
 
   IOBufferReader *
@@ -119,7 +130,12 @@ public:
   }
 
   // Keys for matching hostnames
-  IpEndpoint server_ip;
+  IpEndpoint const &
+  get_server_ip() const
+  {
+    ink_release_assert(server_vc != NULL);
+    return server_vc->get_remote_endpoint();
+  }
   INK_MD5 hostname_hash;
 
   int64_t con_id;

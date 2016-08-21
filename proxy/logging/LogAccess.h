@@ -106,7 +106,7 @@
 #define DEFAULT_STR_FIELD         \
   {                               \
     char *str = NULL;             \
-    int len = INK_MIN_ALIGN;      \
+    int len   = INK_MIN_ALIGN;    \
     if (buf) {                    \
       marshal_str(buf, str, len); \
     }                             \
@@ -122,7 +122,7 @@
     return len;                    \
   }
 
-// should be at least 22 bytes to always accomodate a converted
+// should be at least 22 bytes to always accommodate a converted
 // MgmtInt, MgmtIntCounter or MgmtFloat. 22 bytes is enough for 64 bit
 // ints + sign + eos, and enough for %e floating point representation
 // + eos
@@ -151,7 +151,6 @@ enum LogCacheWriteCodeType {
   N_LOG_CACHE_WRITE_TYPES
 };
 
-
 class LogAccess
 { // Abstract Base Class
 public:
@@ -162,10 +161,9 @@ public:
   }
 
   inkcoreapi virtual ~LogAccess() {}
-
   inkcoreapi virtual void init();
 
-  virtual LogEntryType entry_type() = 0;
+  virtual LogEntryType entry_type() const = 0;
 
   //
   // client -> proxy fields
@@ -187,14 +185,17 @@ public:
   inkcoreapi virtual int marshal_client_req_url_scheme(char *);         // STR
   inkcoreapi virtual int marshal_client_req_http_version(char *);       // INT
   inkcoreapi virtual int marshal_client_req_protocol_version(char *);   // STR
+  inkcoreapi virtual int marshal_client_req_squid_len(char *);          // INT
   inkcoreapi virtual int marshal_client_req_header_len(char *);         // INT
-  inkcoreapi virtual int marshal_client_req_body_len(char *);           // INT
+  inkcoreapi virtual int marshal_client_req_content_len(char *);        // INT
   inkcoreapi virtual int marshal_client_req_tcp_reused(char *);         // INT
   inkcoreapi virtual int marshal_client_req_is_ssl(char *);             // INT
   inkcoreapi virtual int marshal_client_req_ssl_reused(char *);         // INT
-  inkcoreapi virtual int marshal_client_finish_status_code(char *);     // INT
   inkcoreapi virtual int marshal_client_security_protocol(char *);      // STR
   inkcoreapi virtual int marshal_client_security_cipher_suite(char *);  // STR
+  inkcoreapi virtual int marshal_client_finish_status_code(char *);     // INT
+  inkcoreapi virtual int marshal_client_req_id(char *);                 // INT
+  inkcoreapi virtual int marshal_client_req_uuid(char *);               // STR
 
   //
   // proxy -> client fields
@@ -213,7 +214,8 @@ public:
   // proxy -> server fields
   //
   inkcoreapi virtual int marshal_proxy_req_header_len(char *);  // INT
-  inkcoreapi virtual int marshal_proxy_req_body_len(char *);    // INT
+  inkcoreapi virtual int marshal_proxy_req_squid_len(char *);   // INT
+  inkcoreapi virtual int marshal_proxy_req_content_len(char *); // INT
   inkcoreapi virtual int marshal_proxy_req_server_name(char *); // STR
   inkcoreapi virtual int marshal_proxy_req_server_ip(char *);   // INT
   inkcoreapi virtual int marshal_proxy_req_server_port(char *); // INT
@@ -228,6 +230,7 @@ public:
   inkcoreapi virtual int marshal_server_host_ip(char *);           // INT
   inkcoreapi virtual int marshal_server_host_name(char *);         // STR
   inkcoreapi virtual int marshal_server_resp_status_code(char *);  // INT
+  inkcoreapi virtual int marshal_server_resp_squid_len(char *);    // INT
   inkcoreapi virtual int marshal_server_resp_content_len(char *);  // INT
   inkcoreapi virtual int marshal_server_resp_header_len(char *);   // INT
   inkcoreapi virtual int marshal_server_resp_http_version(char *); // INT
@@ -240,10 +243,10 @@ public:
   // cache -> client fields
   //
   inkcoreapi virtual int marshal_cache_resp_status_code(char *);  // INT
+  inkcoreapi virtual int marshal_cache_resp_squid_len(char *);    // INT
   inkcoreapi virtual int marshal_cache_resp_content_len(char *);  // INT
   inkcoreapi virtual int marshal_cache_resp_header_len(char *);   // INT
   inkcoreapi virtual int marshal_cache_resp_http_version(char *); // INT
-
 
   inkcoreapi virtual void set_client_req_url(char *, int){};                // STR
   inkcoreapi virtual void set_client_req_url_canon(char *, int){};          // STR
@@ -265,14 +268,16 @@ public:
 
   // other fields
   //
-  inkcoreapi virtual int marshal_transfer_time_ms(char *);       // INT
-  inkcoreapi virtual int marshal_transfer_time_s(char *);        // INT
-  inkcoreapi virtual int marshal_file_size(char *);              // INT
-  inkcoreapi virtual int marshal_plugin_identity_id(char *);     // INT
-  inkcoreapi virtual int marshal_plugin_identity_tag(char *);    // STR
-  inkcoreapi virtual int marshal_cache_lookup_url_canon(char *); // STR
-  int marshal_entry_type(char *);                                // INT
+  inkcoreapi virtual int marshal_transfer_time_ms(char *);    // INT
+  inkcoreapi virtual int marshal_transfer_time_s(char *);     // INT
+  inkcoreapi virtual int marshal_file_size(char *);           // INT
+  inkcoreapi virtual int marshal_plugin_identity_id(char *);  // INT
+  inkcoreapi virtual int marshal_plugin_identity_tag(char *); // STR
+  inkcoreapi virtual int marshal_process_uuid(char *);        // STR
 
+  // These two are special, in that they are shared for all log types / implementations
+  inkcoreapi int marshal_entry_type(char *);             // INT
+  inkcoreapi int marshal_cache_lookup_url_canon(char *); // STR
 
   // named fields from within a http header
   //

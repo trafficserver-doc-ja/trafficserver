@@ -21,7 +21,6 @@ AM_CPPFLAGS = \
   $(LUAJIT_CPPFLAGS) \
   $(iocore_include_dirs) \
   -I$(top_srcdir)/lib/records \
-  -I$(top_srcdir)/proxy \
   -I$(top_srcdir)/proxy/hdrs \
   -I$(top_srcdir)/proxy/shared \
   -I$(top_srcdir)/mgmt \
@@ -41,23 +40,14 @@ AM_LDFLAGS = \
   @EXPAT_LDFLAGS@ \
   @OPENSSL_LDFLAGS@
 
-AM_LDFLAGS += \
-  $(LUAJIT_LDFLAGS)
-
 traffic_manager_SOURCES = \
   AddConfigFilesHere.cc \
-  traffic_manager.cc \
-  metrics.cc \
-  StatProcessor.cc \
-  StatProcessor.h \
-  StatType.cc \
-  StatType.h \
-  StatXML.cc \
-  StatXML.h \
   MgmtHandlers.cc \
   MgmtHandlers.h \
   WebOverview.cc \
-  WebOverview.h
+  WebOverview.h \
+  metrics.h \
+  traffic_manager.cc
 
 traffic_manager_LDADD = \
   $(top_builddir)/mgmt/api/libmgmtapilocal.la \
@@ -69,11 +59,15 @@ traffic_manager_LDADD = \
   $(top_builddir)/proxy/shared/liberror.a \
   $(top_builddir)/proxy/shared/libdiagsconfig.a
 
-if BUILD_LUAJIT
+AM_LDFLAGS += \
+  $(LUAJIT_LDFLAGS)
+
+traffic_manager_SOURCES += \
+  metrics.cc
+
 traffic_manager_LDADD += \
   $(top_builddir)/lib/bindings/libbindings.la \
   $(top_builddir)/lib/luajit/src/libluajit.a
-endif
 
 traffic_manager_LDADD +=\
   $(LIBUNWIND_LIBS) \
@@ -87,3 +81,8 @@ traffic_manager_LDADD += \
   $(top_builddir)/lib/tsconfig/libtsconfig.la \
   @OPENSSL_LIBS@
 endif
+
+include $(top_srcdir)/build/tidy.mk
+
+tidy-local: $(DIST_SOURCES)
+	$(CXX_Clang_Tidy)
